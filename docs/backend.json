@@ -1,0 +1,64 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Details for students and staff using the library.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "college": { "type": "string" },
+        "studentId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "blocked": { "type": "boolean" },
+        "blockReason": { "type": "string" }
+      },
+      "required": ["uid", "displayName", "studentId", "role"]
+    },
+    "Visit": {
+      "title": "Library Visit",
+      "description": "A record of a library entry.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "college": { "type": "string" },
+        "purpose": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "loginMethod": { "type": "string", "enum": ["id", "google"] }
+      },
+      "required": ["studentId", "fullName", "purpose", "timestamp", "loginMethod"]
+    },
+    "BlocklistEntry": {
+      "title": "Blocklist Entry",
+      "description": "Record of a blocked student.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "reason": { "type": "string" },
+        "blockedBy": { "type": "string" },
+        "blockedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "reason", "blockedBy", "blockedAt"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data and permissions."
+    },
+    "/visits/{visitId}": {
+      "schema": "Visit",
+      "description": "Historical log of library visits."
+    },
+    "/blocklist/{blockId}": {
+      "schema": "BlocklistEntry",
+      "description": "Collection of students barred from library access."
+    }
+  }
+}

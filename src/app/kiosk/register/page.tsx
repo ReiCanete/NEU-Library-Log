@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, Suspense, useEffect, useRef } from 'react';
@@ -7,11 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { firebaseService } from '@/lib/firebase-mock';
+import { useFirestore } from '@/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { firestore } = useFirestore();
+  const { toast } = useToast();
   const studentId = searchParams.get('id') || '';
   const nameInputRef = useRef<HTMLInputElement>(null);
   
@@ -20,7 +25,6 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Focus manually to avoid hydration issues with autoFocus
     if (nameInputRef.current) {
       nameInputRef.current.focus();
     }
@@ -28,31 +32,40 @@ function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !college) return;
+    if (!fullName || !college || !firestore) return;
 
     setLoading(true);
     try {
-      const user = await firebaseService.createUser({
-        uid: Math.random().toString(36).substr(2, 9),
+      const userId = `std_${studentId.replace(/[^a-zA-Z0-9]/g, '')}`;
+      await setDoc(doc(firestore, 'users', userId), {
+        uid: userId,
         displayName: fullName,
         college: college,
         studentId: studentId,
+        role: 'user',
+        blocked: false
       });
 
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-        studentId: user.studentId,
-        fullName: user.displayName,
-        college: user.college,
+        studentId: studentId,
+        fullName: fullName,
+        college: college,
         loginMethod: 'id'
       }));
       router.push('/kiosk/purpose');
+    } catch (err) {
+      toast({
+        title: "Registration Failed",
+        description: "Could not register your profile. Please check with staff.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-8 text-center max-w-lg mx-auto">
+    <div className="space-y-8 text-center max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
       <div className="space-y-2">
         <h2 className="text-4xl font-bold text-primary">First-Time Registration</h2>
         <p className="text-xl text-muted-foreground">Please tell us a bit about yourself</p>
@@ -108,7 +121,7 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <KioskLayout>
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>}>
         <RegisterForm />
       </Suspense>
     </KioskLayout>

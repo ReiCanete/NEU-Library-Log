@@ -1,23 +1,27 @@
+
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UserCircle } from 'lucide-react';
-import { firebaseService } from '@/lib/firebase-mock';
+import { UserCircle, Loader2 } from 'lucide-react';
+import { useFirestore, useAuth, useCollection } from '@/firebase';
+import { collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 
 export default function KioskEntry() {
   const router = useRouter();
   const { toast } = useToast();
+  const { firestore } = useFirestore();
+  const { auth } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Handle focus via useEffect to avoid hydration issues with autoFocus
     const timer = setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus();
@@ -28,23 +32,39 @@ export default function KioskEntry() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!studentId.trim()) return;
+    if (!studentId.trim() || !firestore) return;
 
     setLoading(true);
     try {
-      const user = await firebaseService.findUserByStudentId(studentId.trim());
+      // Check blocklist first
+      const blockQuery = query(
+        collection(firestore, 'blocklist'), 
+        where('studentId', '==', studentId.trim()), 
+        limit(1)
+      );
+      const blockSnap = await getDocs(blockQuery);
       
-      if (user?.blocked) {
+      if (!blockSnap.empty) {
+        const blockData = blockSnap.docs[0].data();
         toast({
           title: "Entry Not Allowed",
-          description: user.blockReason || "Please see the librarian for more information.",
+          description: blockData.reason || "Please see the librarian for more information.",
           variant: "destructive",
         });
         setStudentId('');
         return;
       }
 
-      if (user) {
+      // Find user
+      const userQuery = query(
+        collection(firestore, 'users'), 
+        where('studentId', '==', studentId.trim()), 
+        limit(1)
+      );
+      const userSnap = await getDocs(userQuery);
+      
+      if (!userSnap.empty) {
+        const user = userSnap.docs[0].data();
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: user.studentId,
           fullName: user.displayName,
@@ -56,9 +76,10 @@ export default function KioskEntry() {
         router.push(`/kiosk/register?id=${encodeURIComponent(studentId.trim())}`);
       }
     } catch (err) {
+      console.error(err);
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again.",
+        description: "Connection error. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -66,16 +87,50 @@ export default function KioskEntry() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    toast({
-      title: "Google Sign-in",
-      description: "Redirecting to NEU Google Login...",
-    });
+  const handleGoogleSignIn = async () => {
+    if (!auth || !firestore) return;
+    setLoading(true);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ hd: 'neu.edu.ph' });
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (!user.email?.endsWith('@neu.edu.ph')) {
+        toast({
+          title: "Unauthorized",
+          description: "Only NEU accounts are allowed.",
+          variant: "destructive",
+        });
+        await signOut(auth);
+        return;
+      }
+
+      // Check blocklist for email/uid or just studentId if mapped
+      // For simplicity, we'll assume Google users are checked by email domain + later student mapping
+      
+      sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+        studentId: user.email.split('@')[0], // Fallback ID
+        fullName: user.displayName,
+        college: 'Unspecified',
+        loginMethod: 'google'
+      }));
+      router.push('/kiosk/purpose');
+    } catch (error) {
+      toast({
+        title: "Sign-in Failed",
+        description: "Could not authenticate with Google.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50">
-      <div className="max-w-2xl w-full space-y-12 text-center">
+      <div className="max-w-2xl w-full space-y-12 text-center animate-in fade-in zoom-in duration-500">
         <div className="space-y-4">
           <h1 className="text-6xl font-bold tracking-tight text-primary">
             NEU Library Log
@@ -105,7 +160,7 @@ export default function KioskEntry() {
                   className="w-full h-16 text-xl font-semibold"
                   disabled={loading || !studentId.trim()}
                 >
-                  {loading ? "Processing..." : "Continue with ID"}
+                  {loading ? <Loader2 className="animate-spin" /> : "Continue with ID"}
                 </Button>
               </form>
             </CardContent>
@@ -121,6 +176,7 @@ export default function KioskEntry() {
             variant="outline" 
             className="h-16 text-xl font-semibold border-2 hover:bg-slate-100 flex items-center justify-center gap-3"
             onClick={handleGoogleSignIn}
+            disabled={loading}
           >
             <svg className="h-6 w-6" viewBox="0 0 24 24">
               <path
