@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/firebase';
@@ -19,23 +19,7 @@ function LoginContent() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const errorMessage = searchParams.get('error');
 
-  useEffect(() => {
-    if (errorMessage) {
-      toast({
-        title: "Access Denied",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  }, [errorMessage, toast]);
-
-  useEffect(() => {
-    if (user && !isLoggingIn) {
-      checkAdmin(user);
-    }
-  }, [user]);
-
-  const checkAdmin = async (currentUser: any) => {
+  const checkAdmin = useCallback(async (currentUser: any) => {
     try {
       const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
       if (userDoc.exists() && userDoc.data().role === 'admin') {
@@ -51,33 +35,73 @@ function LoginContent() {
     } catch (error) {
       console.error("Login check error:", error);
     }
-  };
+  }, [router, toast]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      toast({
+        title: "Access Denied",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  }, [errorMessage, toast]);
+
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        setIsLoggingIn(true);
+        const result = await getRedirectResult(auth);
+        if (result) {
+          const user = result.user;
+          if (!user.email?.endsWith('@neu.edu.ph')) {
+            toast({
+              title: "Wrong Domain",
+              description: "Please use your @neu.edu.ph email account.",
+              variant: "destructive",
+            });
+            await signOut(auth);
+            setIsLoggingIn(false);
+            return;
+          }
+          await checkAdmin(user);
+        } else {
+          setIsLoggingIn(false);
+        }
+      } catch (error: any) {
+        console.error("Redirect Result Error:", error);
+        toast({
+          title: "Login Failed",
+          description: error.message || "An unexpected error occurred.",
+          variant: "destructive",
+        });
+        setIsLoggingIn(false);
+      }
+    };
+
+    handleRedirectResult();
+  }, [checkAdmin, toast]);
+
+  useEffect(() => {
+    if (user && !isLoggingIn) {
+      checkAdmin(user);
+    }
+  }, [user, isLoggingIn, checkAdmin]);
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ hd: 'neu.edu.ph' });
+    provider.setCustomParameters({ hd: 'neu.edu.ph', prompt: 'select_account' });
     
     try {
-      const result = await signInWithPopup(auth, provider);
-      if (!result.user.email?.endsWith('@neu.edu.ph')) {
-        toast({
-          title: "Wrong Domain",
-          description: "Please use your @neu.edu.ph email account.",
-          variant: "destructive",
-        });
-        await signOut(auth);
-        return;
-      }
-      await checkAdmin(result.user);
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
-      console.error("Popup Error:", error);
+      console.error("Redirect Error:", error);
       toast({
         title: "Login Failed",
         description: error.message || "An unexpected error occurred.",
         variant: "destructive",
       });
-    } finally {
       setIsLoggingIn(false);
     }
   };

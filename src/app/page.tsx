@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { UserCircle, Loader2, AlertCircle } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -29,6 +29,40 @@ export default function KioskEntry() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        setLoading(true);
+        const result = await getRedirectResult(auth);
+        if (result) {
+          const user = result.user;
+          if (!user.email?.endsWith('@neu.edu.ph')) {
+            setLoginError("Unauthorized: Only NEU accounts (@neu.edu.ph) are allowed.");
+            await signOut(auth);
+            setLoading(false);
+            return;
+          }
+
+          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+            studentId: user.email.split('@')[0], 
+            fullName: user.displayName,
+            college: 'Unspecified',
+            loginMethod: 'google'
+          }));
+          router.push('/kiosk/purpose');
+        } else {
+          setLoading(false);
+        }
+      } catch (error: any) {
+        console.error("Redirect Error:", error);
+        setLoginError(`Google Sign-in Failed: ${error.message}`);
+        setLoading(false);
+      }
+    };
+
+    handleRedirectResult();
+  }, [router]);
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!studentId.trim()) return;
@@ -36,10 +70,8 @@ export default function KioskEntry() {
     setLoading(true);
     setLoginError(null);
     const cleanId = studentId.trim();
-    console.log("Attempting login with School ID:", cleanId);
 
     try {
-      // Check blocklist first
       const blockQuery = query(
         collection(firestore, 'blocklist'), 
         where('studentId', '==', cleanId), 
@@ -52,10 +84,10 @@ export default function KioskEntry() {
         const reason = blockData.reason || "Please see the librarian for more information.";
         setLoginError(`Entry Not Allowed: ${reason}`);
         setStudentId('');
+        setLoading(false);
         return;
       }
 
-      // Find user
       const userQuery = query(
         collection(firestore, 'users'), 
         where('studentId', '==', cleanId), 
@@ -65,7 +97,6 @@ export default function KioskEntry() {
       
       if (!userSnap.empty) {
         const user = userSnap.docs[0].data();
-        console.log("User found:", user.displayName);
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: user.studentId,
           fullName: user.displayName,
@@ -74,13 +105,11 @@ export default function KioskEntry() {
         }));
         router.push('/kiosk/purpose');
       } else {
-        console.log("New user detected, redirecting to registration.");
         router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}`);
       }
     } catch (err: any) {
       console.error("Firestore Error:", err);
       setLoginError(`System error: ${err.message || "Connection failed"}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -89,31 +118,13 @@ export default function KioskEntry() {
     setLoading(true);
     setLoginError(null);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ hd: 'neu.edu.ph' });
+    provider.setCustomParameters({ hd: 'neu.edu.ph', prompt: 'select_account' });
 
     try {
-      console.log("Initiating Google Sign-In popup...");
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      console.log("Google Sign-In Success. Email:", user.email);
-
-      if (!user.email?.endsWith('@neu.edu.ph')) {
-        setLoginError("Unauthorized: Only NEU accounts (@neu.edu.ph) are allowed.");
-        await signOut(auth);
-        return;
-      }
-
-      sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-        studentId: user.email.split('@')[0], 
-        fullName: user.displayName,
-        college: 'Unspecified',
-        loginMethod: 'google'
-      }));
-      router.push('/kiosk/purpose');
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       setLoginError(`Google Sign-in Failed: ${error.message}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -153,7 +164,7 @@ export default function KioskEntry() {
                   type="submit"
                   suppressHydrationWarning
                 >
-                  {loading ? <Loader2 className="animate-spin" /> : "Continue with ID"}
+                  {loading && !loginError ? <Loader2 className="animate-spin" /> : "Continue with ID"}
                 </Button>
               </form>
             </CardContent>
@@ -172,24 +183,28 @@ export default function KioskEntry() {
             disabled={loading}
             suppressHydrationWarning
           >
-            <svg className="h-6 w-6" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="currentColor"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="currentColor"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-              />
-              <path
-                fill="currentColor"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
+            {loading && !loginError ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <svg className="h-6 w-6" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                />
+              </svg>
+            )}
             Sign in with Google (@neu.edu.ph)
           </Button>
 
