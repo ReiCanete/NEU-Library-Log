@@ -1,16 +1,16 @@
-
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UserCircle, Loader2 } from 'lucide-react';
-import { useFirestore, useAuth, useCollection } from '@/firebase';
+import { UserCircle, Loader2, AlertCircle } from 'lucide-react';
+import { useFirestore, useAuth } from '@/firebase';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function KioskEntry() {
   const router = useRouter();
@@ -20,6 +20,7 @@ export default function KioskEntry() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -35,22 +36,23 @@ export default function KioskEntry() {
     if (!studentId.trim() || !firestore) return;
 
     setLoading(true);
+    setLoginError(null);
+    const cleanId = studentId.trim();
+    console.log("Attempting login with School ID:", cleanId);
+
     try {
       // Check blocklist first
       const blockQuery = query(
         collection(firestore, 'blocklist'), 
-        where('studentId', '==', studentId.trim()), 
+        where('studentId', '==', cleanId), 
         limit(1)
       );
       const blockSnap = await getDocs(blockQuery);
       
       if (!blockSnap.empty) {
         const blockData = blockSnap.docs[0].data();
-        toast({
-          title: "Entry Not Allowed",
-          description: blockData.reason || "Please see the librarian for more information.",
-          variant: "destructive",
-        });
+        const reason = blockData.reason || "Please see the librarian for more information.";
+        setLoginError(`Entry Not Allowed: ${reason}`);
         setStudentId('');
         return;
       }
@@ -58,13 +60,14 @@ export default function KioskEntry() {
       // Find user
       const userQuery = query(
         collection(firestore, 'users'), 
-        where('studentId', '==', studentId.trim()), 
+        where('studentId', '==', cleanId), 
         limit(1)
       );
       const userSnap = await getDocs(userQuery);
       
       if (!userSnap.empty) {
         const user = userSnap.docs[0].data();
+        console.log("User found:", user.displayName);
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: user.studentId,
           fullName: user.displayName,
@@ -73,56 +76,50 @@ export default function KioskEntry() {
         }));
         router.push('/kiosk/purpose');
       } else {
-        router.push(`/kiosk/register?id=${encodeURIComponent(studentId.trim())}`);
+        console.log("New user detected, redirecting to registration.");
+        router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}`);
       }
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Error",
-        description: "Connection error. Please try again.",
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      console.error("Firestore Error:", err);
+      setLoginError(`System error: ${err.message || "Connection failed"}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    if (!auth || !firestore) return;
+    if (!auth || !firestore) {
+      setLoginError("Auth service is not available.");
+      return;
+    }
+    
     setLoading(true);
+    setLoginError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'neu.edu.ph' });
 
     try {
+      console.log("Initiating Google Sign-In popup...");
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      console.log("Google Sign-In Success. Email:", user.email);
 
       if (!user.email?.endsWith('@neu.edu.ph')) {
-        toast({
-          title: "Unauthorized",
-          description: "Only NEU accounts are allowed.",
-          variant: "destructive",
-        });
+        setLoginError("Unauthorized: Only NEU accounts (@neu.edu.ph) are allowed.");
         await signOut(auth);
         return;
       }
 
-      // Check blocklist for email/uid or just studentId if mapped
-      // For simplicity, we'll assume Google users are checked by email domain + later student mapping
-      
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-        studentId: user.email.split('@')[0], // Fallback ID
+        studentId: user.email.split('@')[0], // Fallback ID from email prefix
         fullName: user.displayName,
         college: 'Unspecified',
         loginMethod: 'google'
       }));
       router.push('/kiosk/purpose');
-    } catch (error) {
-      toast({
-        title: "Sign-in Failed",
-        description: "Could not authenticate with Google.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      console.error("Google Auth Error:", error);
+      setLoginError(`Google Sign-in Failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -159,6 +156,7 @@ export default function KioskEntry() {
                 <Button 
                   className="w-full h-16 text-xl font-semibold"
                   disabled={loading || !studentId.trim()}
+                  type="submit"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : "Continue with ID"}
                 </Button>
@@ -198,6 +196,14 @@ export default function KioskEntry() {
             </svg>
             Sign in with Google (@neu.edu.ph)
           </Button>
+
+          {loginError && (
+            <Alert variant="destructive" className="animate-in slide-in-from-top-2 duration-300">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{loginError}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </div>
     </div>
