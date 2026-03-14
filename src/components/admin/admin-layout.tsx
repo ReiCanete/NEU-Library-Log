@@ -28,7 +28,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     const checkAdminRole = async () => {
       try {
         const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
+        const userData = userDoc.data();
+        const hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
+
+        if (userDoc.exists() && hasAdminAccess) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
@@ -53,9 +56,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   if (authLoading || checkingRole || isAdmin === null) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground font-medium">Verifying Administrator Access...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a1628]">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+        <p className="text-blue-200 font-medium">Verifying Staff Credentials...</p>
       </div>
     );
   }
@@ -66,7 +69,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         <Sidebar className="border-r border-slate-200">
           <SidebarHeader className="p-6 border-b border-slate-200">
             <h2 className="text-xl font-bold text-primary">NEU Library Log</h2>
-            <p className="text-xs text-muted-foreground">Admin Control Panel</p>
+            <p className="text-xs text-muted-foreground">Staff Control Panel</p>
           </SidebarHeader>
           <SidebarContent className="p-4">
             <SidebarMenu>

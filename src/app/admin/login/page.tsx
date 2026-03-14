@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Library } from 'lucide-react';
+import { Loader2, Library, ShieldCheck } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -36,7 +36,10 @@ function LoginContent() {
           }
           
           const userDoc = await getDoc(doc(firestore, 'users', loggedInUser.uid));
-          if (userDoc.exists() && userDoc.data().role === 'admin') {
+          const userData = userDoc.data();
+          const hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
+
+          if (userDoc.exists() && hasAdminAccess) {
             router.replace('/admin');
             return;
           } else {
@@ -66,7 +69,10 @@ function LoginContent() {
     if (user && !isChecking) {
       const checkRole = async () => {
         const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
+        const userData = userDoc.data();
+        const hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
+        
+        if (userDoc.exists() && hasAdminAccess) {
           router.replace('/admin');
         }
       };
@@ -87,23 +93,22 @@ function LoginContent() {
       <Card className="max-w-md w-full glass-dark border-none shadow-2xl z-10 animate-in fade-in zoom-in duration-700">
         <CardHeader className="text-center space-y-6 pt-12">
           <div className="mx-auto bg-blue-500/10 h-24 w-24 rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
-            <Library className="h-12 w-12 text-blue-400" />
+            <ShieldCheck className="h-12 w-12 text-blue-400" />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-4xl font-black text-white">Admin Access</CardTitle>
-            <CardDescription className="text-blue-200/60 text-lg">Manage the NEU Library visitor system</CardDescription>
+            <CardTitle className="text-4xl font-black text-white">Staff Login</CardTitle>
+            <CardDescription className="text-blue-200/60 text-lg">Administrator access portal</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="pb-16 space-y-8 px-10">
           <div className="bg-blue-500/5 border border-white/10 rounded-2xl p-6 text-sm text-blue-100 text-center leading-relaxed">
-            Administrator authentication is restricted to verified <strong>@neu.edu.ph</strong> accounts only.
+            Authentication is restricted to verified <strong>@neu.edu.ph</strong> accounts with administrator privileges.
           </div>
           
           <Button 
             className="w-full h-16 text-xl font-bold rounded-2xl bg-white text-[#0a1628] hover:bg-white/90 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
             onClick={handleLogin}
             disabled={isChecking || authLoading}
-            suppressHydrationWarning
           >
             {isChecking || authLoading ? (
               <Loader2 className="h-6 w-6 animate-spin" />

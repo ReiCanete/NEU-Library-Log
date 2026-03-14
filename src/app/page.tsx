@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UserCircle, Loader2, AlertCircle, Library } from 'lucide-react';
+import { Library, Loader2, AlertCircle, ShieldCheck, User } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function KioskEntry() {
   const router = useRouter();
@@ -17,8 +18,14 @@ export default function KioskEntry() {
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
 
   useEffect(() => {
+    if (loginMode === 'admin') {
+      router.push('/admin/login');
+      return;
+    }
+
     const handleRedirectResult = async () => {
       try {
         setLoading(true);
@@ -49,7 +56,7 @@ export default function KioskEntry() {
     };
 
     handleRedirectResult();
-  }, [router]);
+  }, [router, loginMode]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -115,10 +122,23 @@ export default function KioskEntry() {
 
   return (
     <div className="min-h-screen bg-[#0a1628] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Admin/User Toggle */}
+      <div className="absolute top-8 right-8 z-20">
+        <Tabs value={loginMode} onValueChange={(v) => setLoginMode(v as 'user' | 'admin')} className="w-[240px]">
+          <TabsList className="grid w-full grid-cols-2 bg-white/5 border border-white/10 backdrop-blur-xl h-12">
+            <TabsTrigger value="user" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white flex gap-2 font-bold">
+              <User className="h-4 w-4" /> Kiosk
+            </TabsTrigger>
+            <TabsTrigger value="admin" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white flex gap-2 font-bold">
+              <ShieldCheck className="h-4 w-4" /> Staff
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       {/* Background Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] animate-float" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] animate-float" style={{ animationDelay: '2s' }} />
-      <div className="absolute top-[20%] right-[10%] w-[20%] h-[20%] bg-cyan-600/10 rounded-full blur-[80px] animate-float" style={{ animationDelay: '4s' }} />
 
       <div className="max-w-xl w-full space-y-8 text-center z-10 animate-in fade-in zoom-in duration-1000">
         <div className="space-y-4">
@@ -131,7 +151,7 @@ export default function KioskEntry() {
             NEU Library Log
           </h1>
           <p className="text-xl text-blue-200/80 font-medium">
-            Please tap your ID or sign in to continue
+            Please scan your ID or sign in to continue
           </p>
         </div>
 
