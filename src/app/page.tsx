@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { UserCircle, Loader2, AlertCircle } from 'lucide-react';
-import { useFirestore, useAuth } from '@/firebase';
+import { auth, db as firestore } from '@/firebase/config';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -15,8 +15,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 export default function KioskEntry() {
   const router = useRouter();
   const { toast } = useToast();
-  const { firestore } = useFirestore();
-  const { auth } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +31,7 @@ export default function KioskEntry() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!studentId.trim() || !firestore) return;
+    if (!studentId.trim()) return;
 
     setLoading(true);
     setLoginError(null);
@@ -88,11 +86,6 @@ export default function KioskEntry() {
   };
 
   const handleGoogleSignIn = async () => {
-    if (!auth || !firestore) {
-      setLoginError("Auth service is not available.");
-      return;
-    }
-    
     setLoading(true);
     setLoginError(null);
     const provider = new GoogleAuthProvider();
@@ -111,7 +104,7 @@ export default function KioskEntry() {
       }
 
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-        studentId: user.email.split('@')[0], // Fallback ID from email prefix
+        studentId: user.email.split('@')[0], 
         fullName: user.displayName,
         college: 'Unspecified',
         loginMethod: 'google'
@@ -152,11 +145,13 @@ export default function KioskEntry() {
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
                   disabled={loading}
+                  suppressHydrationWarning
                 />
                 <Button 
                   className="w-full h-16 text-xl font-semibold"
                   disabled={loading || !studentId.trim()}
                   type="submit"
+                  suppressHydrationWarning
                 >
                   {loading ? <Loader2 className="animate-spin" /> : "Continue with ID"}
                 </Button>
@@ -175,6 +170,7 @@ export default function KioskEntry() {
             className="h-16 text-xl font-semibold border-2 hover:bg-slate-100 flex items-center justify-center gap-3"
             onClick={handleGoogleSignIn}
             disabled={loading}
+            suppressHydrationWarning
           >
             <svg className="h-6 w-6" viewBox="0 0 24 24">
               <path

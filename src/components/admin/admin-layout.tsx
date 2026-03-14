@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -6,15 +5,14 @@ import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, S
 import { LayoutDashboard, Users, UserX, LogOut, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { auth, db as firestore } from '@/firebase/config';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { auth } = useAuth();
-  const { firestore } = useFirestore();
   const { user, loading: authLoading } = useUser();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [checkingRole, setCheckingRole] = useState(true);
@@ -28,15 +26,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
 
     const checkAdminRole = async () => {
-      if (!firestore || !user) return;
-      
       try {
         const userDoc = await getDoc(doc(firestore, 'users', user.uid));
         if (userDoc.exists() && userDoc.data().role === 'admin') {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
-          await signOut(auth!);
+          await signOut(auth);
           router.push('/admin/login?error=Unauthorized access');
         }
       } catch (error) {
@@ -48,13 +44,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     };
 
     checkAdminRole();
-  }, [user, authLoading, router, firestore, auth]);
+  }, [user, authLoading, router]);
 
   const handleLogout = async () => {
-    if (auth) {
-      await signOut(auth);
-      router.push('/admin/login');
-    }
+    await signOut(auth);
+    router.push('/admin/login');
   };
 
   if (authLoading || checkingRole || isAdmin === null) {

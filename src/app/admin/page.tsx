@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from 'react';
@@ -6,10 +5,11 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Calendar, TrendingUp, Download, Loader2, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCollection, useFirestore, useUser } from '@/firebase';
-import { collection, query, orderBy, limit, where, Timestamp, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { useCollection, useUser } from '@/firebase';
+import { auth, db as firestore } from '@/firebase/config';
+import { collection, query, orderBy, limit, where, Timestamp, addDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { format, startOfDay, endOfDay, subDays, isSameDay } from 'date-fns';
+import { format, startOfDay, subDays, isSameDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,7 +21,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export default function AdminDashboard() {
-  const { firestore } = useFirestore();
   const { user: currentUser } = useUser();
   const { toast } = useToast();
   
@@ -32,14 +31,12 @@ export default function AdminDashboard() {
 
   // Firestore Queries
   const recentVisitsQuery = useMemo(() => {
-    if (!firestore) return null;
     return query(collection(firestore, 'visits'), orderBy('timestamp', 'desc'), limit(10));
-  }, [firestore]);
+  }, []);
 
   const statsQuery = useMemo(() => {
-    if (!firestore) return null;
     return query(collection(firestore, 'visits'), where('timestamp', '>=', monthAgo));
-  }, [firestore, monthAgo]);
+  }, [monthAgo]);
 
   const { data: recentVisits, loading: visitsLoading } = useCollection(recentVisitsQuery);
   const { data: allStats, loading: statsLoading } = useCollection(statsQuery);
@@ -47,7 +44,6 @@ export default function AdminDashboard() {
   // Derived Stats
   const stats = useMemo(() => {
     if (!allStats) return { today: 0, week: 0, month: 0 };
-    const now = new Date();
     return {
       today: allStats.filter(v => v.timestamp.toDate() >= todayStart).length,
       week: allStats.filter(v => v.timestamp.toDate() >= weekAgo).length,
@@ -75,11 +71,10 @@ export default function AdminDashboard() {
   const [isBlocking, setIsBlocking] = useState(false);
 
   const handleBlockUser = async () => {
-    if (!selectedStudent || !blockReason || !firestore || !currentUser) return;
+    if (!selectedStudent || !blockReason || !currentUser) return;
     
     setIsBlocking(true);
     try {
-      // Add to blocklist
       await addDoc(collection(firestore, 'blocklist'), {
         studentId: selectedStudent.studentId,
         reason: blockReason,
@@ -87,18 +82,16 @@ export default function AdminDashboard() {
         blockedAt: Timestamp.now()
       });
 
-      // Update user doc if it exists
-      // Note: This assumes we search by studentId, but for simplicity we'll just notify success
       toast({
         title: "User Blocked",
         description: `Student ID ${selectedStudent.studentId} has been added to the blocklist.`,
       });
       setSelectedStudent(null);
       setBlockReason('');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to block user. Please try again.",
+        description: error.message || "Failed to block user. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -112,16 +105,14 @@ export default function AdminDashboard() {
     const doc = new jsPDF();
     const now = new Date();
     
-    // Header
     doc.setFontSize(22);
-    doc.setTextColor(23, 37, 84); // primary color
+    doc.setTextColor(23, 37, 84); 
     doc.text("NEU Library Log", 14, 20);
     
     doc.setFontSize(12);
     doc.setTextColor(100);
     doc.text(`Generated on: ${format(now, 'PPP p')}`, 14, 30);
     
-    // Stats Overview
     doc.setFontSize(16);
     doc.setTextColor(0);
     doc.text("Visitor Statistics", 14, 45);
@@ -138,7 +129,6 @@ export default function AdminDashboard() {
       headStyles: { fillStyle: 'fill', fillColor: [23, 37, 84] }
     });
 
-    // Recent Logs
     doc.text("Recent Activity", 14, doc.lastAutoTable.finalY + 15);
     
     autoTable(doc, {
@@ -167,14 +157,13 @@ export default function AdminDashboard() {
             <p className="text-muted-foreground">Real-time visitor statistics and analytics</p>
           </div>
           <div className="flex gap-3">
-            <Button onClick={exportReport} className="flex items-center gap-2" disabled={statsLoading}>
+            <Button onClick={exportReport} className="flex items-center gap-2" disabled={statsLoading} suppressHydrationWarning>
               <Download className="h-4 w-4" />
               Download PDF Report
             </Button>
           </div>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -209,7 +198,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Chart Section */}
           <Card className="lg:col-span-2 shadow-sm">
             <CardHeader>
               <CardTitle>Visitor Distribution</CardTitle>
@@ -241,7 +229,6 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Activity Mini List */}
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Latest Activity</CardTitle>
@@ -282,7 +269,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Detailed Logs Table */}
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Recent Logs</CardTitle>
@@ -326,6 +312,7 @@ export default function AdminDashboard() {
                             size="sm" 
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => setSelectedStudent(visit)}
+                            suppressHydrationWarning
                           >
                             Block
                           </Button>
@@ -349,11 +336,12 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <DialogFooter>
-                            <Button variant="outline" onClick={() => setSelectedStudent(null)}>Cancel</Button>
+                            <Button variant="outline" onClick={() => setSelectedStudent(null)} suppressHydrationWarning>Cancel</Button>
                             <Button 
                               variant="destructive" 
                               disabled={isBlocking || !blockReason} 
                               onClick={handleBlockUser}
+                              suppressHydrationWarning
                             >
                               {isBlocking ? "Processing..." : "Confirm Block"}
                             </Button>

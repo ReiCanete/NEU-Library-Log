@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, Suspense, useEffect, useRef } from 'react';
@@ -8,14 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFirestore } from '@/firebase';
+import { db as firestore } from '@/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { firestore } = useFirestore();
   const { toast } = useToast();
   const studentId = searchParams.get('id') || '';
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +31,7 @@ function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !college || !firestore) return;
+    if (!fullName || !college) return;
 
     setLoading(true);
     try {
@@ -53,10 +52,10 @@ function RegisterForm() {
         loginMethod: 'id'
       }));
       router.push('/kiosk/purpose');
-    } catch (err) {
+    } catch (err: any) {
       toast({
         title: "Registration Failed",
-        description: "Could not register your profile. Please check with staff.",
+        description: err.message || "Could not register your profile. Please check with staff.",
         variant: "destructive",
       });
     } finally {
@@ -74,7 +73,7 @@ function RegisterForm() {
       <form onSubmit={handleSubmit} className="space-y-6 text-left bg-white p-8 rounded-xl shadow-lg">
         <div className="space-y-2">
           <Label htmlFor="id" className="text-lg">School ID</Label>
-          <Input id="id" value={studentId} readOnly className="bg-slate-50 h-14 text-xl font-mono" />
+          <Input id="id" value={studentId} readOnly className="bg-slate-50 h-14 text-xl font-mono" suppressHydrationWarning />
         </div>
 
         <div className="space-y-2">
@@ -87,6 +86,7 @@ function RegisterForm() {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
+            suppressHydrationWarning
           />
         </div>
 
@@ -110,7 +110,7 @@ function RegisterForm() {
           </Select>
         </div>
 
-        <Button className="w-full h-16 text-xl mt-4" disabled={loading}>
+        <Button className="w-full h-16 text-xl mt-4" disabled={loading} suppressHydrationWarning>
           {loading ? "Registering..." : "Complete Registration"}
         </Button>
       </form>

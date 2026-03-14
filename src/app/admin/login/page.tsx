@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, Suspense } from 'react';
@@ -6,16 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ShieldAlert, Loader2 } from 'lucide-react';
-import { useAuth, useFirestore, useUser } from '@/firebase';
+import { auth, db as firestore } from '@/firebase/config';
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/firebase';
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { auth } = useAuth();
-  const { firestore } = useFirestore();
   const { user, loading: authLoading } = useUser();
   const { toast } = useToast();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -38,8 +36,6 @@ function LoginContent() {
   }, [user]);
 
   const checkAdmin = async (currentUser: any) => {
-    if (!firestore || !auth) return;
-    
     try {
       const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
       if (userDoc.exists() && userDoc.data().role === 'admin') {
@@ -58,7 +54,6 @@ function LoginContent() {
   };
 
   const handleLogin = async () => {
-    if (!auth) return;
     setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'neu.edu.ph' });
@@ -108,6 +103,7 @@ function LoginContent() {
             className="w-full h-14 text-lg font-semibold flex items-center justify-center gap-3"
             onClick={handleLogin}
             disabled={isLoggingIn || authLoading}
+            suppressHydrationWarning
           >
             {isLoggingIn ? (
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -135,7 +131,7 @@ function LoginContent() {
           </Button>
 
           <div className="text-center">
-            <Button variant="link" className="text-slate-400" onClick={() => router.push('/')}>
+            <Button variant="link" className="text-slate-400" onClick={() => router.push('/')} suppressHydrationWarning>
               Return to Kiosk Mode
             </Button>
           </div>

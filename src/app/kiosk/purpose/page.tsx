@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -6,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { KioskLayout } from '@/components/kiosk/kiosk-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Search, Monitor, Users, MoreHorizontal, GraduationCap, Loader2 } from 'lucide-react';
-import { useFirestore } from '@/firebase';
+import { db as firestore } from '@/firebase/config';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,7 +20,6 @@ const PURPOSES = [
 
 export default function PurposePage() {
   const router = useRouter();
-  const { firestore } = useFirestore();
   const { toast } = useToast();
   const [visitor, setVisitor] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +34,7 @@ export default function PurposePage() {
   }, [router]);
 
   const handleSelect = async (purpose: string) => {
-    if (!visitor || !firestore || isSubmitting) return;
+    if (!visitor || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
@@ -49,11 +47,11 @@ export default function PurposePage() {
         timestamp: Timestamp.now(),
       });
       router.push('/kiosk/welcome');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       toast({
         title: "Logging Failed",
-        description: "Could not save your visit. Please inform the staff.",
+        description: err.message || "Could not save your visit. Please inform the staff.",
         variant: "destructive",
       });
       setIsSubmitting(false);
