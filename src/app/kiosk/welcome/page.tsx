@@ -9,9 +9,12 @@ export default function WelcomePage() {
   const router = useRouter();
   const [visitor, setVisitor] = useState<any>(null);
   const [countdown, setCountdown] = useState(8);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   useEffect(() => {
+    // Set initial time on mount to avoid hydration mismatch
+    setCurrentTime(new Date());
+
     const data = sessionStorage.getItem('kiosk_visitor');
     if (!data) {
       router.push('/');
@@ -62,14 +65,18 @@ export default function WelcomePage() {
             <Calendar className="h-10 w-10 text-white/60" />
             <div className="text-left">
               <p className="text-white/60 text-lg uppercase tracking-wider">Date</p>
-              <p className="text-3xl font-semibold">{format(currentTime, 'MMM dd, yyyy')}</p>
+              <p className="text-3xl font-semibold">
+                {currentTime ? format(currentTime, 'MMM dd, yyyy') : '--'}
+              </p>
             </div>
           </div>
           <div className="flex items-center justify-center gap-4 bg-white/5 p-6 rounded-2xl">
             <Clock className="h-10 w-10 text-white/60" />
             <div className="text-left">
               <p className="text-white/60 text-lg uppercase tracking-wider">Time</p>
-              <p className="text-3xl font-semibold tabular-nums">{format(currentTime, 'hh:mm:ss a')}</p>
+              <p className="text-3xl font-semibold tabular-nums">
+                {currentTime ? format(currentTime, 'hh:mm:ss a') : '--:--:--'}
+              </p>
             </div>
           </div>
         </div>

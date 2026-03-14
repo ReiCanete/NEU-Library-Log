@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { KioskLayout } from '@/components/kiosk/kiosk-layout';
 import { Input } from '@/components/ui/input';
@@ -13,10 +13,18 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const studentId = searchParams.get('id') || '';
+  const nameInputRef = useRef<HTMLInputElement>(null);
   
   const [fullName, setFullName] = useState('');
   const [college, setCollege] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Focus manually to avoid hydration issues with autoFocus
+    if (nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,13 +67,13 @@ function RegisterForm() {
         <div className="space-y-2">
           <Label htmlFor="name" className="text-lg">Full Name</Label>
           <Input 
+            ref={nameInputRef}
             id="name" 
             placeholder="Juan Dela Cruz" 
             className="h-14 text-xl"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
-            autoFocus
           />
         </div>
 

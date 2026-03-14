@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { LogIn, UserCircle } from 'lucide-react';
+import { UserCircle } from 'lucide-react';
 import { firebaseService } from '@/lib/firebase-mock';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,9 +17,13 @@ export default function KioskEntry() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
+    // Handle focus via useEffect to avoid hydration issues with autoFocus
+    const timer = setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -41,7 +45,6 @@ export default function KioskEntry() {
       }
 
       if (user) {
-        // Store temp visitor info for the session
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: user.studentId,
           fullName: user.displayName,
@@ -50,7 +53,6 @@ export default function KioskEntry() {
         }));
         router.push('/kiosk/purpose');
       } else {
-        // First time login flow
         router.push(`/kiosk/register?id=${encodeURIComponent(studentId.trim())}`);
       }
     } catch (err) {
@@ -65,12 +67,10 @@ export default function KioskEntry() {
   };
 
   const handleGoogleSignIn = () => {
-    // Mock Google sign in logic
     toast({
       title: "Google Sign-in",
       description: "Redirecting to NEU Google Login...",
     });
-    // In real app: signInWithPopup(auth, provider).then(...)
   };
 
   return (
@@ -100,7 +100,6 @@ export default function KioskEntry() {
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
                   disabled={loading}
-                  autoFocus
                 />
                 <Button 
                   className="w-full h-16 text-xl font-semibold"
