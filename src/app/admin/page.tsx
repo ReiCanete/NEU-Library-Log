@@ -1,15 +1,14 @@
 "use client";
 
-import { useMemo, useState } from 'react';
-import { AdminLayout } from '@/components/admin/admin-layout';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Calendar, TrendingUp, Download, Loader2, UserX } from 'lucide-react';
+import { Users, Calendar, TrendingUp, Download, Loader2, UserX, LayoutDashboard, History, Settings, LogOut, Library, FileText, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCollection, useUser } from '@/firebase';
 import { auth, db as firestore } from '@/firebase/config';
-import { collection, query, orderBy, limit, where, Timestamp, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where, Timestamp, addDoc, getDoc, doc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { format, startOfDay, subDays, isSameDay } from 'date-fns';
+import { format, startOfDay, subDays, isSameDay, startOfWeek, startOfMonth } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,345 +16,354 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export default function AdminDashboard() {
-  const { user: currentUser } = useUser();
+  const router = useRouter();
+  const { user: currentUser, loading: authLoading } = useUser();
   const { toast } = useToast();
-  
-  // Date states
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Date filters
   const todayStart = startOfDay(new Date());
-  const weekAgo = subDays(todayStart, 7);
-  const monthAgo = subDays(todayStart, 30);
+  const weekStart = startOfWeek(new Date());
+  const monthStart = startOfMonth(new Date());
+
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      router.push('/admin/login');
+    } else if (currentUser) {
+      const checkAdmin = async () => {
+        const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          toast({ title: "Unauthorized", description: "Admin permissions required.", variant: "destructive" });
+          router.push('/admin/login');
+        }
+      };
+      checkAdmin();
+    }
+  }, [currentUser, authLoading, router, toast]);
 
   // Firestore Queries
-  const recentVisitsQuery = useMemo(() => {
-    return query(collection(firestore, 'visits'), orderBy('timestamp', 'desc'), limit(10));
-  }, []);
+  const visitsQuery = useMemo(() => query(collection(firestore, 'visits'), orderBy('timestamp', 'desc')), []);
+  const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
 
-  const statsQuery = useMemo(() => {
-    return query(collection(firestore, 'visits'), where('timestamp', '>=', monthAgo));
-  }, [monthAgo]);
-
-  const { data: recentVisits, loading: visitsLoading } = useCollection(recentVisitsQuery);
-  const { data: allStats, loading: statsLoading } = useCollection(statsQuery);
-
-  // Derived Stats
+  // Stats derivation
   const stats = useMemo(() => {
-    if (!allStats) return { today: 0, week: 0, month: 0 };
+    if (!allVisits) return { today: 0, week: 0, month: 0 };
     return {
-      today: allStats.filter(v => v.timestamp.toDate() >= todayStart).length,
-      week: allStats.filter(v => v.timestamp.toDate() >= weekAgo).length,
-      month: allStats.length
+      today: allVisits.filter(v => v.timestamp.toDate() >= todayStart).length,
+      week: allVisits.filter(v => v.timestamp.toDate() >= weekStart).length,
+      month: allVisits.filter(v => v.timestamp.toDate() >= monthStart).length
     };
-  }, [allStats, todayStart, weekAgo]);
+  }, [allVisits, todayStart, weekStart, monthStart]);
 
-  // Chart Data (Last 7 days)
+  // Chart data (Last 7 days)
   const chartData = useMemo(() => {
-    if (!allStats) return [];
-    const days = Array.from({ length: 7 }, (_, i) => subDays(todayStart, 6 - i));
-    return days.map(day => {
-      const count = allStats.filter(v => isSameDay(v.timestamp.toDate(), day)).length;
-      return {
-        name: format(day, 'EEE'),
-        count,
-        fullDate: format(day, 'MMM dd')
-      };
+    if (!allVisits) return [];
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = subDays(todayStart, 6 - i);
+      const count = allVisits.filter(v => isSameDay(v.timestamp.toDate(), day)).length;
+      return { name: format(day, 'EEE'), count };
     });
-  }, [allStats, todayStart]);
+  }, [allVisits, todayStart]);
 
-  // Block Modal State
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  // Pagination logic
+  const paginatedVisits = useMemo(() => {
+    if (!allVisits) return [];
+    const start = (currentPage - 1) * itemsPerPage;
+    return allVisits.slice(start, start + itemsPerPage);
+  }, [allVisits, currentPage]);
+
+  // Block User State
+  const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
   const handleBlockUser = async () => {
-    if (!selectedStudent || !blockReason || !currentUser) return;
-    
+    if (!selectedVisit || !blockReason || !currentUser) return;
     setIsBlocking(true);
     try {
       await addDoc(collection(firestore, 'blocklist'), {
-        studentId: selectedStudent.studentId,
+        studentId: selectedVisit.studentId,
+        fullName: selectedVisit.fullName,
         reason: blockReason,
         blockedBy: currentUser.displayName || currentUser.email,
         blockedAt: Timestamp.now()
       });
-
-      toast({
-        title: "User Blocked",
-        description: `Student ID ${selectedStudent.studentId} has been added to the blocklist.`,
-      });
-      setSelectedStudent(null);
+      toast({ title: "Visitor Blocked", description: `${selectedVisit.fullName} has been added to the blocklist.` });
+      setSelectedVisit(null);
       setBlockReason('');
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to block user. Please try again.",
-        variant: "destructive"
-      });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
       setIsBlocking(false);
     }
   };
 
-  const exportReport = () => {
-    if (!allStats || !recentVisits) return;
-    
+  const generateReport = () => {
+    if (!allVisits) return;
     const doc = new jsPDF();
     const now = new Date();
-    
     doc.setFontSize(22);
-    doc.setTextColor(23, 37, 84); 
-    doc.text("NEU Library Log", 14, 20);
-    
-    doc.setFontSize(12);
+    doc.setTextColor(10, 22, 40);
+    doc.text("NEU Library Visitor Log Report", 14, 20);
+    doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Generated on: ${format(now, 'PPP p')}`, 14, 30);
     
-    doc.setFontSize(16);
-    doc.setTextColor(0);
-    doc.text("Visitor Statistics", 14, 45);
-    
     autoTable(doc, {
-      startY: 50,
-      head: [['Metric', 'Count']],
+      startY: 40,
+      head: [['Metric', 'Value']],
       body: [
-        ['Visitors Today', stats.today.toString()],
-        ['Visitors This Week', stats.week.toString()],
-        ['Visitors This Month', stats.month.toString()]
+        ['Total Visitors Today', stats.today.toString()],
+        ['Total Visitors This Week', stats.week.toString()],
+        ['Total Visitors This Month', stats.month.toString()]
       ],
-      theme: 'striped',
-      headStyles: { fillStyle: 'fill', fillColor: [23, 37, 84] }
+      theme: 'grid',
+      headStyles: { fillColor: [10, 22, 40] }
     });
 
-    doc.text("Recent Activity", 14, doc.lastAutoTable.finalY + 15);
-    
     autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 20,
-      head: [['Visitor', 'College', 'Purpose', 'Method', 'Time']],
-      body: recentVisits.map(v => [
+      startY: doc.lastAutoTable.finalY + 15,
+      head: [['Visitor Name', 'College', 'Purpose', 'Method', 'Timestamp']],
+      body: allVisits.map(v => [
         v.fullName,
         v.college,
         v.purpose,
         v.loginMethod,
-        format(v.timestamp.toDate(), 'MMM dd, hh:mm a')
+        format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')
       ]),
-      theme: 'grid',
-      headStyles: { fillStyle: 'fill', fillColor: [23, 37, 84] }
+      theme: 'striped',
+      headStyles: { fillColor: [10, 22, 40] }
     });
-
     doc.save(`NEU_Library_Report_${format(now, 'yyyyMMdd')}.pdf`);
   };
 
+  if (authLoading || isAdmin === null) {
+    return (
+      <div className="min-h-screen bg-[#f1f5f9] flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
-    <AdminLayout>
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex justify-between items-center">
+    <div className="flex min-h-screen bg-[#f1f5f9]">
+      {/* Sidebar */}
+      <aside className="w-72 bg-[#0a1628] text-white flex flex-col fixed inset-y-0 shadow-2xl z-30">
+        <div className="p-8 border-b border-white/10 flex items-center gap-4">
+          <div className="bg-blue-500 p-2 rounded-xl">
+            <Library className="h-6 w-6 text-white" />
+          </div>
+          <h1 className="text-xl font-black tracking-tight">NEU Library</h1>
+        </div>
+        <nav className="flex-1 p-6 space-y-2">
+          <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-blue-600 text-white font-bold shadow-lg' : 'text-blue-100/60 hover:bg-white/5'}`}
+          >
+            <LayoutDashboard className="h-5 w-5" /> Dashboard
+          </button>
+          <button 
+            onClick={() => setActiveTab('logs')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'logs' ? 'bg-blue-600 text-white font-bold shadow-lg' : 'text-blue-100/60 hover:bg-white/5'}`}
+          >
+            <History className="h-5 w-5" /> Visitor Logs
+          </button>
+        </nav>
+        <div className="p-6 border-t border-white/10 space-y-4">
+          <div className="flex items-center gap-3 px-2">
+            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-sm">
+              {currentUser?.displayName?.charAt(0) || 'A'}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm font-bold truncate">{currentUser?.displayName}</p>
+              <p className="text-xs text-blue-100/40 truncate">{currentUser?.email}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => signOut(auth)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-400/10 transition-all"
+          >
+            <LogOut className="h-5 w-5" /> Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="ml-72 flex-1 p-10 space-y-10 animate-in fade-in duration-700">
+        <div className="flex justify-between items-end">
           <div>
-            <h2 className="text-3xl font-bold text-primary">Library Overview</h2>
-            <p className="text-muted-foreground">Real-time visitor statistics and analytics</p>
+            <h2 className="text-4xl font-black text-slate-900 capitalize">{activeTab}</h2>
+            <p className="text-slate-500 font-medium">Manage and monitor library activities</p>
           </div>
-          <div className="flex gap-3">
-            <Button onClick={exportReport} className="flex items-center gap-2" disabled={statsLoading} suppressHydrationWarning>
-              <Download className="h-4 w-4" />
-              Download PDF Report
-            </Button>
-          </div>
+          <Button onClick={generateReport} className="bg-blue-600 hover:bg-blue-700 rounded-xl px-6 h-12 font-bold shadow-lg flex gap-2">
+            <Download className="h-5 w-5" /> Generate Report
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Today's Visitors</CardTitle>
-              <Users className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? <Skeleton className="h-10 w-20" /> : <div className="text-4xl font-bold">{stats.today}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Snapshot of the day</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">This Week</CardTitle>
-              <Calendar className="h-5 w-5 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? <Skeleton className="h-10 w-20" /> : <div className="text-4xl font-bold">{stats.week}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Last 7 rolling days</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
-              <TrendingUp className="h-5 w-5 text-indigo-500" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? <Skeleton className="h-10 w-20" /> : <div className="text-4xl font-bold">{stats.month}</div>}
-              <p className="text-xs text-muted-foreground mt-1">Total visitor engagement</p>
-            </CardContent>
-          </Card>
-        </div>
+        {activeTab === 'dashboard' ? (
+          <div className="space-y-10">
+            {/* Stats Row */}
+            <div className="grid grid-cols-3 gap-8">
+              {[
+                { label: 'Today', value: stats.today, icon: Users, color: 'border-blue-500' },
+                { label: 'This Week', value: stats.week, icon: Calendar, color: 'border-emerald-500' },
+                { label: 'This Month', value: stats.month, icon: TrendingUp, color: 'border-purple-500' }
+              ].map((s, i) => (
+                <Card key={i} className={`border-l-8 ${s.color} shadow-sm rounded-2xl`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-bold text-slate-400 uppercase tracking-widest">{s.label}</CardTitle>
+                    <s.icon className="h-5 w-5 text-slate-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-5xl font-black text-slate-900">{s.value}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-2 shadow-sm">
-            <CardHeader>
-              <CardTitle>Visitor Distribution</CardTitle>
-              <CardDescription>Daily count for the last 7 days</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[400px]">
-              {statsLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <Loader2 className="animate-spin text-muted-foreground" />
-                </div>
-              ) : (
+            {/* Chart */}
+            <Card className="rounded-3xl shadow-sm overflow-hidden border-none">
+              <CardHeader className="p-8 pb-0">
+                <CardTitle className="text-2xl font-black text-slate-900">Visitor Distribution</CardTitle>
+                <CardDescription className="text-slate-500 font-medium">Daily count for the last 7 days</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[400px] p-8 pt-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontWeight: 600 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontWeight: 600 }} />
                     <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      labelStyle={{ fontWeight: 'bold' }}
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                     />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="count" radius={[8, 8, 0, 0]}>
                       {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 6 ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.4)'} />
+                        <Cell key={`cell-${index}`} fill={index === 6 ? '#2563eb' : '#cbd5e1'} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Latest Activity</CardTitle>
-              <CardDescription>Real-time entry feed</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {visitsLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex gap-4">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="space-y-2 flex-1">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-3 w-2/3" />
-                      </div>
-                    </div>
-                  ))
-                ) : recentVisits && recentVisits.length > 0 ? (
-                  recentVisits.slice(0, 5).map((visit) => (
-                    <div key={visit.id} className="flex items-center gap-4 animate-in slide-in-from-right-4 duration-300">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xs">
-                        {visit.fullName.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{visit.fullName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{visit.purpose}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium">{format(visit.timestamp.toDate(), 'hh:mm a')}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center py-10 text-muted-foreground">No recent activity</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Recent Logs</CardTitle>
-            <CardDescription>Detailed visitor history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Visitor</TableHead>
-                  <TableHead>College</TableHead>
-                  <TableHead>Purpose</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visitsLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={6}><Skeleton className="h-12 w-full" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : recentVisits?.map((visit) => (
-                  <TableRow key={visit.id}>
-                    <TableCell className="font-medium">{visit.fullName}</TableCell>
-                    <TableCell>{visit.college}</TableCell>
-                    <TableCell>{visit.purpose}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {visit.loginMethod}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{format(visit.timestamp.toDate(), 'MMM dd, hh:mm a')}</TableCell>
-                    <TableCell className="text-right">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setSelectedStudent(visit)}
-                            suppressHydrationWarning
-                          >
-                            Block
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Block Student Access</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to block <strong>{selectedStudent?.fullName}</strong> ({selectedStudent?.studentId})? They will be unable to log in until the block is removed.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="reason">Reason for Blocking</Label>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <Card className="rounded-3xl shadow-sm border-none overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="px-8 h-16 font-bold text-slate-500">Visitor Name</TableHead>
+                    <TableHead className="h-16 font-bold text-slate-500">College</TableHead>
+                    <TableHead className="h-16 font-bold text-slate-500">Purpose</TableHead>
+                    <TableHead className="h-16 font-bold text-slate-500">Method</TableHead>
+                    <TableHead className="h-16 font-bold text-slate-500">Time</TableHead>
+                    <TableHead className="h-16 text-right px-8 font-bold text-slate-500">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visitsLoading ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell colSpan={6} className="px-8"><Skeleton className="h-12 w-full rounded-xl" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : paginatedVisits.map((visit) => (
+                    <TableRow key={visit.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="px-8 font-bold text-slate-900">{visit.fullName}</TableCell>
+                      <TableCell className="text-slate-600 font-medium">{visit.college}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 py-1 font-bold">
+                          {visit.purpose}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="border-slate-200 text-slate-500 px-3 py-1 font-bold uppercase tracking-tighter">
+                          {visit.loginMethod}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-slate-500 font-medium">
+                        {format(visit.timestamp.toDate(), 'MMM dd, p')}
+                      </TableCell>
+                      <TableCell className="text-right px-8">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="rounded-full px-4 h-8 font-bold shadow-sm" onClick={() => setSelectedVisit(visit)}>
+                              Block
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="rounded-3xl border-none">
+                            <DialogHeader>
+                              <DialogTitle className="text-2xl font-black">Block Access</DialogTitle>
+                              <DialogDescription className="text-slate-500 font-medium pt-2">
+                                Are you sure you want to block <span className="text-slate-900 font-bold">{selectedVisit?.fullName}</span>? They will be restricted from entering the library.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-6 space-y-2">
+                              <Label className="font-bold text-slate-900">Reason for blocking</Label>
                               <Textarea 
-                                id="reason" 
-                                placeholder="State the reason for access restriction..." 
+                                placeholder="State the reason clearly..." 
+                                className="rounded-xl border-slate-200 min-h-[120px]"
                                 value={blockReason}
                                 onChange={(e) => setBlockReason(e.target.value)}
                               />
                             </div>
-                          </div>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => setSelectedStudent(null)} suppressHydrationWarning>Cancel</Button>
-                            <Button 
-                              variant="destructive" 
-                              disabled={isBlocking || !blockReason} 
-                              onClick={handleBlockUser}
-                              suppressHydrationWarning
-                            >
-                              {isBlocking ? "Processing..." : "Confirm Block"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-    </AdminLayout>
+                            <DialogFooter className="gap-2">
+                              <Button variant="outline" className="rounded-xl h-12 px-6 font-bold" onClick={() => setSelectedVisit(null)}>Cancel</Button>
+                              <Button 
+                                variant="destructive" 
+                                className="rounded-xl h-12 px-8 font-bold"
+                                disabled={isBlocking || !blockReason}
+                                onClick={handleBlockUser}
+                              >
+                                {isBlocking ? "Blocking..." : "Confirm Block"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="p-8 border-t border-slate-100 flex justify-between items-center bg-slate-50/30">
+                <p className="text-sm text-slate-500 font-medium">
+                  Showing <span className="font-bold text-slate-900">{paginatedVisits.length}</span> of <span className="font-bold text-slate-900">{allVisits?.length || 0}</span> entries
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl font-bold" 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl font-bold" 
+                    disabled={!allVisits || currentPage * itemsPerPage >= allVisits.length}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </main>
+    </div>
   );
 }

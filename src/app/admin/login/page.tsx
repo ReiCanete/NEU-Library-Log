@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ShieldAlert, Loader2 } from 'lucide-react';
+import { ShieldAlert, Loader2, Library } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -13,123 +13,99 @@ import { useUser } from '@/firebase';
 
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useUser();
   const { toast } = useToast();
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const errorMessage = searchParams.get('error');
-
-  const checkAdmin = useCallback(async (currentUser: any) => {
-    try {
-      const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
-      if (userDoc.exists() && userDoc.data().role === 'admin') {
-        router.push('/admin');
-      } else {
-        toast({
-          title: "Unauthorized",
-          description: "You do not have admin access. Please use an authorized account.",
-          variant: "destructive",
-        });
-        await signOut(auth);
-      }
-    } catch (error) {
-      console.error("Login check error:", error);
-    }
-  }, [router, toast]);
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
-    if (errorMessage) {
-      toast({
-        title: "Access Denied",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  }, [errorMessage, toast]);
-
-  useEffect(() => {
-    const handleRedirectResult = async () => {
+    const handleResult = async () => {
       try {
-        setIsLoggingIn(true);
+        setIsChecking(true);
         const result = await getRedirectResult(auth);
         if (result) {
           const user = result.user;
           if (!user.email?.endsWith('@neu.edu.ph')) {
             toast({
-              title: "Wrong Domain",
-              description: "Please use your @neu.edu.ph email account.",
+              title: "Unauthorized",
+              description: "Only @neu.edu.ph accounts are allowed.",
               variant: "destructive",
             });
             await signOut(auth);
-            setIsLoggingIn(false);
+            setIsChecking(false);
             return;
           }
-          await checkAdmin(user);
+          
+          const userDoc = await getDoc(doc(firestore, 'users', user.uid));
+          if (userDoc.exists() && userDoc.data().role === 'admin') {
+            router.push('/admin');
+          } else {
+            toast({
+              title: "Access Denied",
+              description: "You do not have administrator permissions.",
+              variant: "destructive",
+            });
+            await signOut(auth);
+            setIsChecking(false);
+          }
         } else {
-          setIsLoggingIn(false);
+          setIsChecking(false);
         }
       } catch (error: any) {
-        console.error("Redirect Result Error:", error);
         toast({
-          title: "Login Failed",
-          description: error.message || "An unexpected error occurred.",
+          title: "Login Error",
+          description: error.message,
           variant: "destructive",
         });
-        setIsLoggingIn(false);
+        setIsChecking(false);
       }
     };
+    handleResult();
+  }, [router, toast]);
 
-    handleRedirectResult();
-  }, [checkAdmin, toast]);
-
+  // Already signed in check
   useEffect(() => {
-    if (user && !isLoggingIn) {
-      checkAdmin(user);
+    if (user && !isChecking) {
+      const checkRole = async () => {
+        const userDoc = await getDoc(doc(firestore, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          router.push('/admin');
+        }
+      };
+      checkRole();
     }
-  }, [user, isLoggingIn, checkAdmin]);
+  }, [user, isChecking, router]);
 
   const handleLogin = async () => {
-    setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'neu.edu.ph', prompt: 'select_account' });
-    
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch (error: any) {
-      console.error("Redirect Error:", error);
-      toast({
-        title: "Login Failed",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-      setIsLoggingIn(false);
-    }
+    await signInWithRedirect(auth, provider);
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-      <Card className="max-w-md w-full shadow-2xl border-none animate-in fade-in zoom-in duration-500">
-        <CardHeader className="text-center space-y-4 pt-10">
-          <div className="mx-auto bg-primary/10 h-20 w-20 rounded-full flex items-center justify-center">
-            <ShieldAlert className="h-10 w-10 text-primary" />
+    <div className="min-h-screen bg-[#0a1628] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[150px] animate-float" />
+      
+      <Card className="max-w-md w-full glass-dark border-none shadow-2xl z-10 animate-in fade-in zoom-in duration-700">
+        <CardHeader className="text-center space-y-6 pt-12">
+          <div className="mx-auto bg-blue-500/10 h-24 w-24 rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
+            <Library className="h-12 w-12 text-blue-400" />
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-bold text-primary">Admin Access</CardTitle>
-            <CardDescription className="text-lg">Please sign in to access the dashboard</CardDescription>
+          <div className="space-y-2">
+            <CardTitle className="text-4xl font-black text-white">Admin Access</CardTitle>
+            <CardDescription className="text-blue-200/60 text-lg">Manage the NEU Library visitor system</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pb-12 space-y-6">
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-muted-foreground">
-            Access is restricted to authorized <strong>@neu.edu.ph</strong> administrator accounts only.
+        <CardContent className="pb-16 space-y-8 px-10">
+          <div className="bg-blue-500/5 border border-white/10 rounded-2xl p-6 text-sm text-blue-100 text-center leading-relaxed">
+            Administrator authentication is restricted to verified <strong>@neu.edu.ph</strong> accounts only.
           </div>
           
           <Button 
-            className="w-full h-14 text-lg font-semibold flex items-center justify-center gap-3"
+            className="w-full h-16 text-xl font-bold rounded-2xl bg-white text-[#0a1628] hover:bg-white/90 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
             onClick={handleLogin}
-            disabled={isLoggingIn || authLoading}
-            suppressHydrationWarning
+            disabled={isChecking || authLoading}
           >
-            {isLoggingIn ? (
+            {isChecking ? (
               <Loader2 className="h-6 w-6 animate-spin" />
             ) : (
               <svg className="h-6 w-6" viewBox="0 0 24 24">
@@ -151,14 +127,16 @@ function LoginContent() {
                 />
               </svg>
             )}
-            {isLoggingIn ? "Signing in..." : "Continue with Google"}
+            Sign in with Google
           </Button>
 
-          <div className="text-center">
-            <Button variant="link" className="text-slate-400" onClick={() => router.push('/')} suppressHydrationWarning>
-              Return to Kiosk Mode
-            </Button>
-          </div>
+          <Button 
+            variant="link" 
+            className="w-full text-blue-200/40 hover:text-blue-200/60"
+            onClick={() => router.push('/')}
+          >
+            Return to Kiosk
+          </Button>
         </CardContent>
       </Card>
     </div>
@@ -167,7 +145,7 @@ function LoginContent() {
 
 export default function AdminLogin() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0a1628] flex items-center justify-center"><Loader2 className="animate-spin text-white" /></div>}>
       <LoginContent />
     </Suspense>
   );

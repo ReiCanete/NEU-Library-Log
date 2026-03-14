@@ -5,29 +5,18 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UserCircle, Loader2, AlertCircle } from 'lucide-react';
+import { UserCircle, Loader2, AlertCircle, Library } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
-import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function KioskEntry() {
   const router = useRouter();
-  const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const handleRedirectResult = async () => {
@@ -54,7 +43,6 @@ export default function KioskEntry() {
           setLoading(false);
         }
       } catch (error: any) {
-        console.error("Redirect Error:", error);
         setLoginError(`Google Sign-in Failed: ${error.message}`);
         setLoading(false);
       }
@@ -81,8 +69,7 @@ export default function KioskEntry() {
       
       if (!blockSnap.empty) {
         const blockData = blockSnap.docs[0].data();
-        const reason = blockData.reason || "Please see the librarian for more information.";
-        setLoginError(`Entry Not Allowed: ${reason}`);
+        setLoginError(`Entry Restricted: ${blockData.reason}`);
         setStudentId('');
         setLoading(false);
         return;
@@ -108,7 +95,6 @@ export default function KioskEntry() {
         router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}`);
       }
     } catch (err: any) {
-      console.error("Firestore Error:", err);
       setLoginError(`System error: ${err.message || "Connection failed"}`);
       setLoading(false);
     }
@@ -119,72 +105,78 @@ export default function KioskEntry() {
     setLoginError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ hd: 'neu.edu.ph', prompt: 'select_account' });
-
     try {
       await signInWithRedirect(auth, provider);
     } catch (error: any) {
-      console.error("Google Auth Error:", error);
       setLoginError(`Google Sign-in Failed: ${error.message}`);
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50">
-      <div className="max-w-2xl w-full space-y-12 text-center animate-in fade-in zoom-in duration-500">
+    <div className="min-h-screen bg-[#0a1628] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] animate-float" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] animate-float" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-[20%] right-[10%] w-[20%] h-[20%] bg-cyan-600/10 rounded-full blur-[80px] animate-float" style={{ animationDelay: '4s' }} />
+
+      <div className="max-w-xl w-full space-y-8 text-center z-10 animate-in fade-in zoom-in duration-1000">
         <div className="space-y-4">
-          <h1 className="text-6xl font-bold tracking-tight text-primary">
+          <div className="flex justify-center mb-6">
+            <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-xl border border-white/20 shadow-2xl">
+              <Library className="h-16 w-16 text-blue-400" />
+            </div>
+          </div>
+          <h1 className="text-6xl font-black tracking-tight text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
             NEU Library Log
           </h1>
-          <p className="text-2xl text-muted-foreground font-medium">
+          <p className="text-xl text-blue-200/80 font-medium">
             Please tap your ID or sign in to continue
           </p>
         </div>
 
-        <div className="grid gap-8">
-          <Card className="shadow-xl border-none ring-1 ring-slate-200">
+        <div className="grid gap-6">
+          <Card className="glass-dark border-none ring-1 ring-white/20">
             <CardContent className="pt-8 pb-10 space-y-6">
-              <div className="flex justify-center mb-6">
-                <UserCircle className="h-20 w-20 text-primary opacity-20" />
-              </div>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  placeholder="Scan or Enter School ID"
-                  className="h-20 text-3xl text-center font-mono border-2 focus-visible:ring-primary"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  disabled={loading}
-                  suppressHydrationWarning
-                />
+                <div className="relative group">
+                  <Input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="Scan or Enter School ID"
+                    className="h-20 text-3xl text-center font-mono bg-black/40 border-white/10 text-white rounded-2xl focus-visible:ring-blue-500 focus-visible:ring-offset-0 focus-visible:border-blue-500 transition-all duration-300 group-hover:border-white/30"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                    disabled={loading}
+                    autoFocus
+                  />
+                  <div className="absolute inset-0 rounded-2xl bg-blue-500/5 opacity-0 group-focus-within:opacity-100 blur-xl transition-opacity -z-10" />
+                </div>
                 <Button 
-                  className="w-full h-16 text-xl font-semibold"
+                  className="w-full h-16 text-xl font-bold rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 border-none shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all active:scale-[0.98]"
                   disabled={loading || !studentId.trim()}
                   type="submit"
-                  suppressHydrationWarning
                 >
-                  {loading && !loginError ? <Loader2 className="animate-spin" /> : "Continue with ID"}
+                  {loading && !loginError ? <Loader2 className="animate-spin mr-2" /> : "Continue with ID"}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          <div className="relative flex items-center gap-4 py-4">
-            <div className="flex-grow border-t border-slate-300"></div>
-            <span className="text-slate-400 font-medium">OR</span>
-            <div className="flex-grow border-t border-slate-300"></div>
+          <div className="relative flex items-center gap-4 py-2">
+            <div className="flex-grow border-t border-white/10"></div>
+            <span className="text-blue-200/40 text-sm font-bold tracking-widest">OR</span>
+            <div className="flex-grow border-t border-white/10"></div>
           </div>
 
           <Button 
             variant="outline" 
-            className="h-16 text-xl font-semibold border-2 hover:bg-slate-100 flex items-center justify-center gap-3"
+            className="h-16 text-xl font-semibold border-white/10 bg-white/5 text-white hover:bg-white/10 hover:border-white/20 rounded-2xl backdrop-blur-md transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            suppressHydrationWarning
           >
             {loading && !loginError ? (
-              <Loader2 className="animate-spin" />
+              <Loader2 className="animate-spin mr-2" />
             ) : (
               <svg className="h-6 w-6" viewBox="0 0 24 24">
                 <path
@@ -209,9 +201,9 @@ export default function KioskEntry() {
           </Button>
 
           {loginError && (
-            <Alert variant="destructive" className="animate-in slide-in-from-top-2 duration-300">
+            <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-200 animate-in slide-in-from-top-2 duration-300 rounded-2xl backdrop-blur-lg">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
+              <AlertTitle className="font-bold">Access Error</AlertTitle>
               <AlertDescription>{loginError}</AlertDescription>
             </Alert>
           )}
