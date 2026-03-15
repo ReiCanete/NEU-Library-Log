@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Comprehensive admin check
+    // Hardened admin check for Staff Portal
     // Explicitly whitelists the user email with a case-insensitive match
     function isAdmin() {
       return request.auth != null && (
@@ -14,32 +14,33 @@ service cloud.firestore {
       );
     }
 
-    // Visitors collection - Publicly readable/creatable for the Kiosk
+    // Visitors collection
     match /visits/{visitId} {
       allow create: if true;
       allow read: if true; 
       allow update, delete: if isAdmin();
     }
 
-    // Users collection - Publicly readable/creatable for registration
+    // Users collection
     match /users/{userId} {
-      allow read, create: if true; 
+      allow read: if true;
+      allow create: if true; 
       allow update: if isAdmin() || request.auth.uid == userId; 
     }
 
-    // Blocklist - Publicly readable for the Kiosk to check status
+    // Blocklist
     match /blocklist/{blockId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
 
-    // Announcements - Publicly readable for the Kiosk alerts
+    // Announcements
     match /announcements/{announcementId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
 
-    // Settings - Publicly readable for Kiosk capacity checks
+    // Settings
     match /settings/{settingId} {
       allow read: if true; 
       allow write: if isAdmin();

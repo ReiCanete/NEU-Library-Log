@@ -13,15 +13,27 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Robust Singleton pattern for Next.js HMR stability
+// Extremely robust Singleton pattern for Next.js 15 HMR stability
+// This prevents "INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9)"
 const G = (typeof window !== 'undefined' ? window : globalThis) as any;
 
 function getFirebaseInstance(): { app: FirebaseApp; auth: Auth; db: Firestore } {
+  if (typeof window === 'undefined') {
+    return { app: null as any, auth: null as any, db: null as any };
+  }
+
   if (!G._firebaseApp) {
     G._firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  }
+  
+  if (!G._firebaseAuth) {
     G._firebaseAuth = getAuth(G._firebaseApp);
+  }
+  
+  if (!G._firebaseDb) {
     G._firebaseDb = getFirestore(G._firebaseApp);
   }
+
   return {
     app: G._firebaseApp,
     auth: G._firebaseAuth,
@@ -29,8 +41,6 @@ function getFirebaseInstance(): { app: FirebaseApp; auth: Auth; db: Firestore } 
   };
 }
 
-const { app, auth, db } = typeof window !== 'undefined' 
-  ? getFirebaseInstance() 
-  : { app: null as any, auth: null as any, db: null as any };
+const { app, auth, db } = getFirebaseInstance();
 
 export { app, auth, db };

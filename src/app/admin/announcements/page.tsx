@@ -1,9 +1,8 @@
-
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Megaphone, Plus, Trash2, CheckCircle2, XCircle, Send, Loader2, Edit2, AlertCircle } from 'lucide-react';
+import { Megaphone, Plus, Trash2, CheckCircle2, XCircle, Send, Loader2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth, errorEmitter, FirestorePermissionError } from '@/firebase';
