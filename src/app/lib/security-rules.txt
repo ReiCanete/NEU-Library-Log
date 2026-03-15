@@ -16,7 +16,8 @@ service cloud.firestore {
 
     // Visitors collection - Publicly readable/creatable for the Kiosk
     match /visits/{visitId} {
-      allow create, read: if true; 
+      allow create: if true;
+      allow read: if true; 
       allow update, delete: if isAdmin();
     }
 
