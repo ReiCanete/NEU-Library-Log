@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, Suspense, useEffect, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2 } from 'lucide-react';
 import { validateFullName, validateStudentId } from '@/lib/validation';
