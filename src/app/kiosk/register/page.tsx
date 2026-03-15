@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, Suspense, useEffect, useMemo } from 'react';
@@ -53,7 +54,6 @@ function RegisterForm() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for Google redirect data first
     const googleUserJson = sessionStorage.getItem('kiosk_google_user');
     if (googleUserJson) {
       const googleUser = JSON.parse(googleUserJson);
@@ -136,9 +136,7 @@ function RegisterForm() {
         loginMethod: loginMethod
       }));
       
-      // Cleanup google user session if it exists
       sessionStorage.removeItem('kiosk_google_user');
-      
       router.push('/kiosk/purpose');
     } catch (err: any) {
       logAppError('Registration', 'SaveUser', err);
@@ -149,6 +147,7 @@ function RegisterForm() {
 
   return (
     <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <title>NEU Library Log — Registration</title>
       <div className="absolute top-6 left-6">
         <Button variant="ghost" onClick={() => {
           sessionStorage.removeItem('kiosk_google_user');
@@ -158,7 +157,7 @@ function RegisterForm() {
         </Button>
       </div>
 
-      <div className="max-w-lg w-full space-y-4 z-10 animate-in fade-in zoom-in duration-700">
+      <div className="max-w-[480px] w-full space-y-4 z-10 animate-in fade-in zoom-in duration-700 mx-auto">
         <div className="text-center space-y-1">
           <div className="mx-auto bg-[#c9a227]/10 h-14 w-14 rounded-2xl flex items-center justify-center border border-[#c9a227]/20 shadow-xl mb-2">
             <UserPlus className="h-7 w-7 text-[#c9a227]" />
@@ -207,7 +206,7 @@ function RegisterForm() {
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute top-[calc(100%+8px)] left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-top-2 duration-300">
+                <div className="absolute bottom-full mb-3 left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-bottom-2 duration-300">
                   <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]" />
                     <Input 
@@ -255,11 +254,6 @@ function RegisterForm() {
                           )}
                         </div>
                       ))}
-                      {filteredOptions.length === 0 && (
-                        <div className="p-6 text-center text-white/20 font-bold text-xs">
-                          No results found
-                        </div>
-                      )}
                     </div>
                   </ScrollArea>
                 </div>

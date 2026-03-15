@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -30,7 +31,6 @@ function KioskEntryContent() {
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
 
-  // Announcement State
   const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -44,7 +44,6 @@ function KioskEntryContent() {
   const currentCount = todayVisits?.length || 0;
   const isAtCapacity = currentCount >= dailyCapacity;
 
-  // Real-time Announcement Listener
   useEffect(() => {
     if (!db) return;
     const q = query(
@@ -64,7 +63,6 @@ function KioskEntryContent() {
     return () => unsubscribe();
   }, [db]);
 
-  // Announcement Cycle
   useEffect(() => {
     if (activeAnnouncements.length <= 1) return;
     const interval = setInterval(() => {
@@ -73,7 +71,6 @@ function KioskEntryContent() {
     return () => clearInterval(interval);
   }, [activeAnnouncements]);
 
-  // Handle Google Redirect Result
   useEffect(() => {
     const handleRedirect = async () => {
       if (!auth || !db) return;
@@ -88,7 +85,6 @@ function KioskEntryContent() {
             return;
           }
 
-          // Check blocklist
           const blockSnap = await getDocs(query(
             collection(db, 'blocklist'),
             where('studentId', '==', user.email)
@@ -100,14 +96,12 @@ function KioskEntryContent() {
             return;
           }
 
-          // Check/create user document
           const userSnap = await getDocs(query(
             collection(db, 'users'),
             where('email', '==', user.email)
           ));
 
           if (userSnap.empty) {
-            // First time - save to sessionStorage and go to register
             sessionStorage.setItem('kiosk_google_user', JSON.stringify({
               email: user.email,
               fullName: user.displayName || '',
@@ -115,7 +109,6 @@ function KioskEntryContent() {
             }));
             router.push('/kiosk/register');
           } else {
-            // Existing user - save to sessionStorage and go to purpose
             const userData = userSnap.docs[0].data();
             sessionStorage.setItem('kiosk_visitor', JSON.stringify({
               studentId: userData.studentId || user.email,
@@ -130,7 +123,6 @@ function KioskEntryContent() {
         }
       } catch (err: any) {
         if (err.code !== 'auth/popup-closed-by-user') {
-          console.error('[NEU Library Log Error] [Kiosk] [Google Redirect]:', err);
           setError(getErrorMessage(err));
         }
         setLoading(false);
@@ -195,8 +187,6 @@ function KioskEntryContent() {
     }
   };
 
-  const currentAnnouncement = activeAnnouncements[currentIndex];
-
   if (blockedData) {
     return (
       <div className="h-screen bg-[#0a2a1a] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
@@ -214,29 +204,22 @@ function KioskEntryContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col relative overflow-hidden">
-      {/* Announcement Banner - Sits outside the centered area */}
-      <div className="w-full h-[48px]">
-        {currentAnnouncement && (
-          <div className={`w-full py-3 px-6 flex items-center justify-center gap-3 transition-all duration-1000 animate-in slide-in-from-top ${
-            currentAnnouncement.priority === 'urgent' 
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col relative">
+      <div className="w-full h-[48px] shrink-0">
+        {activeAnnouncements[currentIndex] && (
+          <div className={`w-full py-2 px-6 flex items-center justify-center gap-3 transition-all duration-1000 animate-in slide-in-from-top ${
+            activeAnnouncements[currentIndex].priority === 'urgent' 
               ? 'bg-[#dc2626] text-white animate-pulse' 
               : 'bg-[#c9a227] text-[#0a2a1a]'
           } shadow-xl`}>
             <Megaphone className="h-4 w-4 shrink-0" />
             <p className="text-sm font-black uppercase tracking-widest text-center truncate max-w-4xl">
-              {currentAnnouncement.priority === 'urgent' && "⚠ URGENT: "}{currentAnnouncement.message}
+              {activeAnnouncements[currentIndex].priority === 'urgent' && "⚠ URGENT: "}{activeAnnouncements[currentIndex].message}
             </p>
-            {activeAnnouncements.length > 1 && (
-              <span className="text-[10px] font-black opacity-50 whitespace-nowrap ml-2">
-                {currentIndex + 1}/{activeAnnouncements.length}
-              </span>
-            )}
           </div>
         )}
       </div>
 
-      {/* Toggle Buttons - Absolute Top Right */}
       <div className="absolute top-4 right-4 z-50">
         <Tabs value={loginMode} onValueChange={(v) => {
           if (v === 'admin') router.push('/admin/login');
@@ -249,67 +232,66 @@ function KioskEntryContent() {
         </Tabs>
       </div>
 
-      {/* Main Content Area - Perfectly Centered in remaining space */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 z-10 animate-in fade-in duration-700">
-        <div className="w-full max-w-md mx-auto flex flex-col items-center gap-8">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <img src="/neu-logo.png" alt="NEU Logo" width={100} height={100} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" />
-            <div className="space-y-2">
-              <h1 className="text-5xl font-black tracking-tight text-[#c9a227] drop-shadow-2xl leading-none">NEU Library</h1>
-              <p className="text-sm text-white/50 font-black uppercase tracking-[0.4em]">Institutional Digital Log</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md mx-auto flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
+            <div className="space-y-1">
+              <h1 className="text-4xl font-black tracking-tight text-[#c9a227] drop-shadow-2xl leading-none">NEU Library</h1>
+              <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.4em]">Digital Visitor Log</p>
             </div>
           </div>
 
           {isAtCapacity ? (
-            <Card className="bg-[#0a2a1a]/60 backdrop-blur-2xl w-full border-2 border-red-500/50 rounded-[2.5rem] p-12 text-center space-y-6">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-              <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Full Capacity</h2>
-              <p className="text-white/60 text-sm font-bold leading-relaxed">The library has reached its maximum capacity ({dailyCapacity}).</p>
-              <Button className="w-full h-14 rounded-xl bg-white/10 text-white font-black uppercase text-xs" onClick={() => window.location.reload()}>Retry</Button>
+            <Card className="bg-[#0a2a1a]/60 backdrop-blur-2xl w-full border-2 border-red-500/50 rounded-[2rem] p-8 text-center space-y-4">
+              <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
+              <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Full Capacity</h2>
+              <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity}).</p>
+              <Button className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</Button>
             </Card>
           ) : (
-            <Card className="bg-[#0a2a1a]/40 backdrop-blur-2xl w-full border-none ring-1 ring-[#c9a227]/30 rounded-[2.5rem] shadow-2xl overflow-hidden">
-              <div className="bg-[#c9a227]/10 p-4 border-b border-[#c9a227]/20 flex justify-between items-center px-8">
-                <span className="text-[10px] font-black text-[#c9a227] uppercase tracking-widest">Visitors Today</span>
-                <span className="text-[10px] font-black text-white uppercase tabular-nums">{currentCount} / {dailyCapacity}</span>
+            <Card className="bg-[#0a2a1a]/40 backdrop-blur-2xl w-full border-none ring-1 ring-[#c9a227]/30 rounded-[2rem] shadow-2xl overflow-hidden">
+              <div className="bg-[#c9a227]/10 p-3 border-b border-[#c9a227]/20 flex justify-between items-center px-8">
+                <span className="text-[9px] font-black text-[#c9a227] uppercase tracking-widest">Entry Count</span>
+                <span className="text-[9px] font-black text-white uppercase tabular-nums">{currentCount} / {dailyCapacity}</span>
               </div>
-              <CardContent className="p-10 space-y-8">
-                <form onSubmit={handleIdSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase tracking-widest text-[#c9a227] ml-2">School ID Entry</Label>
+              <CardContent className="p-8 space-y-6">
+                <form onSubmit={handleIdSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-2">School ID Entry</Label>
                     <Input 
                       ref={inputRef} 
                       placeholder="e.g. 25-12946-343" 
-                      className={`h-20 text-4xl text-center font-mono bg-black/30 border-[#c9a227]/20 text-white rounded-2xl focus:border-[#c9a227] ${error ? 'border-red-500' : ''}`} 
+                      className={`h-16 text-3xl text-center font-mono bg-black/30 border-[#c9a227]/20 text-white rounded-xl focus:border-[#c9a227] ${error ? 'border-red-500' : ''}`} 
                       value={studentId} 
                       onChange={(e) => { setStudentId(e.target.value); setError(null); }} 
                       disabled={loading} 
                       autoFocus 
                     />
-                    {error && <p className="text-red-400 text-xs font-black uppercase tracking-widest text-center mt-3">{error}</p>}
+                    {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
                   </div>
-                  <Button className="w-full h-16 text-2xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-2xl" disabled={loading} type="submit">
+                  <Button className="w-full h-14 text-xl font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90" disabled={loading} type="submit">
                     {loading && studentId.trim() ? "Verifying..." : "Continue"}
                   </Button>
                 </form>
-                <div className="relative flex items-center gap-4">
+                <div className="relative flex items-center gap-3">
                   <div className="flex-grow border-t border-white/5"></div>
-                  <span className="text-white/20 text-[10px] font-black uppercase tracking-widest">OR</span>
+                  <span className="text-white/20 text-[8px] font-black uppercase tracking-widest">OR</span>
                   <div className="flex-grow border-t border-white/5"></div>
                 </div>
                 
                 <button 
                   onClick={handleGoogleSignIn} 
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-medium py-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all shadow-md active:scale-[0.98] disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all shadow-md active:scale-[0.98] text-xs"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24">
+                  <svg width="18" height="18" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
-                  {loading ? "Connecting..." : "Sign in with Google (@neu.edu.ph)"}
+                  Sign in with Google (@neu.edu.ph)
                 </button>
               </CardContent>
             </Card>
@@ -323,6 +305,7 @@ function KioskEntryContent() {
 export default function KioskEntry() {
   return (
     <ErrorBoundary fallbackType="kiosk">
+      <title>NEU Library Log — Visitor Entry</title>
       <KioskEntryContent />
     </ErrorBoundary>
   );

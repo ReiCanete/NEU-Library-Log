@@ -1,0 +1,17 @@
+
+{
+  "name": "NEU Library Log",
+  "short_name": "NEU Library",
+  "description": "Nueva Era University Library Digital Entry Management System",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#0a2a1a",
+  "theme_color": "#c9a227",
+  "icons": [
+    {
+      "src": "/neu-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

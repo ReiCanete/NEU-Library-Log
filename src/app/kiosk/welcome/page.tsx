@@ -1,15 +1,18 @@
+
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Clock, Calendar, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 export default function WelcomePage() {
   const router = useRouter();
   const [visitor, setVisitor] = useState<any>(null);
   const [countdown, setCountdown] = useState(8);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const timerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     setCurrentTime(new Date());
@@ -46,8 +49,9 @@ export default function WelcomePage() {
 
   return (
     <div className="h-screen overflow-hidden flex flex-col items-center justify-center gap-6 bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] text-white text-center relative p-8">
+      <title>NEU Library Log — Welcome</title>
       <div className="max-w-4xl w-full flex flex-col items-center gap-6 z-10 animate-in fade-in zoom-in duration-700">
-        <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="rounded-full shadow-2xl border-2 border-[#c9a227]/30" />
+        <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
         
         <div className="relative flex items-center justify-center w-[100px] h-[100px]">
           <svg className="w-full h-full -rotate-90">
@@ -65,7 +69,9 @@ export default function WelcomePage() {
           </p>
           <h1 className="text-5xl font-black text-white tracking-tight">{visitor.fullName}</h1>
           <p className="text-[#c9a227] text-base font-black uppercase tracking-widest drop-shadow-lg">Welcome to NEU Library!</p>
-          <div className="inline-block px-8 py-2 rounded-2xl bg-[#c9a227] text-[#0a2a1a] text-lg font-black shadow-2xl">{visitor.college}</div>
+          <Badge className="bg-[#c9a227] text-[#0a2a1a] text-lg font-black px-8 py-2 rounded-2xl shadow-2xl max-w-[400px] truncate block mx-auto">
+            {visitor.college}
+          </Badge>
         </div>
 
         <div className="flex gap-4 w-full max-w-[500px] pt-8 border-t border-white/10">

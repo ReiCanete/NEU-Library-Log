@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Search, Monitor, Users, GraduationCap, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
@@ -25,6 +26,7 @@ export default function PurposePage() {
   const [visitor, setVisitor] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState(100);
+  const timerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const data = sessionStorage.getItem('kiosk_visitor');
@@ -34,11 +36,11 @@ export default function PurposePage() {
     }
     setVisitor(JSON.parse(data));
 
-    const timer = setInterval(() => {
+    const interval = setInterval(() => {
       setProgress((prev) => Math.max(0, prev - (100 / 300)));
     }, 100);
 
-    return () => clearInterval(timer);
+    return () => clearInterval(interval);
   }, [router]);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export default function PurposePage() {
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col items-center justify-center p-6 relative">
+      <title>NEU Library Log — Visit Purpose</title>
       <div className="absolute top-6 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
           <ArrowLeft className="h-4 w-4" /> Cancel Entry
@@ -94,7 +97,7 @@ export default function PurposePage() {
             {PURPOSES.map((item) => (
               <Card 
                 key={item.id} 
-                className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] hover:scale-[1.02] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden" 
+                className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] hover:scale-[1.02] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden hover-shimmer" 
                 onClick={() => handleSelect(item.label)}
               >
                 <CardContent className="flex flex-col items-center justify-center p-4 gap-3 h-[140px]">
@@ -109,8 +112,8 @@ export default function PurposePage() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full h-2 bg-black/40">
-        <div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_15px_#c9a227]" style={{ width: `${progress}%` }} />
+      <div className="fixed bottom-0 left-0 w-full h-1 bg-black/40">
+        <div className="h-full bg-[#c9a227] transition-all duration-100 ease-linear shadow-[0_0_10px_#c9a227]" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );

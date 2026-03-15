@@ -1,3 +1,4 @@
+
 export const validateStudentId = (id: string): boolean => {
   return /^\d{2}-\d{5}-\d{3}$/.test(id);
 };
