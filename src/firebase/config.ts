@@ -13,47 +13,11 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Singleton pattern for HMR stability in Next.js
-// Attaching to globalThis ensures the same instance is reused across HMR cycles
-const globalWithFirebase = globalThis as unknown as {
-  __FIREBASE_APP__?: FirebaseApp;
-  __FIREBASE_AUTH__?: Auth;
-  __FIREBASE_DB__?: Firestore;
-};
+// Singleton pattern using globalThis to survive Next.js HMR cycles
+const G = globalThis as any;
 
-function getFirebaseApp(): FirebaseApp {
-  if (globalWithFirebase.__FIREBASE_APP__) return globalWithFirebase.__FIREBASE_APP__;
-  
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  
-  if (process.env.NODE_ENV !== 'production') {
-    globalWithFirebase.__FIREBASE_APP__ = app;
-  }
-  
-  return app;
-}
+const app: FirebaseApp = G._fapp || (typeof window !== 'undefined' ? (G._fapp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : undefined);
+const auth: Auth = G._fauth || (typeof window !== 'undefined' ? (G._fauth = getAuth(app)) : undefined);
+const db: Firestore = G._fdb || (typeof window !== 'undefined' ? (G._fdb = getFirestore(app)) : undefined);
 
-function getFirebaseAuth(): Auth {
-  if (globalWithFirebase.__FIREBASE_AUTH__) return globalWithFirebase.__FIREBASE_AUTH__;
-  const app = getFirebaseApp();
-  const auth = getAuth(app);
-  if (process.env.NODE_ENV !== 'production') {
-    globalWithFirebase.__FIREBASE_AUTH__ = auth;
-  }
-  return auth;
-}
-
-function getFirestoreDb(): Firestore {
-  if (globalWithFirebase.__FIREBASE_DB__) return globalWithFirebase.__FIREBASE_DB__;
-  const app = getFirebaseApp();
-  const db = getFirestore(app);
-  if (process.env.NODE_ENV !== 'production') {
-    globalWithFirebase.__FIREBASE_DB__ = db;
-  }
-  return db;
-}
-
-// Export singletons
-export const app = getFirebaseApp();
-export const auth = getFirebaseAuth();
-export const db = getFirestoreDb();
+export { app, auth, db };

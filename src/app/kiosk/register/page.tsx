@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, Suspense, useEffect, useRef, useMemo } from 'react';
+import { useState, Suspense, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,9 +8,9 @@ import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft } from 'lucide-react';
 import { validateFullName } from '@/lib/validation';
-import { getErrorMessage, logAppError } from '@/lib/errorMessages';
+import { logAppError } from '@/lib/errorMessages';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const COLLEGES = [
@@ -54,14 +53,12 @@ function RegisterForm() {
     const term = search.toLowerCase();
     const results: { type: 'header' | 'item' | 'non-student'; label: string; college?: string }[] = [];
     
-    // Add non-student options if they match
     NON_STUDENT_OPTIONS.forEach(opt => { 
       if (opt.toLowerCase().includes(term)) {
         results.push({ type: 'non-student', label: opt }); 
       }
     });
 
-    // Add college and program options
     COLLEGES.forEach(college => {
       const matchedPrograms = college.programs.filter(p => 
         p.toLowerCase().includes(term) || college.name.toLowerCase().includes(term)
@@ -116,7 +113,7 @@ function RegisterForm() {
       router.push('/kiosk/purpose');
     } catch (err: any) {
       logAppError('Registration', 'SaveUser', err);
-      setFormError("Registration failed. Please try again or ask library staff for help.");
+      setFormError("Registration failed. Please try again.");
       setLoading(false);
     }
   };
@@ -129,24 +126,24 @@ function RegisterForm() {
         </Button>
       </div>
 
-      <div className="max-w-xl w-full space-y-4 z-10 animate-in fade-in zoom-in duration-700">
+      <div className="max-w-lg w-full space-y-4 z-10 animate-in fade-in zoom-in duration-700">
         <div className="text-center space-y-1">
           <div className="mx-auto bg-[#c9a227]/10 h-14 w-14 rounded-2xl flex items-center justify-center border border-[#c9a227]/20 shadow-xl mb-2">
             <UserPlus className="h-7 w-7 text-[#c9a227]" />
           </div>
-          <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase">New Profile</h2>
+          <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">New Profile</h2>
           <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Please complete your registration</p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass-neu rounded-[2rem] p-8 space-y-4 shadow-2xl border-none">
           {formError && (
-            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-300">
-              <p className="text-red-200 text-[10px] font-black uppercase tracking-widest">{formError}</p>
+            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+              <p className="text-red-200 text-[9px] font-black uppercase text-center tracking-widest">{formError}</p>
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4">
-             <div className="space-y-1">
+          <div className="space-y-4">
+            <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Assigned ID</Label>
               <Input value={studentId} readOnly className="h-12 text-xl font-mono bg-black/40 border-[#c9a227]/20 text-white/50 rounded-xl px-4" />
             </div>
@@ -168,7 +165,7 @@ function RegisterForm() {
             <div className="space-y-1 relative">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program / Affiliation</Label>
               <div 
-                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] ${isDropdownOpen ? 'border-[#c9a227]' : ''}`}
+                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all ${isDropdownOpen ? 'border-[#c9a227] ring-2 ring-[#c9a227]/10' : ''}`}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 <span className={`font-bold text-xs truncate pr-2 ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
@@ -178,7 +175,7 @@ function RegisterForm() {
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute top-[calc(100%+8px)] left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-top-4 duration-300 flex flex-col">
+                <div className="absolute top-[calc(100%+8px)] left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-top-2 duration-300">
                   <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]" />
                     <Input 
@@ -190,58 +187,56 @@ function RegisterForm() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
-                  <div className="max-h-[220px] overflow-hidden">
-                    <ScrollArea className="h-[220px] pr-1">
-                      <div className="space-y-1 pb-2">
-                        {filteredOptions.map((opt, i) => (
-                          <div key={i}>
-                            {opt.type === 'header' && (
-                              <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60 mt-1">
+                  <ScrollArea className="h-[220px] pr-2">
+                    <div className="space-y-1">
+                      {filteredOptions.map((opt, i) => (
+                        <div key={i}>
+                          {opt.type === 'header' && (
+                            <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60">
+                              {opt.label}
+                            </div>
+                          )}
+                          {(opt.type === 'item' || opt.type === 'non-student') && (
+                            <div 
+                              className="px-3 py-2 rounded-lg hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (opt.type === 'non-student') { 
+                                  setSelectedCollege(opt.label); 
+                                  setSelectedProgram(''); 
+                                } else { 
+                                  setSelectedCollege(opt.college!); 
+                                  setSelectedProgram(opt.label); 
+                                }
+                                setIsDropdownOpen(false); 
+                                setSearch(''); 
+                                setFormError(null);
+                              }}
+                            >
+                              <span className="text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
                                 {opt.label}
-                              </div>
-                            )}
-                            {(opt.type === 'item' || opt.type === 'non-student') && (
-                              <div 
-                                className="px-3 py-2 rounded-lg hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (opt.type === 'non-student') { 
-                                    setSelectedCollege(opt.label); 
-                                    setSelectedProgram(''); 
-                                  } else { 
-                                    setSelectedCollege(opt.college!); 
-                                    setSelectedProgram(opt.label); 
-                                  }
-                                  setIsDropdownOpen(false); 
-                                  setSearch(''); 
-                                  setFormError(null);
-                                }}
-                              >
-                                <span className="text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
-                                  {opt.label}
-                                </span>
-                                {(selectedProgram === opt.label || selectedCollege === opt.label) && (
-                                  <Check className="h-4 w-4 text-[#c9a227]" />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {filteredOptions.length === 0 && (
-                          <div className="p-6 text-center text-white/20 font-bold text-xs">
-                            No results found
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
+                              </span>
+                              {(selectedProgram === opt.label || selectedCollege === opt.label) && (
+                                <Check className="h-4 w-4 text-[#c9a227]" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {filteredOptions.length === 0 && (
+                        <div className="p-6 text-center text-white/20 font-bold text-xs">
+                          No results found
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </div>
               )}
             </div>
           </div>
 
           <Button 
-            className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98]"
+            className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98] mt-2"
             disabled={loading}
             type="submit"
           >
