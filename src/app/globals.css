@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 32% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 32% 17%;
-    --accent-foreground: 210 40% 98%;
+    --background: 60 20% 97%;
+    --foreground: 150 60% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 60% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 60% 5%;
+    --primary: 138 56% 23%;
+    --primary-foreground: 45 67% 95%;
+    --secondary: 45 67% 47%;
+    --secondary-foreground: 150 60% 5%;
+    --muted: 138 20% 90%;
+    --muted-foreground: 138 20% 40%;
+    --accent: 45 67% 47%;
+    --accent-foreground: 45 67% 95%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 17%;
-    --input: 217 32% 17%;
-    --ring: 224 76% 48%;
+    --border: 138 20% 85%;
+    --input: 138 20% 85%;
+    --ring: 45 67% 47%;
     --radius: 1rem;
   }
 }
@@ -32,36 +32,36 @@
     @apply border-border;
   }
   body {
-    @apply bg-[#0a1628] text-foreground font-body antialiased;
+    @apply bg-[#f5f5f0] text-foreground font-body antialiased;
   }
 }
 
-.glass {
-  @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-xl;
+.neu-dark-bg {
+  background: radial-gradient(circle at center, #1a5c2e 0%, #0a2a1a 100%);
+  position: relative;
 }
 
-.glass-dark {
-  @apply bg-black/20 backdrop-blur-lg border border-white/10 shadow-2xl;
+.neu-dark-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#ffffff08 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+
+.glass-neu {
+  @apply bg-[#0a2a1a]/40 backdrop-blur-xl border border-[#c9a227]/30 shadow-2xl;
 }
 
 @keyframes float {
-  0% { transform: translateY(0px) translateX(0px); }
-  50% { transform: translateY(-20px) translateX(10px); }
-  100% { transform: translateY(0px) translateX(0px); }
-}
-
-@keyframes orb-float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-}
-
-.animate-orb {
-  animation: orb-float 20s ease-in-out infinite;
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
 }
 
 .animate-float {
-  animation: float 8s ease-in-out infinite;
+  animation: float 6s ease-in-out infinite;
 }
 
 .progress-ring {

@@ -74,45 +74,43 @@ export default function PurposePage() {
   if (!visitor) return null;
 
   return (
-    <div className="min-h-screen bg-[#0a1628] flex flex-col items-center justify-center p-12 relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[150px] animate-orb" />
-      
-      <div className="absolute top-8 left-8">
+    <div className="min-h-screen neu-dark-bg flex flex-col items-center justify-center p-8 relative overflow-hidden">
+      <div className="absolute top-6 left-6">
         <Button 
           variant="ghost" 
           onClick={() => router.push('/')}
-          className="text-white hover:bg-white/10 gap-2 font-bold px-6 h-12 rounded-full"
+          className="text-[#c9a227] hover:bg-white/5 gap-2 font-bold px-6 h-12 rounded-full border border-[#c9a227]/20"
         >
           <ArrowLeft className="h-5 w-5" /> Cancel
         </Button>
       </div>
 
-      <div className="max-w-6xl w-full space-y-16 text-center z-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-        <div className="space-y-4">
-          <h2 className="text-7xl font-black text-white drop-shadow-2xl tracking-tight">Visit Purpose</h2>
-          <p className="text-2xl text-blue-200/50 font-bold">
-            What brings you to the library today, <span className="text-blue-400">{visitor.fullName.split(' ')[0]}</span>?
+      <div className="max-w-5xl w-full space-y-12 text-center z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="space-y-3">
+          <h2 className="text-6xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight">Visit Purpose</h2>
+          <p className="text-xl text-white/50 font-bold">
+            What brings you to the library today, <span className="text-white">{visitor.fullName.split(' ')[0]}</span>?
           </p>
         </div>
 
         {isSubmitting ? (
-          <div className="py-24 flex flex-col items-center gap-8 glass rounded-[3rem] p-16">
-            <Loader2 className="h-24 w-24 animate-spin text-blue-400" />
-            <p className="text-3xl font-black text-white uppercase tracking-widest">Logging your entry...</p>
+          <div className="py-20 flex flex-col items-center gap-6 glass-neu rounded-[2.5rem] p-12">
+            <Loader2 className="h-16 w-16 animate-spin text-[#c9a227]" />
+            <p className="text-2xl font-black text-white uppercase tracking-widest">Logging Entry...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-10">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
             {PURPOSES.map((item) => (
               <Card 
                 key={item.id}
-                className="group cursor-pointer glass-dark border-white/5 hover:bg-blue-600/30 hover:border-blue-500/50 hover:scale-[1.03] active:scale-95 transition-all duration-500 rounded-[3rem] overflow-hidden shadow-2xl"
+                className="group cursor-pointer glass-neu border-[#c9a227]/10 hover:bg-[#c9a227]/10 hover:border-[#c9a227] hover:scale-[1.02] active:scale-95 transition-all duration-300 rounded-[2rem] overflow-hidden shadow-2xl"
                 onClick={() => handleSelect(item.label)}
               >
-                <CardContent className="flex flex-col items-center justify-center p-20 gap-10">
-                  <div className="p-8 rounded-[2rem] bg-white/5 group-hover:bg-blue-500 group-hover:shadow-[0_0_50px_rgba(59,130,246,0.6)] transition-all duration-500">
-                    <item.icon className="h-20 w-20 text-blue-300 group-hover:text-white transition-colors" strokeWidth={1.5} />
+                <CardContent className="flex flex-col items-center justify-center p-10 gap-6">
+                  <div className="p-6 rounded-2xl bg-[#c9a227]/10 group-hover:bg-[#c9a227] group-hover:shadow-[0_0_30px_rgba(201,162,39,0.4)] transition-all">
+                    <item.icon className="h-14 w-14 text-[#c9a227] group-hover:text-[#0a2a1a] transition-colors" strokeWidth={1.5} />
                   </div>
-                  <span className="text-3xl font-black text-white tracking-tight">{item.label}</span>
+                  <span className="text-xl font-black text-white tracking-tight">{item.label}</span>
                 </CardContent>
               </Card>
             ))}
@@ -120,10 +118,9 @@ export default function PurposePage() {
         )}
       </div>
 
-      {/* Progress Bar Countdown */}
-      <div className="fixed bottom-0 left-0 w-full h-3 bg-white/5">
+      <div className="fixed bottom-0 left-0 w-full h-2 bg-black/20">
         <div 
-          className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-100 ease-linear shadow-[0_0_20px_rgba(37,99,235,1)]"
+          className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_15px_#c9a227]"
           style={{ width: `${progress}%` }}
         />
       </div>

@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Calendar, TrendingUp, Download, Loader2, Library, LayoutDashboard, History, LogOut, Search, Filter } from 'lucide-react';
+import { Users, Calendar, TrendingUp, Download, Loader2, Library, LayoutDashboard, History, LogOut, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCollection } from '@/firebase';
 import { auth, db as firestore } from '@/firebase/config';
-import { collection, query, orderBy, limit, where, Timestamp, addDoc, getDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, where, Timestamp, addDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { format, startOfDay, subDays, isSameDay, startOfWeek, startOfMonth, endOfDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -18,14 +18,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { toast } = useToast();
-  const [admin, setAdmin] = useState<any>(null);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
 
@@ -39,26 +39,14 @@ export default function AdminDashboard() {
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push('/admin/login');
-        return;
-      }
-      
-      const emailPrefix = user.email?.split('@')[0];
-      const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-      const userData = userDoc.data();
-      
-      if (userData?.role === 'admin' || emailPrefix === '25-14294-549') {
-        setAdmin(user);
-        setAuthLoading(false);
-      } else {
-        await signOut(auth);
-        router.push('/admin/login');
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
+    const email = sessionStorage.getItem('adminEmail');
+    if (!email) {
+      window.location.href = '/admin/login';
+      return;
+    }
+    setAdminEmail(email);
+    setAuthLoading(false);
+  }, []);
 
   // Firestore Queries
   const todayStart = startOfDay(new Date());
@@ -104,14 +92,14 @@ export default function AdminDashboard() {
   const [isBlocking, setIsBlocking] = useState(false);
 
   const handleBlockUser = async () => {
-    if (!selectedVisit || !blockReason || !admin) return;
+    if (!selectedVisit || !blockReason || !adminEmail) return;
     setIsBlocking(true);
     try {
       await addDoc(collection(firestore, 'blocklist'), {
         studentId: selectedVisit.studentId,
         fullName: selectedVisit.fullName,
         reason: blockReason,
-        blockedBy: admin.email,
+        blockedBy: adminEmail,
         blockedAt: Timestamp.now()
       });
       toast({ title: "Visitor Blocked", description: `${selectedVisit.fullName} is now on the blocklist.` });
@@ -133,15 +121,13 @@ export default function AdminDashboard() {
     const doc = new jsPDF();
     const now = new Date();
     
-    // Header
     doc.setFontSize(22);
-    doc.setTextColor(10, 22, 40);
+    doc.setTextColor(10, 42, 26);
     doc.text("NEU Library Log — Visitor Report", 14, 20);
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Generation Date: ${format(now, 'PPP p')}`, 14, 28);
     
-    // Stats Table
     autoTable(doc, {
       startY: 35,
       head: [['Metric', 'Count']],
@@ -151,10 +137,9 @@ export default function AdminDashboard() {
         ['Total Visitors This Month', stats.month.toString()]
       ],
       theme: 'grid',
-      headStyles: { fillColor: [10, 22, 40] }
+      headStyles: { fillColor: [26, 92, 46] }
     });
 
-    // Log Table
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 10,
       head: [['Visitor Name', 'College', 'Program', 'Purpose', 'Method', 'Timestamp']],
@@ -167,7 +152,7 @@ export default function AdminDashboard() {
         format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')
       ]),
       theme: 'striped',
-      headStyles: { fillColor: [10, 22, 40] }
+      headStyles: { fillColor: [26, 92, 46] }
     });
 
     doc.save(`NEU-Library-Report-${format(now, 'yyyyMMdd')}.pdf`);
@@ -175,62 +160,57 @@ export default function AdminDashboard() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    localStorage.removeItem('adminUser');
-    router.push('/admin/login');
-  };
-
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-    setActiveSection(id);
+    sessionStorage.removeItem('adminEmail');
+    window.location.href = '/admin/login';
   };
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0a1628] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-        <p className="text-blue-100 font-medium">Loading Dashboard...</p>
+      <div className="min-h-screen neu-dark-bg flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-[#c9a227]" />
+        <p className="text-white/60 font-black tracking-widest uppercase text-sm">Loading Panel...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f1f5f9]">
+    <div className="flex min-h-screen bg-[#f5f5f0]">
       {/* Sidebar */}
-      <aside className="w-72 bg-[#0a1628] text-white flex flex-col fixed inset-y-0 shadow-2xl z-40 transition-all">
-        <div className="p-8 border-b border-white/5 flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)]">
-            <Library className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight leading-none">NEU Library</h1>
-            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Admin Panel</span>
+      <aside className="w-72 bg-[#0a2a1a] text-white flex flex-col fixed inset-y-0 shadow-2xl z-40">
+        <div className="p-8 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
+          <img src="/neu-logo.png" alt="NEU Logo" className="w-16 h-16 object-contain" />
+          <div className="text-center">
+            <h1 className="text-lg font-black text-[#c9a227] tracking-tight leading-none uppercase">NEU Library</h1>
+            <span className="text-[10px] text-[#c9a227]/40 font-bold uppercase tracking-widest">Admin Dashboard</span>
           </div>
         </div>
         
         <nav className="flex-1 p-6 space-y-2">
           <button 
-            onClick={() => scrollTo('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'dashboard' ? 'bg-blue-600 text-white font-bold shadow-lg' : 'text-blue-100/50 hover:bg-white/5'}`}
+            onClick={() => setActiveSection('dashboard')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'dashboard' ? 'bg-[#c9a227] text-[#0a2a1a] font-black' : 'text-white/50 hover:bg-white/5 font-bold'}`}
           >
             <LayoutDashboard className="h-5 w-5" /> Dashboard
           </button>
           <button 
-            onClick={() => scrollTo('logs')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'logs' ? 'bg-blue-600 text-white font-bold shadow-lg' : 'text-blue-100/50 hover:bg-white/5'}`}
+            onClick={() => {
+              setActiveSection('logs');
+              document.getElementById('logs')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'logs' ? 'bg-[#c9a227] text-[#0a2a1a] font-black' : 'text-white/50 hover:bg-white/5 font-bold'}`}
           >
             <History className="h-5 w-5" /> Visitor Logs
           </button>
         </nav>
 
-        <div className="p-6 border-t border-white/5 space-y-4">
+        <div className="p-6 border-t border-[#c9a227]/10 space-y-4">
           <div className="flex items-center gap-3 px-2">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-sm shadow-xl">
-              {admin?.displayName?.charAt(0) || 'A'}
+            <div className="h-10 w-10 rounded-full bg-[#c9a227] flex items-center justify-center font-black text-[#0a2a1a]">
+              {adminEmail?.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-bold truncate">{admin?.displayName || 'Administrator'}</p>
-              <p className="text-[10px] text-blue-100/30 truncate">{admin?.email}</p>
+              <p className="text-sm font-bold truncate">Administrator</p>
+              <p className="text-[10px] text-white/30 truncate">{adminEmail}</p>
             </div>
           </div>
           <button 
@@ -244,12 +224,12 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="ml-72 flex-1 p-10 space-y-12 animate-in fade-in duration-1000">
-        <div id="dashboard" className="flex justify-between items-end">
+        <div className="flex justify-between items-end">
           <div>
-            <h2 className="text-4xl font-black text-slate-900 tracking-tight">Overview</h2>
-            <p className="text-slate-500 font-medium">Real-time visitor monitoring and analytics</p>
+            <h2 className="text-4xl font-black text-[#0a2a1a] tracking-tight">System Overview</h2>
+            <p className="text-[#1a5c2e]/60 font-bold uppercase text-[10px] tracking-widest">Live statistics and monitoring</p>
           </div>
-          <Button onClick={generateReport} className="bg-blue-600 hover:bg-blue-700 rounded-xl px-8 h-14 font-black shadow-lg flex gap-2 active:scale-95 transition-all">
+          <Button onClick={generateReport} className="bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 rounded-xl px-8 h-14 font-black shadow-lg flex gap-2 transition-all">
             <Download className="h-5 w-5" /> Generate Report
           </Button>
         </div>
@@ -257,41 +237,35 @@ export default function AdminDashboard() {
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-8">
           {[
-            { label: 'Today', value: stats.today, icon: Users, color: 'border-blue-500', sub: 'active entries' },
-            { label: 'This Week', value: stats.week, icon: Calendar, color: 'border-emerald-500', sub: 'last 7 days' },
-            { label: 'This Month', value: stats.month, icon: TrendingUp, color: 'border-purple-500', sub: 'monthly total' }
+            { label: 'Today', value: stats.today, icon: Users, color: 'border-[#1a5c2e]', sub: 'active entries' },
+            { label: 'This Week', value: stats.week, icon: Calendar, color: 'border-[#c9a227]', sub: 'last 7 days' },
+            { label: 'This Month', value: stats.month, icon: TrendingUp, color: 'border-[#0a2a1a]', sub: 'monthly total' }
           ].map((s, i) => (
-            <Card key={i} className={`border-l-8 ${s.color} shadow-sm rounded-2xl bg-white border-t-0 border-r-0 border-b-0`}>
+            <Card key={i} className={`border-l-[6px] ${s.color} shadow-md rounded-2xl bg-white`}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-black text-slate-400 uppercase tracking-widest">{s.label}</CardTitle>
-                <div className="p-2 bg-slate-50 rounded-lg"><s.icon className="h-4 w-4 text-slate-400" /></div>
+                <CardTitle className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.label}</CardTitle>
+                <div className="p-2 bg-gray-50 rounded-lg"><s.icon className="h-4 w-4 text-gray-400" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-5xl font-black text-slate-900">{s.value}</div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{s.sub}</p>
+                <div className="text-5xl font-black text-[#0a2a1a]">{s.value}</div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">{s.sub}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {/* Chart Section */}
-        <Card className="rounded-[2rem] shadow-sm overflow-hidden border-none bg-white p-8 space-y-8">
+        <Card className="rounded-[2rem] shadow-md overflow-hidden border-none bg-white p-8 space-y-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <CardTitle className="text-2xl font-black text-slate-900">Visitor Distribution</CardTitle>
-              <CardDescription className="text-slate-500 font-medium">Daily visitor traffic analysis</CardDescription>
+              <CardTitle className="text-2xl font-black text-[#0a2a1a]">Visitor Trends</CardTitle>
+              <CardDescription className="text-gray-400 font-bold uppercase text-[10px]">Daily distribution analytics</CardDescription>
             </div>
-            <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
-              <div className="flex items-center gap-2">
-                <Label className="text-[10px] font-black uppercase text-slate-400 ml-2">From</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 w-36 rounded-xl border-none bg-transparent font-bold text-slate-700" />
-              </div>
-              <div className="h-4 w-px bg-slate-200" />
-              <div className="flex items-center gap-2">
-                <Label className="text-[10px] font-black uppercase text-slate-400">To</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 w-36 rounded-xl border-none bg-transparent font-bold text-slate-700" />
-              </div>
-              <Button onClick={handleApplyRange} size="sm" className="bg-blue-600 rounded-xl px-4 h-9 font-bold">Apply</Button>
+            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 w-36 rounded-xl border-none bg-transparent font-bold text-gray-700" />
+              <div className="h-4 w-px bg-gray-200" />
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 w-36 rounded-xl border-none bg-transparent font-bold text-gray-700" />
+              <Button onClick={handleApplyRange} size="sm" className="bg-[#1a5c2e] rounded-xl px-4 h-9 font-bold">Apply</Button>
             </div>
           </div>
           
@@ -303,11 +277,11 @@ export default function AdminDashboard() {
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }} />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '1.2rem', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px 16px' }}
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px' }}
                 />
                 <Bar dataKey="count" radius={[10, 10, 0, 0]}>
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? '#2563eb' : '#cbd5e1'} />
+                    <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#c9a227' : '#e2e8f0'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -318,26 +292,20 @@ export default function AdminDashboard() {
         {/* Table Section */}
         <div id="logs" className="space-y-6 pt-10">
           <div className="flex justify-between items-center">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Recent Activity</h2>
-            <div className="flex gap-4">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                <Input placeholder="Search logs..." className="pl-11 h-12 w-80 rounded-2xl border-none bg-white shadow-sm font-medium" />
-              </div>
-            </div>
+            <h2 className="text-3xl font-black text-[#0a2a1a] tracking-tight">Visitor Activity Logs</h2>
           </div>
 
-          <Card className="rounded-[2rem] shadow-sm border-none overflow-hidden bg-white">
+          <Card className="rounded-[2rem] shadow-md border-none overflow-hidden bg-white">
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow className="hover:bg-transparent border-b-slate-100">
-                    <TableHead className="px-8 h-16 font-black text-slate-400 uppercase tracking-widest text-[10px]">Visitor Name</TableHead>
-                    <TableHead className="h-16 font-black text-slate-400 uppercase tracking-widest text-[10px]">Program / College</TableHead>
-                    <TableHead className="h-16 font-black text-slate-400 uppercase tracking-widest text-[10px]">Purpose</TableHead>
-                    <TableHead className="h-16 font-black text-slate-400 uppercase tracking-widest text-[10px]">Method</TableHead>
-                    <TableHead className="h-16 font-black text-slate-400 uppercase tracking-widest text-[10px]">Time</TableHead>
-                    <TableHead className="h-16 text-right px-8 font-black text-slate-400 uppercase tracking-widest text-[10px]">Action</TableHead>
+                <TableHeader className="bg-[#1a5c2e]">
+                  <TableRow className="hover:bg-transparent border-none">
+                    <TableHead className="px-8 h-14 font-black text-white uppercase tracking-widest text-[10px]">Visitor Name</TableHead>
+                    <TableHead className="h-14 font-black text-white uppercase tracking-widest text-[10px]">Program / College</TableHead>
+                    <TableHead className="h-14 font-black text-white uppercase tracking-widest text-[10px]">Purpose</TableHead>
+                    <TableHead className="h-14 font-black text-white uppercase tracking-widest text-[10px]">Method</TableHead>
+                    <TableHead className="h-14 font-black text-white uppercase tracking-widest text-[10px]">Time</TableHead>
+                    <TableHead className="h-14 text-right px-8 font-black text-white uppercase tracking-widest text-[10px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -348,55 +316,55 @@ export default function AdminDashboard() {
                       </TableRow>
                     ))
                   ) : paginatedVisits.map((visit) => (
-                    <TableRow key={visit.id} className="hover:bg-slate-50/30 transition-colors border-b-slate-50">
-                      <TableCell className="px-8 font-bold text-slate-900">{visit.fullName}</TableCell>
-                      <TableCell className="text-slate-500 font-medium">
+                    <TableRow key={visit.id} className="hover:bg-gray-50/50 border-b-gray-100">
+                      <TableCell className="px-8 font-black text-[#0a2a1a]">{visit.fullName}</TableCell>
+                      <TableCell className="text-gray-500 font-bold text-xs">
                         <div className="flex flex-col">
-                           <span className="text-slate-700 font-bold">{visit.program || 'Staff/Visitor'}</span>
-                           <span className="text-[10px] uppercase font-bold text-slate-400">{visit.college}</span>
+                           <span>{visit.program || 'Visitor'}</span>
+                           <span className="text-[10px] uppercase text-gray-400">{visit.college}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-4 py-1.5 font-bold rounded-full text-[10px] uppercase">
+                        <Badge className="bg-[#1a5c2e]/10 text-[#1a5c2e] hover:bg-[#1a5c2e]/10 border-none px-4 py-1.5 font-black rounded-full text-[9px] uppercase">
                           {visit.purpose}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={`border-none px-4 py-1.5 font-bold rounded-full text-[10px] uppercase ${visit.loginMethod === 'google' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                        <Badge className={`border-none px-4 py-1.5 font-black rounded-full text-[9px] uppercase ${visit.loginMethod === 'google' ? 'bg-[#c9a227]/10 text-[#c9a227]' : 'bg-gray-100 text-gray-600'}`}>
                           {visit.loginMethod}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-slate-400 font-medium text-xs">
+                      <TableCell className="text-gray-400 font-bold text-[10px]">
                         {format(visit.timestamp.toDate(), 'MMM dd, p')}
                       </TableCell>
                       <TableCell className="text-right px-8">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="rounded-full px-6 h-9 font-black shadow-sm bg-red-500 hover:bg-red-600 active:scale-95 transition-all text-[10px] uppercase" onClick={() => setSelectedVisit(visit)}>
+                            <Button variant="destructive" size="sm" className="rounded-full px-6 h-9 font-black shadow-sm bg-red-600 text-[9px] uppercase" onClick={() => setSelectedVisit(visit)}>
                               Block
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="rounded-[2rem] border-none shadow-2xl p-10 max-w-lg">
+                          <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-lg">
                             <DialogHeader className="space-y-4">
-                              <DialogTitle className="text-3xl font-black text-slate-900">Block Access</DialogTitle>
-                              <DialogDescription className="text-slate-500 text-lg leading-relaxed">
-                                Are you sure you want to restrict <span className="text-slate-900 font-bold underline decoration-red-400 underline-offset-4">{selectedVisit?.fullName}</span>? This takes effect immediately at all kiosks.
+                              <DialogTitle className="text-3xl font-black text-[#0a2a1a]">Restrict Access</DialogTitle>
+                              <DialogDescription className="text-gray-500 font-medium">
+                                Are you sure you want to block <span className="text-red-600 font-black underline">{selectedVisit?.fullName}</span>? This student will be immediately denied entry.
                               </DialogDescription>
                             </DialogHeader>
                             <div className="py-8 space-y-3">
-                              <Label className="font-black text-slate-900 text-xs uppercase tracking-widest ml-1">Reason for blocking</Label>
+                              <Label className="font-black text-[#0a2a1a] text-[10px] uppercase tracking-widest ml-1">Reason for blocking</Label>
                               <Textarea 
                                 placeholder="Describe the violation..." 
-                                className="rounded-2xl border-slate-100 bg-slate-50 focus:bg-white transition-all min-h-[140px] p-5 font-medium"
+                                className="rounded-2xl border-gray-100 bg-gray-50 focus:bg-white min-h-[140px] p-5 font-bold text-sm"
                                 value={blockReason}
                                 onChange={(e) => setBlockReason(e.target.value)}
                               />
                             </div>
                             <DialogFooter className="gap-4">
-                              <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-slate-200" onClick={() => setSelectedVisit(null)}>Cancel</Button>
+                              <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-gray-200" onClick={() => setSelectedVisit(null)}>Cancel</Button>
                               <Button 
                                 variant="destructive" 
-                                className="rounded-2xl h-14 px-10 font-black shadow-lg shadow-red-500/30"
+                                className="rounded-2xl h-14 px-10 font-black shadow-lg"
                                 disabled={isBlocking || !blockReason}
                                 onClick={handleBlockUser}
                               >
@@ -412,14 +380,14 @@ export default function AdminDashboard() {
               </Table>
               
               {/* Pagination */}
-              <div className="p-8 border-t border-slate-50 flex justify-between items-center bg-slate-50/20">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-                  Showing <span className="text-slate-900">{paginatedVisits.length}</span> / {allVisits?.length || 0} logs
+              <div className="p-8 flex justify-between items-center bg-gray-50/30">
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">
+                  Showing <span className="text-[#0a2a1a]">{paginatedVisits.length}</span> / {allVisits?.length || 0} logs
                 </p>
                 <div className="flex gap-3">
                   <Button 
                     variant="outline" 
-                    className="rounded-xl h-10 px-6 font-black border-slate-200 text-xs uppercase disabled:opacity-30" 
+                    className="rounded-xl h-10 px-6 font-black border-gray-200 text-[10px] uppercase disabled:opacity-30" 
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(p => p - 1)}
                   >
@@ -427,7 +395,7 @@ export default function AdminDashboard() {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="rounded-xl h-10 px-6 font-black border-slate-200 text-xs uppercase disabled:opacity-30" 
+                    className="rounded-xl h-10 px-6 font-black border-gray-200 text-[10px] uppercase disabled:opacity-30" 
                     disabled={!allVisits || currentPage * itemsPerPage >= allVisits.length}
                     onClick={() => setCurrentPage(p => p + 1)}
                   >
