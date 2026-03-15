@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from 'react';
@@ -7,7 +6,7 @@ import { Download, Calendar, FileText, Loader2, TrendingUp, LayoutList, Share2, 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, isWithinInterval, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { AdminLayout } from '@/components/admin/admin-layout';
@@ -37,6 +36,18 @@ export default function ReportsPage() {
   }, [db]);
   const { data: allBlocked } = useCollection(blocklistQuery);
 
+  const usersQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'users'));
+  }, [db]);
+  const { data: users } = useCollection(usersQuery);
+
+  const userMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    users?.forEach(u => map[u.studentId] = u);
+    return map;
+  }, [users]);
+
   const filteredData = useMemo(() => {
     if (!allVisits) return [];
     const start = startOfDay(new Date(startDate));
@@ -55,18 +66,26 @@ export default function ReportsPage() {
     if (filteredData.length === 0) return null;
     const p: Record<string, number> = {};
     const c: Record<string, number> = {};
+    const prog: Record<string, { count: number; college: string }> = {};
+    
     filteredData.forEach(v => {
       p[v.purpose] = (p[v.purpose] || 0) + 1;
-      const col = v.college || 'Other';
+      const col = v.college || userMap[v.studentId]?.college || 'Other';
+      const pr = v.program || userMap[v.studentId]?.program || 'N/A';
+      
       c[col] = (c[col] || 0) + 1;
+      if (!prog[pr]) prog[pr] = { count: 0, college: col };
+      prog[pr].count++;
     });
+
     return { 
       total: filteredData.length, 
-      p, c,
+      p, c, prog,
       topP: Object.entries(p).sort((a,b)=>b[1]-a[1])[0], 
-      topC: Object.entries(c).sort((a,b)=>b[1]-a[1])[0] 
+      topC: Object.entries(c).sort((a,b)=>b[1]-a[1])[0],
+      topProg: Object.entries(prog).sort((a,b)=>b[1].count-a[1].count)[0]
     };
-  }, [filteredData]);
+  }, [filteredData, userMap]);
 
   const exportCSV = () => {
     if (filteredData.length === 0) return;
@@ -75,7 +94,9 @@ export default function ReportsPage() {
       const headers = "Student ID,Full Name,College,Program,Purpose,Login Method,Date,Time\n";
       const rows = filteredData.map(v => {
         const d = v.timestamp.toDate();
-        return `${v.studentId},"${v.fullName}","${v.college || ''}","${v.program || ''}","${v.purpose}","${v.loginMethod || 'id'}",${format(d, 'yyyy-MM-dd')},${format(d, 'HH:mm')}`;
+        const col = v.college || userMap[v.studentId]?.college || '';
+        const pr = v.program || userMap[v.studentId]?.program || '';
+        return `${v.studentId},"${v.fullName}","${col}","${pr}","${v.purpose}","${v.loginMethod || 'id'}",${format(d, 'yyyy-MM-dd')},${format(d, 'HH:mm')}`;
       }).join("\n");
       const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -100,7 +121,7 @@ export default function ReportsPage() {
       const doc = new jsPDF('p', 'mm', 'a4');
       const adminEmail = auth?.currentUser?.email || 'N/A';
       
-      const renderHeader = (page: number) => {
+      const renderHeader = () => {
         doc.setFillColor(26, 58, 42);
         doc.rect(0, 0, 210, 40, 'F');
         doc.setTextColor(201, 162, 39);
@@ -114,7 +135,7 @@ export default function ReportsPage() {
         doc.text(`Report Period: ${startDate} to ${endDate}`, 105, 33, { align: 'center' });
       };
 
-      renderHeader(1);
+      renderHeader();
 
       doc.setTextColor(26, 58, 42);
       doc.setFontSize(12);
@@ -126,6 +147,7 @@ export default function ReportsPage() {
           ['Total Visitors Recorded', stats.total.toString()],
           ['Primary Purpose', stats.topP?.[0] || 'N/A'],
           ['Most Active College', stats.topC?.[0] || 'N/A'],
+          ['Most Active Program', stats.topProg?.[0] || 'N/A'],
           ['Blocks Issued', filteredBlocked.length.toString()]
         ],
         headStyles: { fillColor: [26, 58, 42] },
@@ -141,11 +163,34 @@ export default function ReportsPage() {
         styles: { fontSize: 8 }
       });
 
-      doc.text("Detailed Activity Log", 14, (doc as any).lastAutoTable.finalY + 15);
+      doc.addPage();
+      renderHeader();
+      doc.text("Program Breakdown", 14, 50);
       autoTable(doc, {
-        startY: (doc as any).lastAutoTable.finalY + 20,
-        head: [['#', 'ID', 'Full Name', 'College', 'Purpose', 'Date & Time']],
-        body: filteredData.map((v, i) => [i + 1, v.studentId, v.fullName, v.college || '—', v.purpose, format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')]),
+        startY: 55,
+        head: [['Program', 'College', 'Count', '%']],
+        body: Object.entries(stats.prog)
+          .sort((a,b) => b[1].count - a[1].count)
+          .map(([name, data]) => [name, data.college, data.count.toString(), `${((data.count/stats.total)*100).toFixed(1)}%`]),
+        headStyles: { fillColor: [26, 58, 42] },
+        styles: { fontSize: 8 }
+      });
+
+      doc.addPage();
+      renderHeader();
+      doc.text("Detailed Activity Log", 14, 50);
+      autoTable(doc, {
+        startY: 55,
+        head: [['#', 'ID', 'Full Name', 'College', 'Program', 'Purpose', 'Date & Time']],
+        body: filteredData.map((v, i) => [
+          i + 1, 
+          v.studentId, 
+          v.fullName, 
+          v.college || userMap[v.studentId]?.college || '—',
+          v.program || userMap[v.studentId]?.program || '—',
+          v.purpose, 
+          format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')
+        ]),
         headStyles: { fillColor: [26, 58, 42] },
         styles: { fontSize: 7 },
         alternateRowStyles: { fillColor: [247, 250, 248] }
@@ -208,21 +253,25 @@ export default function ReportsPage() {
         </Card>
 
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="bg-white p-6 rounded-2xl border border-[#d4e4d8] shadow-sm">
-              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Selected Entries</p>
+              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Total Entries</p>
               <p className="text-3xl font-bold text-[#1a3a2a] mt-1">{stats.total}</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-[#d4e4d8] shadow-sm">
-              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Primary Purpose</p>
-              <p className="text-sm font-bold text-[#1a3a2a] mt-2 uppercase">{stats.topP?.[0]}</p>
+              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Top Purpose</p>
+              <p className="text-[11px] font-bold text-[#1a3a2a] mt-2 uppercase truncate">{stats.topP?.[0]}</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-[#d4e4d8] shadow-sm">
-              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Active College</p>
-              <p className="text-sm font-bold text-[#1a3a2a] mt-2 uppercase">{stats.topC?.[0]}</p>
+              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Top College</p>
+              <p className="text-[11px] font-bold text-[#1a3a2a] mt-2 uppercase truncate">{stats.topC?.[0]}</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-[#d4e4d8] shadow-sm">
-              <p className="text-[9px] font-bold text-red-600 uppercase tracking-widest">Blocks Issued</p>
+              <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">Top Program</p>
+              <p className="text-[11px] font-bold text-[#1a3a2a] mt-2 uppercase truncate">{stats.topProg?.[0]}</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-[#d4e4d8] shadow-sm">
+              <p className="text-[9px] font-bold text-red-600 uppercase tracking-widest">Restrictions</p>
               <p className="text-3xl font-bold text-[#1a3a2a] mt-1">{filteredBlocked.length}</p>
             </div>
           </div>

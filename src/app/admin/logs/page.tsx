@@ -1,13 +1,12 @@
-
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Trash2, FileText, Calendar, Table as TableIcon, History, UserX, CheckCircle, Info, ArrowRight } from 'lucide-react';
+import { Search, Trash2, FileText, Calendar, Table as TableIcon, History, UserX, CheckCircle, Info, ArrowRight, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +22,28 @@ import autoTable from 'jspdf-autotable';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const COLLEGE_ABBREVIATIONS: Record<string, string> = {
+  "College of Informatics and Computing Studies": "CICS",
+  "College of Engineering and Architecture": "CEA",
+  "College of Business Administration": "CBA",
+  "College of Education": "COEd",
+  "College of Arts and Sciences": "CAS",
+  "College of Criminology": "CCrim",
+  "College of Nursing": "CON",
+  "College of Accountancy": "COA",
+  "College of Communication": "COC",
+  "College of Agriculture": "CA",
+  "College of Medical Technology": "CMT",
+  "College of Physical Therapy": "CPT",
+  "College of Respiratory Therapy": "CRT",
+  "College of Music": "COM",
+  "College of Midwifery": "CMid",
+  "College of Law": "COL",
+  "College of Medicine": "COM",
+  "School of International Relations": "SIR"
+};
 
 export default function VisitorLogs() {
   const { toast } = useToast();
@@ -30,6 +51,8 @@ export default function VisitorLogs() {
   const auth = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
+  const [collegeFilter, setCollegeFilter] = useState('all');
+  const [programFilter, setProgramFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -46,22 +69,66 @@ export default function VisitorLogs() {
   }, [db]);
   const { data: blocklist } = useCollection(blocklistQuery);
 
+  const usersQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'users'));
+  }, [db]);
+  const { data: users } = useCollection(usersQuery);
+
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [historyUser, setHistoryUser] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Fallback map for missing college/program data
+  const userMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    users?.forEach(u => {
+      map[u.studentId] = u;
+    });
+    return map;
+  }, [users]);
+
+  const uniqueColleges = useMemo(() => {
+    if (!allVisits) return [];
+    const colleges = new Set<string>();
+    allVisits.forEach(v => {
+      const col = v.college || userMap[v.studentId]?.college;
+      if (col) colleges.add(col);
+    });
+    return Array.from(colleges).sort();
+  }, [allVisits, userMap]);
+
+  const uniquePrograms = useMemo(() => {
+    if (!allVisits) return [];
+    const programs = new Set<string>();
+    allVisits.forEach(v => {
+      const col = v.college || userMap[v.studentId]?.college;
+      const prog = v.program || userMap[v.studentId]?.program;
+      if (prog && (collegeFilter === 'all' || col === collegeFilter)) {
+        programs.add(prog);
+      }
+    });
+    return Array.from(programs).sort();
+  }, [allVisits, collegeFilter, userMap]);
+
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
     return allVisits.filter(v => {
+      const vCollege = v.college || userMap[v.studentId]?.college || '';
+      const vProgram = v.program || userMap[v.studentId]?.program || '';
+      
       const matchesSearch = v.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            v.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           v.college?.toLowerCase().includes(searchTerm.toLowerCase());
+                           vCollege.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
+      const matchesCollege = collegeFilter === 'all' || vCollege === collegeFilter;
+      const matchesProgram = programFilter === 'all' || vProgram === programFilter;
       const matchesDate = !dateFilter || isSameDay(v.timestamp.toDate(), new Date(dateFilter));
-      return matchesSearch && matchesPurpose && matchesDate;
+      
+      return matchesSearch && matchesPurpose && matchesCollege && matchesProgram && matchesDate;
     });
-  }, [allVisits, searchTerm, purposeFilter, dateFilter]);
+  }, [allVisits, searchTerm, purposeFilter, collegeFilter, programFilter, dateFilter, userMap]);
 
   const paginatedVisits = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -145,8 +212,12 @@ export default function VisitorLogs() {
     
     autoTable(doc, {
       startY: 45,
-      head: [['#', 'Student ID', 'Full Name', 'College', 'Purpose', 'Date & Time']],
-      body: filteredVisits.map((v, i) => [i + 1, v.studentId, v.fullName, v.college || '—', v.purpose, format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')]),
+      head: [['#', 'Student ID', 'Full Name', 'College', 'Program', 'Purpose', 'Date & Time']],
+      body: filteredVisits.map((v, i) => {
+        const col = v.college || userMap[v.studentId]?.college || '—';
+        const prog = v.program || userMap[v.studentId]?.program || '—';
+        return [i + 1, v.studentId, v.fullName, col, prog, v.purpose, format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')];
+      }),
       headStyles: { fillColor: [26, 58, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
       styles: { fontSize: 8 },
       alternateRowStyles: { fillColor: [247, 250, 248] }
@@ -178,8 +249,8 @@ export default function VisitorLogs() {
         </div>
 
         <Card className="rounded-2xl border-[#d4e4d8] shadow-sm bg-white p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="space-y-1 md:col-span-1">
               <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">Search Name / ID</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
@@ -187,18 +258,53 @@ export default function VisitorLogs() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">Filter Purpose</Label>
-              <select className="w-full h-11 px-4 rounded-xl bg-[#f0f4f1] border-none font-medium text-sm appearance-none" value={purposeFilter} onChange={(e) => setPurposeFilter(e.target.value)}>
-                <option value="all">All Activities</option>
-                <option value="Reading Books">Reading Books</option>
-                <option value="Research / Study">Research / Study</option>
-                <option value="Computer / Internet">Computer / Internet</option>
-                <option value="Group Discussion">Group Discussion</option>
-                <option value="Thesis / Archival">Thesis / Archival</option>
-              </select>
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">College</Label>
+              <Select value={collegeFilter} onValueChange={setCollegeFilter}>
+                <SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-medium text-xs">
+                  <SelectValue placeholder="All Colleges" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Colleges</SelectItem>
+                  {uniqueColleges.map(c => (
+                    <SelectItem key={c} value={c} title={c}>
+                      {COLLEGE_ABBREVIATIONS[c] || c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">Filter Date</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">Program</Label>
+              <Select value={programFilter} onValueChange={setProgramFilter}>
+                <SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-medium text-xs">
+                  <SelectValue placeholder="All Programs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Programs</SelectItem>
+                  {uniquePrograms.map(p => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">Purpose</Label>
+              <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+                <SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-medium text-xs">
+                  <SelectValue placeholder="All Activities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Activities</SelectItem>
+                  <SelectItem value="Reading Books">Reading Books</SelectItem>
+                  <SelectItem value="Research / Study">Research / Study</SelectItem>
+                  <SelectItem value="Computer / Internet">Computer / Internet</SelectItem>
+                  <SelectItem value="Group Discussion">Group Discussion</SelectItem>
+                  <SelectItem value="Thesis / Archival">Thesis / Archival</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-[#4a6741]">Date</Label>
               <Input type="date" className="h-11 px-4 rounded-xl bg-[#f0f4f1] border-none font-medium" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
             </div>
           </div>
@@ -208,23 +314,28 @@ export default function VisitorLogs() {
           <Table>
             <TableHeader className="bg-[#1a3a2a]">
               <TableRow className="border-none hover:bg-[#1a3a2a]">
-                <TableHead className="text-white text-xs tracking-widest uppercase font-bold h-12 px-6">#</TableHead>
-                <TableHead className="text-white text-xs tracking-widest uppercase font-bold">Student ID</TableHead>
-                <TableHead className="text-white text-xs tracking-widest uppercase font-bold">Full Name</TableHead>
-                <TableHead className="text-white text-xs tracking-widest uppercase font-bold">Purpose</TableHead>
-                <TableHead className="text-white text-xs tracking-widest uppercase font-bold">Date & Time</TableHead>
-                <TableHead className="text-white text-xs tracking-widest uppercase font-bold text-right px-6">Actions</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold h-12 px-6">#</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Student ID</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Full Name</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">College</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Program</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Purpose</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Time</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold text-right px-6">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visitsLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-lg" /></TableCell></TableRow>
+                  <TableRow key={i}><TableCell colSpan={8} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-lg" /></TableCell></TableRow>
                 ))
               ) : paginatedVisits.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="h-64 text-center text-slate-400 font-medium">No activity records found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="h-64 text-center text-slate-400 font-medium">No activity records found.</TableCell></TableRow>
               ) : paginatedVisits.map((v, i) => {
                 const blocked = isBlocked(v.studentId);
+                const vCollege = v.college || userMap[v.studentId]?.college || '—';
+                const vProgram = v.program || userMap[v.studentId]?.program || '—';
+                
                 return (
                   <TableRow key={v.id} className="group hover:bg-[#f0f7f2] border-b-[#f0f4f1] transition-colors even:bg-[#f7faf8]">
                     <TableCell className="px-6 text-slate-400 font-bold text-xs">{(currentPage - 1) * itemsPerPage + i + 1}</TableCell>
@@ -234,12 +345,18 @@ export default function VisitorLogs() {
                         {v.fullName} <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </button>
                     </TableCell>
+                    <TableCell className="text-xs font-medium text-slate-600">
+                      {COLLEGE_ABBREVIATIONS[vCollege] || vCollege}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium text-slate-500 max-w-[150px] truncate" title={vProgram}>
+                      {vProgram}
+                    </TableCell>
                     <TableCell>
-                      <Badge className="bg-[#f0f7f2] text-[#1a3a2a] text-[10px] font-bold px-3 py-1 rounded-full border border-[#d4e4d8] uppercase">
+                      <Badge className="bg-[#f0f7f2] text-[#1a3a2a] text-[9px] font-bold px-3 py-1 rounded-full border border-[#d4e4d8] uppercase">
                         {v.purpose}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-slate-500 font-medium text-xs">
+                    <TableCell className="text-slate-500 font-medium text-[10px]">
                       {format(v.timestamp.toDate(), 'MMM dd, hh:mm a')}
                     </TableCell>
                     <TableCell className="px-6 text-right space-x-2">
@@ -259,10 +376,10 @@ export default function VisitorLogs() {
                         </AlertDialogContent>
                       </AlertDialog>
                       {blocked ? (
-                        <Button size="sm" className="h-8 px-4 rounded-full font-bold text-[10px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50" variant="outline" onClick={() => handleUnblockUser(v.studentId)}>Unblock</Button>
+                        <Button size="sm" className="h-8 px-4 rounded-full font-bold text-[9px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50" variant="outline" onClick={() => handleUnblockUser(v.studentId)}>Unblock</Button>
                       ) : (
                         <Dialog>
-                          <DialogTrigger asChild><Button size="sm" className="h-8 px-4 rounded-full font-bold text-[10px] uppercase bg-red-600 text-white hover:bg-red-700" onClick={() => { setSelectedVisit(v); setBlockReason(''); }}>Block</Button></DialogTrigger>
+                          <DialogTrigger asChild><Button size="sm" className="h-8 px-4 rounded-full font-bold text-[9px] uppercase bg-red-600 text-white hover:bg-red-700" onClick={() => { setSelectedVisit(v); setBlockReason(''); }}>Block</Button></DialogTrigger>
                           <DialogContent className="rounded-2xl">
                             <DialogHeader><DialogTitle>Restrict Student</DialogTitle></DialogHeader>
                             <div className="py-4 space-y-4">
@@ -321,6 +438,13 @@ export default function VisitorLogs() {
                       {isBlocked(historyUser.studentId) ? 'Restricted' : 'Authorized'}
                     </p>
                   </div>
+                </div>
+                <div className="space-y-2">
+                   <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">College & Program</p>
+                      <p className="text-xs font-bold text-[#1a3a2a]">{historyUser.college || userMap[historyUser.studentId]?.college || '—'}</p>
+                      <p className="text-[10px] font-medium text-slate-500 mt-1">{historyUser.program || userMap[historyUser.studentId]?.program || '—'}</p>
+                   </div>
                 </div>
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-[#1a3a2a] uppercase tracking-widest flex items-center gap-2">

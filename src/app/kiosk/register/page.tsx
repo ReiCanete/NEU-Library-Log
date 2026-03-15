@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, Suspense, useEffect, useMemo } from 'react';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2 } from 'lucide-react';
 import { validateFullName, validateStudentId } from '@/lib/validation';
@@ -89,7 +88,7 @@ function RegisterForm() {
           setTimeout(() => {
             sessionStorage.setItem('kiosk_visitor', JSON.stringify({
               studentId: userData.studentId || googleUser.email,
-              fullName: userData.displayName || userData.fullName,
+              fullName: userData.fullName || userData.displayName,
               college: userData.college,
               program: userData.program,
               loginMethod: 'google'
@@ -141,7 +140,7 @@ function RegisterForm() {
     setFormError(null);
 
     if (!validateFullName(fullName)) {
-      setFormError("Please enter your full name (letters only, minimum 3 characters).");
+      setFormError("Please enter your full name (letters only, min 3 chars).");
       return;
     }
 
@@ -160,28 +159,28 @@ function RegisterForm() {
       // 1. Check if student ID already exists
       const idSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', studentId), limit(1)));
       
-      let userId = idSnap.empty ? doc(collection(db, 'users')).id : idSnap.docs[0].id;
+      const userId = studentId; // Use student ID as doc ID for consistency
       const docRef = doc(db, 'users', userId);
 
       const userData = {
-        displayName: fullName,
+        studentId: studentId,
         fullName: fullName,
+        displayName: fullName,
         college: selectedCollege,
         program: selectedProgram || 'N/A',
-        studentId: studentId,
         email: email || `${studentId}@neu.edu.ph`,
-        role: 'user',
+        role: 'visitor',
         blocked: false,
-        updatedAt: new Date()
+        updatedAt: Timestamp.now()
       };
 
       if (idSnap.empty) {
-        await setDoc(docRef, { ...userData, createdAt: new Date(), uid: userId });
+        await setDoc(docRef, { ...userData, createdAt: Timestamp.now(), uid: userId });
       } else {
         await updateDoc(docRef, userData);
       }
 
-      // 2. Check blocklist again with student ID
+      // 2. Check blocklist
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', studentId), limit(1)));
       if (!blockSnap.empty) {
         setFormError("This student ID is restricted. Please contact library staff.");
@@ -189,7 +188,7 @@ function RegisterForm() {
         return;
       }
 
-      // 3. Complete session
+      // 3. Complete session with both college and program
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
         studentId: studentId,
         fullName: fullName,
@@ -219,7 +218,7 @@ function RegisterForm() {
     return (
       <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
         <div className="bg-black/40 backdrop-blur-2xl p-12 rounded-[3rem] border-2 border-[#c9a227]/30 flex flex-col items-center gap-6 shadow-2xl">
-          <div className="h-20 w-20 rounded-full bg-[#c9a227]/20 flex items-center justify-center border-2 border-[#c9a227]/50 shadow-[0_0_30px_rgba(201,162,39,0.2)]">
+          <div className="h-20 w-20 rounded-full bg-[#c9a227]/20 flex items-center justify-center border-2 border-[#c9a227]/50">
             <CheckCircle2 className="h-10 w-10 text-[#c9a227]" />
           </div>
           <div className="space-y-2">
@@ -229,14 +228,7 @@ function RegisterForm() {
           <div className="flex items-center gap-2 text-white/40 font-bold uppercase tracking-[0.2em] text-[10px]">
             <Sparkles className="h-3 w-3 animate-pulse text-[#c9a227]" />
             Redirecting to entry selection...
-            <Sparkles className="h-3 w-3 animate-pulse text-[#c9a227]" />
           </div>
-          <Button 
-            onClick={() => router.push('/kiosk/purpose')}
-            className="mt-4 h-14 px-12 rounded-2xl bg-white text-[#0a2a1a] font-black uppercase tracking-widest hover:bg-[#c9a227] transition-all"
-          >
-            Continue Now
-          </Button>
         </div>
       </div>
     );
@@ -244,7 +236,8 @@ function RegisterForm() {
 
   return (
     <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <title>NEU Library Log — Registration</title>
+      {isDropdownOpen && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90]" onClick={() => setIsDropdownOpen(false)} />}
+      
       <div className="absolute top-6 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -274,45 +267,26 @@ function RegisterForm() {
                   Institutional Email <Lock className="h-2.5 w-2.5 opacity-50" />
                 </Label>
                 <div className="relative group">
-                  <Input 
-                    value={email} 
-                    readOnly 
-                    className="h-12 text-xs font-bold bg-black/40 border-[#c9a227]/10 text-white/40 rounded-xl px-4 cursor-not-allowed group-hover:bg-black/50 transition-all" 
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                    <Check className="h-4 w-4 text-emerald-500/50" />
-                  </div>
+                  <Input value={email} readOnly className="h-12 text-xs font-bold bg-black/40 border-[#c9a227]/10 text-white/40 rounded-xl px-4 cursor-not-allowed" />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-emerald-500/50" /></div>
                 </div>
               </div>
             )}
 
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Student ID</Label>
-              <Input 
-                autoFocus
-                placeholder="XX-XXXXX-XXX"
-                className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20 transition-all ${studentId ? 'font-bold' : ''}`}
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                required
-              />
+              <Input autoFocus placeholder="XX-XXXXX-XXX" className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20" value={studentId} onChange={(e) => setStudentId(e.target.value)} required />
             </div>
 
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
-              <Input 
-                placeholder="Enter your full name" 
-                className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
+              <Input placeholder="Enter your full name" className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </div>
 
             <div className="space-y-1 relative">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program / Affiliation</Label>
               <div 
-                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all ${isDropdownOpen ? 'border-[#c9a227] ring-2 ring-[#c9a227]/10' : ''}`}
+                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all z-[101] relative ${isDropdownOpen ? 'ring-2 ring-[#c9a227]/30' : ''}`}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 <span className={`font-bold text-xs truncate pr-2 ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
@@ -322,13 +296,13 @@ function RegisterForm() {
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute bottom-full mb-3 left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-bottom-2 duration-300">
+                <div className="absolute bottom-full mb-3 left-0 w-full bg-[#071a0f] rounded-[1.25rem] border border-[#c9a227] shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-3 z-[102] animate-in slide-in-from-bottom-2 duration-300">
                   <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]" />
                     <Input 
-                      autoFocus
+                      autoFocus 
                       placeholder="Type to search..." 
-                      className="pl-9 h-10 bg-black/20 border-none rounded-xl text-white font-bold text-xs"
+                      className="pl-9 h-10 bg-black/40 border-[#c9a227]/20 rounded-xl text-white font-bold text-xs focus:border-[#c9a227]"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -339,13 +313,11 @@ function RegisterForm() {
                       {filteredOptions.map((opt, i) => (
                         <div key={i}>
                           {opt.type === 'header' && (
-                            <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60">
-                              {opt.label}
-                            </div>
+                            <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60">{opt.label}</div>
                           )}
                           {(opt.type === 'item' || opt.type === 'non-student') && (
                             <div 
-                              className="px-3 py-2 rounded-lg hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
+                              className={`px-3 py-2 rounded-lg hover:bg-[#0d3d24] cursor-pointer flex items-center justify-between group transition-colors ${selectedProgram === opt.label ? 'border-l-2 border-[#c9a227] bg-[#c9a227]/10' : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (opt.type === 'non-student') { 
@@ -360,12 +332,8 @@ function RegisterForm() {
                                 setFormError(null);
                               }}
                             >
-                              <span className="text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
-                                {opt.label}
-                              </span>
-                              {(selectedProgram === opt.label || selectedCollege === opt.label) && (
-                                <Check className="h-4 w-4 text-[#c9a227]" />
-                              )}
+                              <span className="text-xs font-bold text-white">{opt.label}</span>
+                              {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-[#c9a227]" />}
                             </div>
                           )}
                         </div>
@@ -377,11 +345,7 @@ function RegisterForm() {
             </div>
           </div>
 
-          <Button 
-            className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98] mt-2"
-            disabled={submitting}
-            type="submit"
-          >
+          <Button className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg mt-2" disabled={submitting} type="submit">
             {submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Entry Registration"}
           </Button>
         </form>

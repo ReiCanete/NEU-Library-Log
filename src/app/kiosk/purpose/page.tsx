@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
@@ -26,7 +25,6 @@ export default function PurposePage() {
   const [visitor, setVisitor] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState(100);
-  const timerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     const data = sessionStorage.getItem('kiosk_visitor');
@@ -54,13 +52,14 @@ export default function PurposePage() {
     if (!visitor || isSubmitting || !db) return;
     setIsSubmitting(true);
     try {
+      // PART 1: Ensure all fields are saved to the visits collection
       await addDoc(collection(db, 'visits'), {
-        studentId: visitor.studentId,
-        fullName: visitor.fullName,
-        college: visitor.college || '—',
-        program: visitor.program || '—',
+        studentId: visitor.studentId || '',
+        fullName: visitor.fullName || '',
+        college: visitor.college || '',
+        program: visitor.program || '',
         purpose: purpose,
-        loginMethod: visitor.loginMethod,
+        loginMethod: visitor.loginMethod || 'id',
         timestamp: Timestamp.now(),
       });
       router.push('/kiosk/welcome');
