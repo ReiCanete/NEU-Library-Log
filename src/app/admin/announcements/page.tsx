@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Megaphone, Plus, Trash2, CheckCircle2, Send, Loader2, Edit2 } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Edit2, Send, Loader2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth, errorEmitter, FirestorePermissionError } from '@/firebase';
@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function AnnouncementsPage() {
   const { toast } = useToast();
@@ -48,11 +48,11 @@ export default function AnnouncementsPage() {
   };
 
   const handleSave = () => {
-    if (!msg || !startDate || !endDate || !db) return;
+    if (!msg.trim() || !startDate || !endDate || !db) return;
     setIsProcessing(true);
 
     const announcementData = {
-      message: msg,
+      message: msg.trim(),
       priority,
       startDate: Timestamp.fromDate(new Date(startDate)),
       endDate: Timestamp.fromDate(new Date(endDate)),
@@ -65,7 +65,7 @@ export default function AnnouncementsPage() {
       const docRef = doc(db, 'announcements', editingId);
       updateDoc(docRef, announcementData)
         .then(() => {
-          toast({ title: "Broadcast Updated", description: "The message has been refreshed on the kiosk." });
+          toast({ title: "Broadcast Updated", description: "Changes saved successfully." });
           setShowModal(false);
           resetForm();
         })
@@ -81,7 +81,7 @@ export default function AnnouncementsPage() {
       const newData = { ...announcementData, createdAt: Timestamp.now() };
       addDoc(collection(db, 'announcements'), newData)
         .then(() => {
-          toast({ title: "Broadcast Live", description: "New announcement sent to kiosk display." });
+          toast({ title: "Broadcast Live", description: "Message is now active on the kiosk." });
           setShowModal(false);
           resetForm();
         })
@@ -122,78 +122,80 @@ export default function AnnouncementsPage() {
     if (!db) return;
     const docRef = doc(db, 'announcements', id);
     deleteDoc(docRef)
+      .then(() => {
+        toast({ title: "Post Removed", description: "Announcement deleted." });
+      })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: docRef.path,
           operation: 'delete'
         }));
       });
-    toast({ title: "Broadcast Removed", description: "Record deleted from system." });
   };
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-black text-[#1a3a2a] tracking-tight uppercase">Broadcast Center</h2>
-            <p className="text-sm font-bold text-[#4a6741] uppercase tracking-widest">Live Institutional Announcements</p>
+            <p className="text-xs font-bold text-[#4a6741] uppercase tracking-widest mt-1">Manage institutional alerts</p>
           </div>
           <Dialog open={showModal} onOpenChange={(open) => { if (!open) resetForm(); setShowModal(open); }}>
             <DialogTrigger asChild>
-              <Button className="h-14 px-8 rounded-2xl bg-[#c9a227] text-[#0a2a1a] font-black hover:bg-[#b08d20] shadow-lg flex gap-3 transition-all">
-                <Plus className="h-5 w-5" /> Create Post
+              <Button className="h-12 px-6 rounded-xl bg-[#c9a227] text-[#0a2a1a] font-black hover:bg-[#b08d20] shadow-md flex gap-2">
+                <Plus className="h-5 w-5" /> New Broadcast
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-3xl p-6 max-w-lg border-none shadow-2xl">
+            <DialogContent className="rounded-2xl p-6 max-w-md border-none shadow-2xl">
               <DialogHeader className="space-y-1">
-                <DialogTitle className="text-2xl font-black text-[#1a3a2a]">
+                <DialogTitle className="text-xl font-black text-[#1a3a2a]">
                   {editingId ? "Edit Broadcast" : "New Broadcast"}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-[#4a6741] font-bold uppercase tracking-widest">
-                  Messages appear on the kiosk entry screen instantly.
+                <DialogDescription className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">
+                  Messages appear on the kiosk entry screen.
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
-                  <Label className="font-black text-xs uppercase tracking-widest text-[#1a3a2a]">Message Content</Label>
-                  <Textarea placeholder="Enter announcement text..." className="rounded-xl bg-[#f0f4f1] min-h-[120px] p-4 text-sm font-bold border-none resize-none" value={msg} onChange={(e) => setMsg(e.target.value)} />
+                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Message</Label>
+                  <Textarea placeholder="Type message..." className="rounded-xl bg-[#f0f4f1] min-h-[100px] p-3 text-sm font-bold border-none" value={msg} onChange={(e) => setMsg(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase tracking-widest text-[#1a3a2a]">Priority</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Priority</Label>
                     <Select value={priority} onValueChange={(v: any) => setPriority(v)}>
-                      <SelectTrigger className="h-12 rounded-xl bg-[#f0f4f1] border-none text-xs font-black uppercase">
+                      <SelectTrigger className="h-10 rounded-xl bg-[#f0f4f1] border-none text-xs font-bold">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-2xl">
-                        <SelectItem value="normal" className="text-xs font-bold">Normal (Gold)</SelectItem>
-                        <SelectItem value="urgent" className="text-xs font-bold">Urgent (Red)</SelectItem>
+                      <SelectContent className="rounded-xl border-none">
+                        <SelectItem value="normal" className="text-xs font-bold">Normal</SelectItem>
+                        <SelectItem value="urgent" className="text-xs font-bold">Urgent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase tracking-widest text-[#1a3a2a]">Status</Label>
-                    <div className="h-12 bg-[#f0f4f1] rounded-xl px-4 flex items-center justify-between">
-                      <span className="font-black text-[10px] text-[#1a3a2a]">ACTIVE</span>
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Status</Label>
+                    <div className="h-10 bg-[#f0f4f1] rounded-xl px-4 flex items-center justify-between">
+                      <span className="font-bold text-[10px] text-[#1a3a2a]">LIVE</span>
                       <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
                     </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase tracking-widest text-[#1a3a2a]">Release</Label>
-                    <Input type="datetime-local" className="h-12 rounded-xl bg-[#f0f4f1] border-none text-xs font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Start</Label>
+                    <Input type="datetime-local" className="h-10 rounded-xl bg-[#f0f4f1] border-none text-[10px] font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-black text-xs uppercase tracking-widest text-[#1a3a2a]">Expiry</Label>
-                    <Input type="datetime-local" className="h-12 rounded-xl bg-[#f0f4f1] border-none text-xs font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">End</Label>
+                    <Input type="datetime-local" className="h-10 rounded-xl bg-[#f0f4f1] border-none text-[10px] font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                   </div>
                 </div>
               </div>
               <DialogFooter className="gap-2">
-                <Button variant="ghost" className="h-12 px-6 rounded-xl font-black text-sm" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button className="h-12 px-8 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-sm shadow-md" disabled={isProcessing || !msg} onClick={handleSave}>
+                <Button variant="ghost" className="h-10 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button className="h-10 px-6 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing || !msg} onClick={handleSave}>
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {editingId ? "Update" : "Broadcast"}
                 </Button>
@@ -202,71 +204,69 @@ export default function AnnouncementsPage() {
           </Dialog>
         </div>
 
-        <Card className="rounded-3xl shadow-xl border border-[#d4e4d8] bg-white overflow-hidden">
+        <Card className="rounded-2xl shadow-xl border border-[#d4e4d8] bg-white overflow-hidden">
           <Table>
             <TableHeader className="bg-[#f0f4f1]">
               <TableRow className="border-none">
-                <TableHead className="px-6 h-14 font-black text-[#4a6741] uppercase tracking-widest text-xs">Active</TableHead>
-                <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-xs">Priority</TableHead>
-                <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-xs">Message</TableHead>
-                <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-xs">Timeline</TableHead>
-                <TableHead className="px-6 h-14 text-right font-black text-[#4a6741] uppercase tracking-widest text-xs">Actions</TableHead>
+                <TableHead className="px-6 h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Active</TableHead>
+                <TableHead className="h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Priority</TableHead>
+                <TableHead className="h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Message</TableHead>
+                <TableHead className="h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Schedule</TableHead>
+                <TableHead className="px-6 h-12 text-right font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={5} className="px-6 py-4"><Skeleton className="h-12 w-full rounded-xl" /></TableCell></TableRow>
+                  <TableRow key={i}><TableCell colSpan={5} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
                 ))
               ) : announcements?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-4 opacity-20">
-                      <Megaphone className="h-16 w-16" />
-                      <p className="text-xl font-black uppercase tracking-tighter">No Scheduled Broadcasts</p>
+                  <TableCell colSpan={5} className="h-48 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3 opacity-20">
+                      <Megaphone className="h-12 w-12" />
+                      <p className="text-sm font-black uppercase tracking-widest">No Broadcasts</p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : announcements?.map((a) => (
-                <TableRow key={a.id} className="group hover:bg-[#f0f4f1]/30 transition-colors border-b-[#f0f4f1]">
+                <TableRow key={a.id} className="group hover:bg-[#f0f4f1]/30 border-b-[#f0f4f1]">
                   <TableCell className="px-6">
                     <Switch checked={a.isActive} onCheckedChange={() => toggleStatus(a.id, a.isActive)} />
                   </TableCell>
                   <TableCell>
-                    {a.priority === 'urgent' ? (
-                      <Badge className="bg-red-600 text-white font-black uppercase text-[10px] px-2 py-0.5 rounded shadow-sm">Urgent</Badge>
-                    ) : (
-                      <Badge className="bg-[#c9a227] text-[#0a2a1a] font-black uppercase text-[10px] px-2 py-0.5 rounded shadow-sm">Normal</Badge>
-                    )}
+                    <Badge className={`${a.priority === 'urgent' ? 'bg-red-600' : 'bg-[#c9a227]'} text-white font-black uppercase text-[9px] px-2 py-0.5 rounded`}>
+                      {a.priority}
+                    </Badge>
                   </TableCell>
                   <TableCell className="max-w-[300px] py-4">
-                    <p className="font-bold text-[#1a3a2a] line-clamp-2 text-sm leading-tight">{a.message}</p>
-                    <p className="text-[10px] font-black text-[#4a6741]/50 uppercase tracking-widest mt-1">By {a.createdBy}</p>
+                    <p className="font-bold text-sm text-[#1a3a2a] line-clamp-2">{a.message}</p>
+                    <p className="text-[9px] font-black text-[#4a6741]/50 uppercase tracking-widest mt-1">Admin: {a.createdBy}</p>
                   </TableCell>
                   <TableCell>
-                    <div className="space-y-1 text-[10px] font-black uppercase tabular-nums">
-                      <div className="text-emerald-600">START: {format(a.startDate.toDate(), 'MMM dd, HH:mm')}</div>
-                      <div className="text-red-400">END: {format(a.endDate.toDate(), 'MMM dd, HH:mm')}</div>
+                    <div className="space-y-0.5 text-[9px] font-black uppercase tabular-nums">
+                      <div className="text-emerald-600">IN: {format(a.startDate.toDate(), 'MMM dd, HH:mm')}</div>
+                      <div className="text-red-400">OUT: {format(a.endDate.toDate(), 'MMM dd, HH:mm')}</div>
                     </div>
                   </TableCell>
-                  <TableCell className="px-6 text-right space-x-2">
-                    <Button variant="ghost" size="icon" className="h-10 w-10 text-[#4a6741] hover:text-[#1a3a2a] hover:bg-[#f0f4f1] rounded-xl" onClick={() => handleEdit(a)}>
+                  <TableCell className="px-6 text-right space-x-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[#4a6741] hover:text-[#1a3a2a]" onClick={() => handleEdit(a)}>
                       <Edit2 className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 text-[#4a6741] hover:text-red-600 hover:bg-red-50 rounded-xl">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-[#4a6741] hover:text-red-600">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-3xl p-8 max-w-sm border-none shadow-2xl">
+                      <AlertDialogContent className="rounded-2xl p-6 max-w-sm border-none shadow-2xl">
                         <AlertDialogHeader className="space-y-2">
-                          <AlertDialogTitle className="text-xl font-black text-[#1a3a2a]">Delete Post?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-sm font-bold text-[#4a6741] uppercase tracking-widest">This action will permanently stop this broadcast.</AlertDialogDescription>
+                          <AlertDialogTitle className="text-lg font-black text-[#1a3a2a]">Delete Post?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-xs font-bold text-[#4a6741] uppercase tracking-widest">Permanently stop this broadcast.</AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-6 gap-2">
-                          <AlertDialogCancel className="rounded-xl h-12 px-6 font-black border-[#d4e4d8]">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(a.id)} className="rounded-xl h-12 px-8 font-black bg-red-600 text-white hover:bg-red-700">Delete</AlertDialogAction>
+                        <AlertDialogFooter className="mt-4 gap-2">
+                          <AlertDialogCancel className="rounded-xl h-10 px-4 font-black text-xs border-[#d4e4d8]">Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(a.id)} className="rounded-xl h-10 px-6 font-black text-xs bg-red-600 text-white hover:bg-red-700">Delete</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>

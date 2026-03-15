@@ -13,7 +13,6 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Robust Singleton pattern to survive Next.js HMR reloads
 const G = (typeof window !== 'undefined' ? window : globalThis) as any;
 
 function getFirebaseInstance(): { app: FirebaseApp; auth: Auth; db: Firestore } {
