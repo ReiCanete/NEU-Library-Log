@@ -165,8 +165,8 @@ export default function KioskEntry() {
                  <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Scan or Enter School ID</Label>
                  <Input
                     ref={inputRef}
-                    placeholder="25-12946-343"
-                    className="h-14 text-2xl text-center font-mono bg-black/20 border-[#c9a227]/20 text-white rounded-xl focus:ring-4 focus:ring-[#c9a227]/20 focus:border-[#c9a227] transition-all duration-300 placeholder:text-white/10"
+                    placeholder="e.g. 25-12946-343"
+                    className="h-14 text-3xl text-center font-mono bg-black/20 border-[#c9a227]/20 text-white rounded-xl focus:ring-4 focus:ring-[#c9a227]/20 focus:border-[#c9a227] transition-all duration-300 placeholder:text-white/20"
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
                     disabled={loading}

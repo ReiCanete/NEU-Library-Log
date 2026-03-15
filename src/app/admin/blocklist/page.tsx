@@ -65,7 +65,7 @@ export default function BlocklistPage() {
                   <Label htmlFor="sid">School ID</Label>
                   <Input 
                     id="sid" 
-                    placeholder="25-12946-343" 
+                    placeholder="e.g. 25-12946-343" 
                     value={blockId}
                     onChange={(e) => setBlockId(e.target.value)}
                   />
