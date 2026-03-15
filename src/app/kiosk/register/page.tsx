@@ -39,15 +39,37 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const db = useFirestore();
-  const studentId = searchParams.get('id') || '';
   
   const [fullName, setFullName] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'id' | 'google'>('id');
+  const [email, setEmail] = useState('');
+  
   const [search, setSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for Google redirect data first
+    const googleUserJson = sessionStorage.getItem('kiosk_google_user');
+    if (googleUserJson) {
+      const googleUser = JSON.parse(googleUserJson);
+      setFullName(googleUser.fullName || '');
+      setStudentId(googleUser.email.split('@')[0]);
+      setEmail(googleUser.email);
+      setLoginMethod('google');
+    } else {
+      const idParam = searchParams.get('id');
+      if (idParam) {
+        setStudentId(idParam);
+      } else {
+        router.push('/');
+      }
+    }
+  }, [searchParams, router]);
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
@@ -91,25 +113,32 @@ function RegisterForm() {
 
     setLoading(true);
     try {
-      const userId = `std_${studentId.replace(/[^a-zA-Z0-9]/g, '')}`;
-      await setDoc(doc(db, 'users', userId), {
+      const userId = loginMethod === 'google' ? studentId : `std_${studentId.replace(/[^a-zA-Z0-9]/g, '')}`;
+      const userData = {
         uid: userId,
         displayName: fullName,
         college: selectedCollege,
         program: selectedProgram || 'N/A',
         studentId: studentId,
+        email: email || `${studentId}@neu.edu.ph`,
         role: 'user',
         blocked: false,
         createdAt: new Date()
-      }, { merge: true });
+      };
+
+      await setDoc(doc(db, 'users', userId), userData, { merge: true });
 
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
         studentId: studentId,
         fullName: fullName,
         college: selectedCollege,
         program: selectedProgram || 'N/A',
-        loginMethod: 'id'
+        loginMethod: loginMethod
       }));
+      
+      // Cleanup google user session if it exists
+      sessionStorage.removeItem('kiosk_google_user');
+      
       router.push('/kiosk/purpose');
     } catch (err: any) {
       logAppError('Registration', 'SaveUser', err);
@@ -121,7 +150,10 @@ function RegisterForm() {
   return (
     <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute top-6 left-6">
-        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
+        <Button variant="ghost" onClick={() => {
+          sessionStorage.removeItem('kiosk_google_user');
+          router.push('/');
+        }} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
       </div>
