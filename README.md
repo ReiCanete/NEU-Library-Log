@@ -1,5 +1,17 @@
-# Firebase Studio
+# NEU Library Log
 
-This is a NextJS starter in Firebase Studio.
+Digital visitor log system for New Era University Library.
 
-To get started, take a look at src/app/page.tsx.
+## Production URL
+[neu-library-log-nine.vercel.app](https://neu-library-log-nine.vercel.app)
+
+## Deployment Notes
+- This application uses Next.js 15 and Firebase.
+- **Google Auth**: Ensure that `neu-library-log-nine.vercel.app` is added to your Authorized Domains in the Firebase Console (Authentication > Settings).
+- **PWA**: The app is configured with a `manifest.json` for full-screen tablet usage.
+
+## Technical Architecture
+- **Framework**: Next.js (App Router)
+- **Database**: Firestore (Real-time updates)
+- **Authentication**: Firebase Auth (Google Redirect & School ID)
+- **Styling**: Tailwind CSS & ShadCN UI

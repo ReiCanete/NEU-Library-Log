@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -9,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, Megaphone, ShieldX } from 'lucide-react';
 import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
-import { collection, query, where, limit, getDocs, doc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { startOfDay } from 'date-fns';
@@ -44,6 +43,7 @@ function KioskEntryContent() {
   const currentCount = todayVisits?.length || 0;
   const isAtCapacity = currentCount >= dailyCapacity;
 
+  // Real-time Announcements Listener
   useEffect(() => {
     if (!db) return;
     const q = query(
@@ -63,6 +63,7 @@ function KioskEntryContent() {
     return () => unsubscribe();
   }, [db]);
 
+  // Cycle Announcements
   useEffect(() => {
     if (activeAnnouncements.length <= 1) return;
     const interval = setInterval(() => {
@@ -71,6 +72,7 @@ function KioskEntryContent() {
     return () => clearInterval(interval);
   }, [activeAnnouncements]);
 
+  // Handle Google Redirect Result on Mount
   useEffect(() => {
     const handleRedirect = async () => {
       if (!auth || !db) return;
@@ -78,6 +80,8 @@ function KioskEntryContent() {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           const user = result.user;
+          
+          // Institutional domain check
           if (!user.email?.endsWith('@neu.edu.ph')) {
             await signOut(auth);
             setError('Only @neu.edu.ph Google accounts are allowed.');
@@ -85,6 +89,7 @@ function KioskEntryContent() {
             return;
           }
 
+          // Blocklist check
           const blockSnap = await getDocs(query(
             collection(db, 'blocklist'),
             where('studentId', '==', user.email)
@@ -96,6 +101,7 @@ function KioskEntryContent() {
             return;
           }
 
+          // User existence check
           const userSnap = await getDocs(query(
             collection(db, 'users'),
             where('email', '==', user.email)
@@ -113,7 +119,7 @@ function KioskEntryContent() {
             sessionStorage.setItem('kiosk_visitor', JSON.stringify({
               studentId: userData.studentId || user.email,
               fullName: userData.displayName || userData.fullName,
-              college: userData.college || userData.College || '',
+              college: userData.college || '',
               loginMethod: 'google'
             }));
             router.push('/kiosk/purpose');
@@ -123,6 +129,7 @@ function KioskEntryContent() {
         }
       } catch (err: any) {
         if (err.code !== 'auth/popup-closed-by-user') {
+          logAppError('KioskEntry', 'GoogleRedirect', err);
           setError(getErrorMessage(err));
         }
         setLoading(false);
