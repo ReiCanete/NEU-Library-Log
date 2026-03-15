@@ -91,16 +91,20 @@ function RegisterForm() {
               fullName: userData.fullName || userData.displayName,
               college: userData.college,
               program: userData.program,
+              email: userData.email,
               loginMethod: 'google'
             }));
             router.push('/kiosk/purpose');
-          }, 2000);
+          }, 3000);
+          setLoading(false);
+          return;
         }
       } else if (idFromUrl) {
         setStudentId(idFromUrl);
         setLoginMethod('id');
-      } else {
+      } else if (!method && !idFromUrl) {
         router.push('/');
+        return;
       }
       
       setLoading(false);
@@ -168,8 +172,9 @@ function RegisterForm() {
         displayName: fullName,
         college: selectedCollege,
         program: selectedProgram || 'N/A',
-        email: email || `${studentId}@neu.edu.ph`,
+        email: email || '',
         role: 'visitor',
+        googleLinked: loginMethod === 'google',
         blocked: false,
         updatedAt: Timestamp.now()
       };
@@ -188,12 +193,13 @@ function RegisterForm() {
         return;
       }
 
-      // 3. Complete session with both college and program
+      // 3. Complete session
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
         studentId: studentId,
         fullName: fullName,
         college: selectedCollege,
         program: selectedProgram || 'N/A',
+        email: email || '',
         loginMethod: loginMethod
       }));
       
@@ -209,7 +215,7 @@ function RegisterForm() {
     return (
       <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 gap-4">
         <Loader2 className="animate-spin text-[#c9a227] h-12 w-12" />
-        <p className="text-[#c9a227] font-black uppercase tracking-widest text-xs">Loading profile data...</p>
+        <p className="text-[#c9a227] font-black uppercase tracking-widest text-sm">Validating profile...</p>
       </div>
     );
   }
@@ -218,17 +224,21 @@ function RegisterForm() {
     return (
       <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
         <div className="bg-black/40 backdrop-blur-2xl p-12 rounded-[3rem] border-2 border-[#c9a227]/30 flex flex-col items-center gap-6 shadow-2xl">
-          <div className="h-20 w-20 rounded-full bg-[#c9a227]/20 flex items-center justify-center border-2 border-[#c9a227]/50">
-            <CheckCircle2 className="h-10 w-10 text-[#c9a227]" />
+          <div className="h-24 w-24 rounded-full bg-[#c9a227]/20 flex items-center justify-center border-2 border-[#c9a227]/50">
+            <CheckCircle2 className="h-12 w-12 text-[#c9a227]" />
           </div>
           <div className="space-y-2">
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Welcome back!</h2>
-            <p className="text-[#c9a227] font-black text-lg uppercase tracking-widest">{existingUser.fullName || existingUser.displayName}</p>
+            <p className="text-[#c9a227] font-black text-xl uppercase tracking-widest">{existingUser.fullName || existingUser.displayName}</p>
+            <p className="text-white/40 font-bold text-xs uppercase tracking-[0.2em]">{existingUser.college}</p>
           </div>
-          <div className="flex items-center gap-2 text-white/40 font-bold uppercase tracking-[0.2em] text-[10px]">
-            <Sparkles className="h-3 w-3 animate-pulse text-[#c9a227]" />
-            Redirecting to entry selection...
+          <div className="flex items-center gap-3 text-white/40 font-bold uppercase tracking-[0.2em] text-[10px] mt-4">
+            <Sparkles className="h-4 w-4 animate-pulse text-[#c9a227]" />
+            Redirecting to selection...
           </div>
+          <Button onClick={() => router.push('/kiosk/purpose')} className="mt-4 bg-[#c9a227] text-[#0a2a1a] font-black rounded-xl px-10 h-12 hover:opacity-90">
+            Continue Now
+          </Button>
         </div>
       </div>
     );
@@ -249,8 +259,12 @@ function RegisterForm() {
           <div className="mx-auto bg-[#c9a227]/10 h-14 w-14 rounded-2xl flex items-center justify-center border border-[#c9a227]/20 shadow-xl mb-2">
             <UserPlus className="h-7 w-7 text-[#c9a227]" />
           </div>
-          <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">Complete Profile</h2>
-          <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Please verify your details</p>
+          <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">
+            {method === 'google' ? 'Complete Profile' : 'New Registration'}
+          </h2>
+          <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">
+            {method === 'google' ? 'Link your Google account to your NEU profile' : 'Please verify your details'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass-neu rounded-[2rem] p-8 space-y-5 shadow-2xl border-none">
@@ -267,20 +281,37 @@ function RegisterForm() {
                   Institutional Email <Lock className="h-2.5 w-2.5 opacity-50" />
                 </Label>
                 <div className="relative group">
-                  <Input value={email} readOnly className="h-12 text-xs font-bold bg-black/40 border-[#c9a227]/10 text-white/40 rounded-xl px-4 cursor-not-allowed" />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2"><Check className="h-4 w-4 text-emerald-500/50" /></div>
+                  <Input 
+                    value={email} 
+                    readOnly 
+                    className="h-12 text-xs font-bold bg-black/40 border-[#c9a227] text-white/50 rounded-xl px-4 cursor-not-allowed" 
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2"><Lock className="h-4 w-4 text-[#c9a227]/50" /></div>
                 </div>
               </div>
             )}
 
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Student ID</Label>
-              <Input autoFocus placeholder="XX-XXXXX-XXX" className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20" value={studentId} onChange={(e) => setStudentId(e.target.value)} required />
+              <Input 
+                autoFocus={!email}
+                placeholder="XX-XXXXX-XXX" 
+                className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20" 
+                value={studentId} 
+                onChange={(e) => setStudentId(e.target.value)} 
+                required 
+              />
             </div>
 
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
-              <Input placeholder="Enter your full name" className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              <Input 
+                placeholder="Enter your full name" 
+                className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
+                value={fullName} 
+                onChange={(e) => setFullName(e.target.value)} 
+                required 
+              />
             </div>
 
             <div className="space-y-1 relative">
@@ -302,7 +333,7 @@ function RegisterForm() {
                     <Input 
                       autoFocus 
                       placeholder="Type to search..." 
-                      className="pl-9 h-10 bg-black/40 border-[#c9a227]/20 rounded-xl text-white font-bold text-xs focus:border-[#c9a227]"
+                      className="pl-9 h-10 bg-black/40 border-[#c9a227]/20 rounded-xl text-white font-bold text-xs focus:border-[#c9a227] text-white"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -346,7 +377,7 @@ function RegisterForm() {
           </div>
 
           <Button className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg mt-2" disabled={submitting} type="submit">
-            {submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Entry Registration"}
+            {submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Registration"}
           </Button>
         </form>
       </div>

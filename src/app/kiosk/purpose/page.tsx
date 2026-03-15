@@ -52,7 +52,7 @@ export default function PurposePage() {
     if (!visitor || isSubmitting || !db) return;
     setIsSubmitting(true);
     try {
-      // PART 1: Ensure all fields are saved to the visits collection
+      // Ensure ALL fields are saved to the visits collection
       await addDoc(collection(db, 'visits'), {
         studentId: visitor.studentId || '',
         fullName: visitor.fullName || '',

@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Trash2, FileText, Calendar, Table as TableIcon, History, UserX, CheckCircle, Info, ArrowRight, Filter } from 'lucide-react';
+import { Search, Trash2, FileText, Calendar, Table as TableIcon, History, UserX, CheckCircle, Info, ArrowRight, Filter, Mail, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, deleteDoc, doc, Timestamp, where, getDocs, addDoc } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -80,7 +80,7 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fallback map for missing college/program data
+  // Fallback map for missing college/program/email data
   const userMap = useMemo(() => {
     const map: Record<string, any> = {};
     users?.forEach(u => {
@@ -156,6 +156,8 @@ export default function VisitorLogs() {
       await addDoc(collection(db, 'blocklist'), {
         studentId: userToBlock.studentId,
         fullName: userToBlock.fullName,
+        college: userToBlock.college || userMap[userToBlock.studentId]?.college || '',
+        program: userToBlock.program || userMap[userToBlock.studentId]?.program || '',
         reason: blockReason,
         blockedBy: auth?.currentUser?.email || 'Staff',
         blockedAt: Timestamp.now()
@@ -165,6 +167,7 @@ export default function VisitorLogs() {
       setHistoryUser(null);
       setBlockReason('');
     } catch (e: any) {
+      console.error('[NEU Library Log Error] [AdminLogs] [BlockVisitor]:', e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
@@ -212,11 +215,11 @@ export default function VisitorLogs() {
     
     autoTable(doc, {
       startY: 45,
-      head: [['#', 'Student ID', 'Full Name', 'College', 'Program', 'Purpose', 'Date & Time']],
+      head: [['#', 'Student ID', 'Full Name', 'College', 'Program', 'Purpose', 'Method', 'Date & Time']],
       body: filteredVisits.map((v, i) => {
         const col = v.college || userMap[v.studentId]?.college || '—';
         const prog = v.program || userMap[v.studentId]?.program || '—';
-        return [i + 1, v.studentId, v.fullName, col, prog, v.purpose, format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')];
+        return [i + 1, v.studentId, v.fullName, col, prog, v.purpose, v.loginMethod?.toUpperCase() || 'ID', format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')];
       }),
       headStyles: { fillColor: [26, 58, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
       styles: { fontSize: 8 },
@@ -320,6 +323,7 @@ export default function VisitorLogs() {
                 <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">College</TableHead>
                 <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Program</TableHead>
                 <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Purpose</TableHead>
+                <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold text-center">Login Method</TableHead>
                 <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold">Time</TableHead>
                 <TableHead className="text-white text-[10px] tracking-widest uppercase font-bold text-right px-6">Actions</TableHead>
               </TableRow>
@@ -327,22 +331,31 @@ export default function VisitorLogs() {
             <TableBody>
               {visitsLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={8} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-lg" /></TableCell></TableRow>
+                  <TableRow key={i}><TableCell colSpan={9} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-lg" /></TableCell></TableRow>
                 ))
               ) : paginatedVisits.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="h-64 text-center text-slate-400 font-medium">No activity records found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="h-64 text-center text-slate-400 font-medium">No activity records found.</TableCell></TableRow>
               ) : paginatedVisits.map((v, i) => {
                 const blocked = isBlocked(v.studentId);
                 const vCollege = v.college || userMap[v.studentId]?.college || '—';
                 const vProgram = v.program || userMap[v.studentId]?.program || '—';
+                const vEmail = userMap[v.studentId]?.email;
+                const isGoogle = v.loginMethod === 'google';
                 
                 return (
                   <TableRow key={v.id} className="group hover:bg-[#f0f7f2] border-b-[#f0f4f1] transition-colors even:bg-[#f7faf8]">
                     <TableCell className="px-6 text-slate-400 font-bold text-xs">{(currentPage - 1) * itemsPerPage + i + 1}</TableCell>
                     <TableCell className="font-mono text-sm font-semibold text-[#1a3a2a]">{v.studentId}</TableCell>
                     <TableCell>
-                      <button onClick={() => setHistoryUser(v)} className="font-bold text-[#1a3a2a] hover:underline flex items-center gap-1">
-                        {v.fullName} <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <button onClick={() => setHistoryUser(v)} className="flex flex-col text-left group/name">
+                        <span className="font-bold text-[#1a3a2a] group-hover/name:underline flex items-center gap-1">
+                          {v.fullName} <ArrowRight className="h-3 w-3 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                        </span>
+                        {isGoogle && vEmail && (
+                          <span className="text-[9px] font-medium text-slate-400 leading-none mt-0.5 flex items-center gap-1">
+                            <Mail className="h-2 w-2" /> {vEmail}
+                          </span>
+                        )}
                       </button>
                     </TableCell>
                     <TableCell className="text-xs font-medium text-slate-600">
@@ -355,6 +368,24 @@ export default function VisitorLogs() {
                       <Badge className="bg-[#f0f7f2] text-[#1a3a2a] text-[9px] font-bold px-3 py-1 rounded-full border border-[#d4e4d8] uppercase">
                         {v.purpose}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isGoogle ? (
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[8px] font-black uppercase px-2 py-0.5 gap-1.5 flex items-center justify-center w-fit mx-auto">
+                          <svg className="h-2 w-2" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          Google
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[8px] font-black uppercase px-2 py-0.5 gap-1.5 flex items-center justify-center w-fit mx-auto">
+                          <CreditCard className="h-2 w-2" />
+                          School ID
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-slate-500 font-medium text-[10px]">
                       {format(v.timestamp.toDate(), 'MMM dd, hh:mm a')}
@@ -444,6 +475,11 @@ export default function VisitorLogs() {
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">College & Program</p>
                       <p className="text-xs font-bold text-[#1a3a2a]">{historyUser.college || userMap[historyUser.studentId]?.college || '—'}</p>
                       <p className="text-[10px] font-medium text-slate-500 mt-1">{historyUser.program || userMap[historyUser.studentId]?.program || '—'}</p>
+                      {userMap[historyUser.studentId]?.email && (
+                        <p className="text-[10px] font-medium text-[#c9a227] mt-1 flex items-center gap-1">
+                          <Mail className="h-2.5 w-2.5" /> {userMap[historyUser.studentId].email}
+                        </p>
+                      )}
                    </div>
                 </div>
                 <div className="space-y-4">
