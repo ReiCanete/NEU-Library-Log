@@ -19,7 +19,11 @@ function LoginContent() {
     const handleRedirectResult = async () => {
       try {
         const result = await getRedirectResult(auth);
+        console.log('getRedirectResult called');
+        console.log('result:', result);
+
         if (result?.user) {
+          console.log('user:', result.user.email);
           const user = result.user;
           
           if (!user.email?.endsWith('@neu.edu.ph')) {
@@ -35,6 +39,7 @@ function LoginContent() {
 
           const q = query(collection(firestore, 'users'), where('email', '==', user.email));
           const snap = await getDocs(q);
+          console.log('Firestore query result:', snap.docs.map(d => d.data()));
 
           let role = '';
           if (!snap.empty) {
@@ -51,6 +56,7 @@ function LoginContent() {
           }
         }
       } catch (err: any) {
+        console.error('Redirect error:', err);
         setError(err.message);
       }
       setLoading(false);
