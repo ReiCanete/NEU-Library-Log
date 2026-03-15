@@ -1,98 +1,92 @@
-
 "use client";
 
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { auth, db as firestore } from '@/firebase/config';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/firebase';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function LoginContent() {
   const router = useRouter();
-  const { user, loading: authLoading } = useUser();
-  const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(true);
-
-  const checkAdminAccess = async (firebaseUser: any) => {
-    if (!firebaseUser.email?.endsWith('@neu.edu.ph')) {
-      toast({
-        title: "Unauthorized",
-        description: "Only @neu.edu.ph accounts are allowed.",
-        variant: "destructive",
-      });
-      await signOut(auth);
-      return false;
-    }
-
-    const emailPrefix = firebaseUser.email.split('@')[0];
-    const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef);
-    const userData = userDoc.data();
-
-    // Whitelist check: either role is admin in DB OR email/studentId matches the master whitelist
-    const isWhitelisted = emailPrefix === '25-14294-549' || userData?.studentId === '25-14294-549';
-    const hasAdminRole = userData?.role === 'admin' || isWhitelisted;
-
-    if (hasAdminRole) {
-      // If user is whitelisted but doesn't have a record or role yet, create/update it
-      if (!userDoc.exists() || userData?.role !== 'admin') {
-        await setDoc(userDocRef, {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          role: 'admin',
-          studentId: isWhitelisted ? '25-14294-549' : (userData?.studentId || emailPrefix),
-          college: userData?.college || 'Administration'
-        }, { merge: true });
-      }
-      router.replace('/admin');
-      return true;
-    } else {
-      toast({
-        title: "Access Denied",
-        description: "You do not have administrator permissions.",
-        variant: "destructive",
-      });
-      await signOut(auth);
-      return false;
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleAuth = async () => {
       try {
-        // 1. Check if we just returned from a redirect
         const result = await getRedirectResult(auth);
+        
         if (result?.user) {
-          await checkAdminAccess(result.user);
+          const firebaseUser = result.user;
+
+          if (!firebaseUser.email?.endsWith('@neu.edu.ph')) {
+            setError("Unauthorized: Only @neu.edu.ph accounts are allowed.");
+            await signOut(auth);
+            setIsProcessing(false);
+            return;
+          }
+
+          const emailPrefix = firebaseUser.email.split('@')[0];
+          const userDocRef = doc(firestore, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          const userData = userDoc.data();
+
+          const isWhitelisted = emailPrefix === '25-14294-549';
+          const hasAdminRole = userData?.role === 'admin' || isWhitelisted;
+
+          if (hasAdminRole) {
+            if (isWhitelisted && userData?.role !== 'admin') {
+              await setDoc(userDocRef, {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+                role: 'admin',
+                studentId: emailPrefix,
+                college: 'Administration'
+              }, { merge: true });
+            }
+            localStorage.setItem('adminUser', JSON.stringify({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName
+            }));
+            router.replace('/admin');
+          } else {
+            setError("You do not have administrator permissions.");
+            await signOut(auth);
+            setIsProcessing(false);
+          }
           return;
         }
 
-        // 2. If no redirect result, check if user is already logged in
-        if (user && !authLoading) {
-          await checkAdminAccess(user);
+        // Check if already logged in via context/session
+        if (auth.currentUser) {
+           const emailPrefix = auth.currentUser.email?.split('@')[0];
+           const userDoc = await getDoc(doc(firestore, 'users', auth.currentUser.uid));
+           const userData = userDoc.data();
+           if (userData?.role === 'admin' || emailPrefix === '25-14294-549') {
+              router.replace('/admin');
+              return;
+           }
         }
-      } catch (error: any) {
-        console.error("Auth Error:", error);
-        toast({
-          title: "Login Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
+
+        setIsProcessing(false);
+      } catch (err: any) {
+        console.error("Auth Error:", err);
+        setError(err.message || "An error occurred during sign-in.");
         setIsProcessing(false);
       }
     };
 
     handleAuth();
-  }, [user, authLoading, router, toast]);
+  }, [router]);
 
   const handleLogin = async () => {
+    setError(null);
     setIsProcessing(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ 
@@ -101,58 +95,60 @@ function LoginContent() {
     });
     try {
       await signInWithRedirect(auth, provider);
-    } catch (error: any) {
-      toast({
-        title: "Redirect Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      setError(err.message);
       setIsProcessing(false);
     }
   };
 
+  if (isProcessing) {
+    return (
+      <div className="min-h-screen bg-[#0a1628] flex flex-col items-center justify-center gap-6">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+        <p className="text-blue-200 text-lg font-medium animate-pulse">Verifying credentials...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0a1628] flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[150px] animate-float" />
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[150px] animate-orb" />
       
-      <Card className="max-w-md w-full glass-dark border-none shadow-2xl z-10 animate-in fade-in zoom-in duration-700">
-        <CardHeader className="text-center space-y-6 pt-12">
-          <div className="mx-auto bg-blue-500/10 h-24 w-24 rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
-            <ShieldCheck className="h-12 w-12 text-blue-400" />
+      <Card className="max-w-md w-full glass-dark border-none shadow-2xl z-10 animate-in fade-in zoom-in duration-500">
+        <CardHeader className="text-center space-y-4 pt-10">
+          <div className="mx-auto bg-blue-500/10 h-20 w-20 rounded-2xl flex items-center justify-center border border-white/10 shadow-xl">
+            <ShieldCheck className="h-10 w-10 text-blue-400" />
           </div>
-          <div className="space-y-2">
-            <CardTitle className="text-4xl font-black text-white">Staff Login</CardTitle>
-            <CardDescription className="text-blue-200/60 text-lg">Administrator access portal</CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-3xl font-black text-white">Staff Portal</CardTitle>
+            <CardDescription className="text-blue-200/50">NEU Library Log Administrator Access</CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pb-16 space-y-8 px-10">
-          <div className="bg-blue-500/5 border border-white/10 rounded-2xl p-6 text-sm text-blue-100 text-center leading-relaxed">
-            Authentication is restricted to verified <strong>@neu.edu.ph</strong> accounts with administrator privileges.
-          </div>
-          
+        <CardContent className="pb-12 space-y-6 px-10">
+          {error && (
+            <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-200 rounded-xl">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="font-bold">Access Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
           <Button 
-            className="w-full h-16 text-xl font-bold rounded-2xl bg-white text-[#0a1628] hover:bg-white/90 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+            className="w-full h-14 text-lg font-bold rounded-xl bg-white text-[#0a1628] hover:bg-white/90 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
             onClick={handleLogin}
-            disabled={isProcessing || authLoading}
           >
-            {isProcessing || authLoading ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <div className="flex items-center gap-3">
-                <svg className="h-6 w-6" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
-                  <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-                Sign in with Google
-              </div>
-            )}
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            Sign in with Google
           </Button>
 
           <Button 
             variant="link" 
-            className="w-full text-blue-200/40 hover:text-blue-200/60"
+            className="w-full text-blue-200/30 hover:text-blue-200/50"
             onClick={() => router.push('/')}
           >
             Return to Kiosk

@@ -50,6 +50,16 @@
   100% { transform: translateY(0px) translateX(0px); }
 }
 
+@keyframes orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+.animate-orb {
+  animation: orb-float 20s ease-in-out infinite;
+}
+
 .animate-float {
   animation: float 8s ease-in-out infinite;
 }
