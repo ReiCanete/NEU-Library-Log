@@ -190,7 +190,7 @@ function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen neu-dark-bg flex flex-col items-center justify-center p-8 relative overflow-hidden">
+    <div className="min-h-screen neu-dark-bg flex flex-col items-center pt-12 pb-24 px-8 relative overflow-y-auto">
       <div className="absolute top-8 left-8">
         <Button 
           variant="ghost" 
@@ -241,7 +241,7 @@ function RegisterForm() {
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute top-[calc(100%+12px)] left-0 w-full glass-neu rounded-[2rem] border-none shadow-2xl p-4 z-50 animate-in slide-in-from-top-4 duration-300 max-h-[400px] flex flex-col">
+                <div className="absolute top-[calc(100%+12px)] left-0 w-full glass-neu rounded-[2rem] border-none shadow-2xl p-4 z-[100] animate-in slide-in-from-top-4 duration-300 max-h-[320px] flex flex-col">
                   <div className="relative mb-4">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]" />
                     <Input 
@@ -295,6 +295,7 @@ function RegisterForm() {
           <Button 
             className="w-full h-16 text-xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98]"
             disabled={loading || !fullName || !selectedCollege}
+            type="submit"
           >
             {loading ? <Loader2 className="animate-spin mr-3 h-6 w-6" /> : "Complete Registration"}
           </Button>
