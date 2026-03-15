@@ -57,7 +57,7 @@ export default function AdminLogin() {
         hasAdminAccess = userData.role === 'admin' || userData.studentId === '25-14294-549';
       }
 
-      const isWhitelisted = user.email?.startsWith('25-14294-549');
+      const isWhitelisted = user.email?.startsWith('25-14294-549') || user.email === 'reiangelo.canete@neu.edu.ph';
 
       if (hasAdminAccess || isWhitelisted) {
         await setDoc(doc(db, 'users', user.uid), {
@@ -65,7 +65,7 @@ export default function AdminLogin() {
           email: user.email,
           displayName: user.displayName || user.email?.split('@')[0],
           role: 'admin',
-          studentId: userData?.studentId || '25-14294-549'
+          studentId: userData?.studentId || 'ADMIN-ACCESS'
         }, { merge: true });
 
         setAttempts(0);

@@ -58,7 +58,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
     const unsubscribe = onSnapshot(query(collection(db, 'users'), where('email', '==', user.email)), (snap) => {
       let hasAdminAccess = false;
-      const isWhitelisted = user.email?.startsWith('25-14294-549');
+      const isWhitelisted = user.email?.startsWith('25-14294-549') || user.email === 'reiangelo.canete@neu.edu.ph';
       if (!snap.empty) {
         const userData = snap.docs[0].data();
         hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
@@ -153,7 +153,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         
-        <SidebarInset className="flex flex-col flex-1 overflow-y-auto">
+        <SidebarInset className="flex flex-col flex-1">
           <header className="h-14 bg-white border-b border-[#d4e4d8] flex items-center justify-between px-6 sticky top-0 z-50 shadow-sm">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="text-[#1a3a2a]" />
@@ -181,7 +181,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="p-6 flex-1 bg-[#f0f4f1] animate-in fade-in duration-500">
+          <main className="p-6 flex-1 bg-[#f0f4f1] overflow-y-auto">
             {children}
           </main>
         </SidebarInset>
