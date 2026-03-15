@@ -52,6 +52,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authLoading || !db || !auth) return;
     if (!user) {
+      setIsAdmin(false);
+      setCheckingRole(false);
       router.push('/admin/login');
       return;
     }
@@ -73,14 +75,22 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         signOut(auth).then(() => router.push('/admin/login'));
       }
       setCheckingRole(false);
+    }, (error) => {
+      console.error("Admin check failed:", error);
+      setIsAdmin(false);
+      setCheckingRole(false);
     });
     return () => unsubscribe();
   }, [user, authLoading, router, db, auth]);
 
   const handleLogout = async () => {
     if (!auth) return;
-    await signOut(auth);
-    router.push('/admin/login');
+    try {
+      await signOut(auth);
+      router.push('/admin/login');
+    } catch (err) {
+      console.error("Sign out failed:", err);
+    }
   };
 
   if (authLoading || checkingRole || isAdmin === null || !currentTime) {

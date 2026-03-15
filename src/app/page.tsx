@@ -30,23 +30,19 @@ function KioskEntryContent() {
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
 
-  const [todayDate, setTodayDate] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setTodayDate(startOfDay(new Date()));
-  }, []);
+  const todayDate = useMemo(() => startOfDay(new Date()), []);
 
   const visitsQuery = useMemo(() => {
-    if (typeof window === 'undefined' || !todayDate || !db) return null;
+    if (!todayDate || !db) return null;
     return query(collection(db, 'visits'), where('timestamp', '>=', todayDate));
   }, [todayDate, db]);
 
   const { data: todayVisits } = useCollection(visitsQuery);
-  const settingsRef = useMemo(() => (typeof window !== 'undefined' && db) ? doc(db, 'settings', 'library') : null, [db]);
+  const settingsRef = useMemo(() => (db ? doc(db, 'settings', 'library') : null), [db]);
   const { data: settings } = useDoc(settingsRef);
   
   const announcementsQuery = useMemo(() => {
-    if (typeof window === 'undefined' || !db) return null;
+    if (!db) return null;
     return query(
       collection(db, 'announcements'), 
       where('isActive', '==', true),
@@ -75,7 +71,7 @@ function KioskEntryContent() {
 
   useEffect(() => {
     const handleRedirect = async () => {
-      if (!auth) return;
+      if (!auth || !db) return;
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
@@ -103,13 +99,13 @@ function KioskEntryContent() {
           router.push('/kiosk/purpose'); 
           return;
         }
-        setLoading(false);
       } catch (err: any) { 
         if (err.code !== 'auth/popup-closed-by-user') {
           logAppError('KioskEntry', 'RedirectResult', err);
           toast({ title: "Sign-in Error", description: getErrorMessage(err), variant: "destructive" });
         }
-        setLoading(false); 
+      } finally {
+        setLoading(false);
       }
     };
     handleRedirect();
