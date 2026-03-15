@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Trash2, FileText, Calendar, Table as TableIcon, History, UserX, CheckCircle, Info, ArrowRight, Filter, Mail, CreditCard } from 'lucide-react';
+import { Search, Trash2, FileText, Calendar, History, ArrowRight, Mail, CreditCard, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
@@ -12,7 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -80,7 +81,6 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fallback map for missing college/program/email data
   const userMap = useMemo(() => {
     const map: Record<string, any> = {};
     users?.forEach(u => {
@@ -167,7 +167,6 @@ export default function VisitorLogs() {
       setHistoryUser(null);
       setBlockReason('');
     } catch (e: any) {
-      console.error('[NEU Library Log Error] [AdminLogs] [BlockVisitor]:', e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
@@ -269,7 +268,7 @@ export default function VisitorLogs() {
                 <SelectContent>
                   <SelectItem value="all">All Colleges</SelectItem>
                   {uniqueColleges.map(c => (
-                    <SelectItem key={c} value={c} title={c}>
+                    <SelectItem key={c} value={c}>
                       {COLLEGE_ABBREVIATIONS[c] || c}
                     </SelectItem>
                   ))}
@@ -339,8 +338,7 @@ export default function VisitorLogs() {
                 const blocked = isBlocked(v.studentId);
                 const vCollege = v.college || userMap[v.studentId]?.college || '—';
                 const vProgram = v.program || userMap[v.studentId]?.program || '—';
-                const vEmail = userMap[v.studentId]?.email;
-                const isGoogle = v.loginMethod === 'google';
+                const vEmail = v.email || userMap[v.studentId]?.email;
                 
                 return (
                   <TableRow key={v.id} className="group hover:bg-[#f0f7f2] border-b-[#f0f4f1] transition-colors even:bg-[#f7faf8]">
@@ -351,7 +349,7 @@ export default function VisitorLogs() {
                         <span className="font-bold text-[#1a3a2a] group-hover/name:underline flex items-center gap-1">
                           {v.fullName} <ArrowRight className="h-3 w-3 opacity-0 group-hover/name:opacity-100 transition-opacity" />
                         </span>
-                        {isGoogle && vEmail && (
+                        {vEmail && (
                           <span className="text-[9px] font-medium text-slate-400 leading-none mt-0.5 flex items-center gap-1">
                             <Mail className="h-2 w-2" /> {vEmail}
                           </span>
@@ -370,9 +368,14 @@ export default function VisitorLogs() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      {isGoogle ? (
+                      {v.loginMethod === 'email' ? (
+                        <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-[8px] font-black uppercase px-2 py-0.5 gap-1.5 flex items-center justify-center w-fit mx-auto">
+                          <Mail className="h-2 w-2" />
+                          Email
+                        </Badge>
+                      ) : v.loginMethod === 'google' ? (
                         <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[8px] font-black uppercase px-2 py-0.5 gap-1.5 flex items-center justify-center w-fit mx-auto">
-                          <svg className="h-2 w-2" viewBox="0 0 24 24">
+                           <svg className="h-2 w-2" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                             <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                             <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -475,9 +478,9 @@ export default function VisitorLogs() {
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">College & Program</p>
                       <p className="text-xs font-bold text-[#1a3a2a]">{historyUser.college || userMap[historyUser.studentId]?.college || '—'}</p>
                       <p className="text-[10px] font-medium text-slate-500 mt-1">{historyUser.program || userMap[historyUser.studentId]?.program || '—'}</p>
-                      {userMap[historyUser.studentId]?.email && (
+                      {(historyUser.email || userMap[historyUser.studentId]?.email) && (
                         <p className="text-[10px] font-medium text-[#c9a227] mt-1 flex items-center gap-1">
-                          <Mail className="h-2.5 w-2.5" /> {userMap[historyUser.studentId].email}
+                          <Mail className="h-2.5 w-2.5" /> {historyUser.email || userMap[historyUser.studentId].email}
                         </p>
                       )}
                    </div>

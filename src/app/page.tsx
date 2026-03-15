@@ -7,24 +7,25 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, AlertCircle, Megaphone, ShieldX } from 'lucide-react';
+import { Loader2, AlertCircle, Megaphone, ShieldX, Mail, CreditCard } from 'lucide-react';
 import { useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, onSnapshot } from 'firebase/firestore';
-import { getRedirectResult, GoogleAuthProvider, signInWithRedirect, signOut } from 'firebase/auth';
-import { auth, db } from '@/firebase/config';
+import { db } from '@/firebase/config';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { startOfDay } from 'date-fns';
-import { validateStudentId } from '@/lib/validation';
+import { validateStudentId, validateNEUEmail } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useToast } from '@/hooks/use-toast';
 
 function KioskEntryContent() {
   const router = useRouter();
+  const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   
   const [studentId, setStudentId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [redirectVerifying, setRedirectVerifying] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
@@ -73,71 +74,6 @@ function KioskEntryContent() {
     return () => clearInterval(interval);
   }, [activeAnnouncements]);
 
-  useEffect(() => {
-    const handleGoogleRedirect = async () => {
-      try {
-        setRedirectVerifying(true);
-        const result = await getRedirectResult(auth);
-        
-        if (!result?.user) {
-          setRedirectVerifying(false);
-          setLoading(false);
-          return;
-        }
-        
-        const user = result.user;
-        
-        if (!user.email?.endsWith('@neu.edu.ph')) {
-          await signOut(auth);
-          setError('Only @neu.edu.ph Google accounts are allowed.');
-          setRedirectVerifying(false);
-          setLoading(false);
-          return;
-        }
-        
-        const blockSnap = await getDocs(
-          query(collection(db, 'blocklist'), where('studentId', '==', user.email))
-        );
-        if (!blockSnap.empty) {
-          await signOut(auth);
-          setError('Your account has been restricted. Please contact library staff.');
-          setRedirectVerifying(false);
-          setLoading(false);
-          return;
-        }
-        
-        sessionStorage.setItem('kiosk_google_user', JSON.stringify({
-          email: user.email,
-          fullName: user.displayName || '',
-          loginMethod: 'google'
-        }));
-
-        router.push('/kiosk/register?method=google');
-      } catch (err: any) {
-        if (err.code !== 'auth/popup-closed-by-user') {
-          console.error('[NEU Library Log Error] [Kiosk] [GoogleRedirectResult]:', err);
-          setError('Sign-in failed. Please try again.');
-        }
-        setRedirectVerifying(false);
-        setLoading(false);
-      }
-    };
-    
-    handleGoogleRedirect();
-  }, [router]);
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setLoading(true);
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ hd: 'neu.edu.ph' });
-      await signInWithRedirect(auth, provider);
-    } catch (err) {
-      console.error('[NEU Library Log Error] [Kiosk] [GoogleSignInInitiate]:', err);
-      setLoading(false);
-    }
-  };
-
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (loading || isAtCapacity || !db) return;
@@ -173,6 +109,7 @@ function KioskEntryContent() {
           fullName: d.displayName || d.fullName, 
           college: d.college, 
           program: d.program, 
+          email: d.email || '',
           loginMethod: 'id' 
         }));
         router.push('/kiosk/purpose');
@@ -181,6 +118,57 @@ function KioskEntryContent() {
       }
     } catch (err: any) { 
       logAppError('KioskEntry', 'IdSubmit', err);
+      setError("Connection error. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (loading || isAtCapacity || !db) return;
+
+    if (!emailInput.trim()) {
+      setError("Please enter your NEU email.");
+      return;
+    }
+
+    if (!validateNEUEmail(emailInput.trim())) {
+      setError("Invalid email. Must end with @neu.edu.ph");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const cleanEmail = emailInput.trim().toLowerCase();
+
+    try {
+      // Check blocklist for email
+      const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanEmail), limit(1)));
+      if (!blockSnap.empty) {
+        setBlockedData(blockSnap.docs[0].data());
+        setLoading(false);
+        return;
+      }
+
+      // Query users by email
+      const userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', cleanEmail), limit(1)));
+      if (!userSnap.empty) {
+        const d = userSnap.docs[0].data();
+        sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
+          studentId: d.studentId, 
+          fullName: d.displayName || d.fullName, 
+          college: d.college, 
+          program: d.program, 
+          email: d.email,
+          loginMethod: 'email' 
+        }));
+        toast({ title: `Welcome back, ${d.fullName.split(' ')[0]}!`, description: "Redirecting to selection...", className: "bg-[#1a3a2a] text-white border-[#c9a227]" });
+        setTimeout(() => router.push('/kiosk/purpose'), 1500);
+      } else { 
+        router.push(`/kiosk/register?method=email&email=${encodeURIComponent(cleanEmail)}`); 
+      }
+    } catch (err: any) { 
+      logAppError('KioskEntry', 'EmailSubmit', err);
       setError("Connection error. Please try again.");
       setLoading(false);
     }
@@ -232,18 +220,11 @@ function KioskEntryContent() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-4">
-        {redirectVerifying && (
-          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4 text-white">
-            <Loader2 className="h-12 w-12 animate-spin text-[#c9a227]" />
-            <p className="font-black uppercase tracking-[0.2em] text-sm animate-pulse">Verifying Google account...</p>
-          </div>
-        )}
-
         <div className="w-full max-w-md mx-auto flex flex-col items-center gap-4">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
+          <div className="flex flex-col items-center gap-2 text-center mb-2">
+            <img src="/neu-logo.png" alt="NEU Logo" width={70} height={70} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
             <div className="space-y-1">
-              <h1 className="text-4xl font-black tracking-tight text-[#c9a227] drop-shadow-2xl leading-none">NEU Library</h1>
+              <h1 className="text-3xl font-black tracking-tight text-[#c9a227] drop-shadow-2xl leading-none uppercase">NEU Library</h1>
               <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.4em]">Digital Visitor Log</p>
             </div>
           </div>
@@ -252,7 +233,7 @@ function KioskEntryContent() {
             <Card className="bg-[#0a2a1a]/60 backdrop-blur-2xl w-full border-2 border-red-500/50 rounded-[2rem] p-8 text-center space-y-4">
               <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Full Capacity</h2>
-              <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity})..</p>
+              <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity}).</p>
               <Button className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</Button>
             </Card>
           ) : (
@@ -262,43 +243,50 @@ function KioskEntryContent() {
                 <span className="text-[9px] font-black text-white uppercase tabular-nums">{currentCount} / {dailyCapacity}</span>
               </div>
               <CardContent className="p-8 space-y-6">
-                <form onSubmit={handleIdSubmit} className="space-y-4">
+                <form onSubmit={handleIdSubmit} className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-2">School ID Entry</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-2 flex items-center gap-2">
+                      <CreditCard className="h-3 w-3" /> School ID Entry
+                    </Label>
                     <Input 
                       ref={inputRef} 
                       placeholder="e.g. 25-12946-343" 
-                      className={`h-16 text-3xl text-center font-mono bg-black/30 border-[#c9a227]/20 text-white rounded-xl focus:border-[#c9a227] ${error ? 'border-red-500' : ''}`} 
+                      className={`h-14 text-2xl text-center font-mono bg-black/30 border-[#c9a227]/20 text-white rounded-xl focus:border-[#c9a227] ${error ? 'border-red-500' : ''}`} 
                       value={studentId} 
                       onChange={(e) => { setStudentId(e.target.value); setError(null); }} 
                       disabled={loading} 
-                      autoFocus 
                     />
-                    {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
                   </div>
-                  <Button className="w-full h-14 text-xl font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={loading} type="submit">
-                    {loading && studentId.trim() ? "Verifying..." : "Continue"}
+                  <Button className="w-full h-12 text-sm font-black rounded-xl bg-[#c9a227] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={loading} type="submit">
+                    {loading && studentId.trim() ? <Loader2 className="animate-spin h-4 w-4" /> : "Continue with ID"}
                   </Button>
                 </form>
-                <div className="relative flex items-center gap-3">
+
+                <div className="relative flex items-center gap-3 py-1">
                   <div className="flex-grow border-t border-white/5"></div>
                   <span className="text-white/20 text-[8px] font-black uppercase tracking-widest">OR</span>
                   <div className="flex-grow border-t border-white/5"></div>
                 </div>
-                
-                <button 
-                  onClick={handleGoogleSignIn} 
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all shadow-md active:scale-[0.98] text-xs"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Sign in with Google (@neu.edu.ph)
-                </button>
+
+                <form onSubmit={handleEmailSubmit} className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-2 flex items-center gap-2">
+                      <Mail className="h-3 w-3" /> Institutional Email
+                    </Label>
+                    <Input 
+                      type="email"
+                      placeholder="e.g. juan@neu.edu.ph" 
+                      className={`h-14 text-lg text-center font-bold bg-black/30 border-[#c9a227]/20 text-white rounded-xl focus:border-[#c9a227] ${error ? 'border-red-500' : ''}`} 
+                      value={emailInput} 
+                      onChange={(e) => { setEmailInput(e.target.value); setError(null); }} 
+                      disabled={loading} 
+                    />
+                  </div>
+                  {error && <p className="text-red-400 text-[9px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
+                  <Button className="w-full h-12 text-sm font-black rounded-xl border-2 border-[#c9a227] bg-transparent text-[#c9a227] hover:bg-[#c9a227] hover:text-[#0a2a1a] shadow-lg transition-all" disabled={loading} type="submit">
+                    {loading && emailInput.trim() ? <Loader2 className="animate-spin h-4 w-4" /> : "Continue with Email"}
+                  </Button>
+                </form>
               </CardContent>
             </Card>
           )}

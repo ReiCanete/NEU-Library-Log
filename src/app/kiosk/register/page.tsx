@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, Suspense, useEffect, useMemo } from 'react';
@@ -8,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2 } from 'lucide-react';
-import { validateFullName, validateStudentId } from '@/lib/validation';
+import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2, Mail } from 'lucide-react';
+import { validateFullName, validateStudentId, validateNEUEmail } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -45,7 +46,6 @@ function RegisterForm() {
   const [selectedCollege, setSelectedCollege] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
   const [email, setEmail] = useState('');
-  const [loginMethod, setLoginMethod] = useState<'id' | 'google'>('id');
   
   const [search, setSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -53,11 +53,9 @@ function RegisterForm() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   
-  const [isReturningUser, setIsReturningUser] = useState(false);
-  const [existingUser, setExistingUser] = useState<any>(null);
-
   const method = searchParams.get('method');
   const idFromUrl = searchParams.get('id');
+  const emailFromUrl = searchParams.get('email');
 
   useEffect(() => {
     if (!db) return;
@@ -65,43 +63,10 @@ function RegisterForm() {
     const initialize = async () => {
       setLoading(true);
       
-      if (method === 'google') {
-        const googleDataJson = sessionStorage.getItem('kiosk_google_user');
-        if (!googleDataJson) {
-          router.push('/');
-          return;
-        }
-        
-        const googleUser = JSON.parse(googleDataJson);
-        setEmail(googleUser.email);
-        setFullName(googleUser.fullName);
-        setLoginMethod('google');
-        
-        // Check if email already registered
-        const userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', googleUser.email), limit(1)));
-        if (!userSnap.empty) {
-          const userData = userSnap.docs[0].data();
-          setExistingUser(userData);
-          setIsReturningUser(true);
-          
-          // Auto-redirect for returning users
-          setTimeout(() => {
-            sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-              studentId: userData.studentId || googleUser.email,
-              fullName: userData.fullName || userData.displayName,
-              college: userData.college,
-              program: userData.program,
-              email: userData.email,
-              loginMethod: 'google'
-            }));
-            router.push('/kiosk/purpose');
-          }, 3000);
-          setLoading(false);
-          return;
-        }
+      if (method === 'email' && emailFromUrl) {
+        setEmail(emailFromUrl);
       } else if (idFromUrl) {
         setStudentId(idFromUrl);
-        setLoginMethod('id');
       } else if (!method && !idFromUrl) {
         router.push('/');
         return;
@@ -111,7 +76,7 @@ function RegisterForm() {
     };
 
     initialize();
-  }, [db, method, idFromUrl, router]);
+  }, [db, method, idFromUrl, emailFromUrl, router]);
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
@@ -163,7 +128,7 @@ function RegisterForm() {
       // 1. Check if student ID already exists
       const idSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', studentId), limit(1)));
       
-      const userId = studentId; // Use student ID as doc ID for consistency
+      const userId = studentId; 
       const docRef = doc(db, 'users', userId);
 
       const userData = {
@@ -174,8 +139,6 @@ function RegisterForm() {
         program: selectedProgram || 'N/A',
         email: email || '',
         role: 'visitor',
-        googleLinked: loginMethod === 'google',
-        blocked: false,
         updatedAt: Timestamp.now()
       };
 
@@ -200,7 +163,7 @@ function RegisterForm() {
         college: selectedCollege,
         program: selectedProgram || 'N/A',
         email: email || '',
-        loginMethod: loginMethod
+        loginMethod: method === 'email' ? 'email' : 'id'
       }));
       
       router.push('/kiosk/purpose');
@@ -215,31 +178,7 @@ function RegisterForm() {
     return (
       <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 gap-4">
         <Loader2 className="animate-spin text-[#c9a227] h-12 w-12" />
-        <p className="text-[#c9a227] font-black uppercase tracking-widest text-sm">Validating profile...</p>
-      </div>
-    );
-  }
-
-  if (isReturningUser && existingUser) {
-    return (
-      <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
-        <div className="bg-black/40 backdrop-blur-2xl p-12 rounded-[3rem] border-2 border-[#c9a227]/30 flex flex-col items-center gap-6 shadow-2xl">
-          <div className="h-24 w-24 rounded-full bg-[#c9a227]/20 flex items-center justify-center border-2 border-[#c9a227]/50">
-            <CheckCircle2 className="h-12 w-12 text-[#c9a227]" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Welcome back!</h2>
-            <p className="text-[#c9a227] font-black text-xl uppercase tracking-widest">{existingUser.fullName || existingUser.displayName}</p>
-            <p className="text-white/40 font-bold text-xs uppercase tracking-[0.2em]">{existingUser.college}</p>
-          </div>
-          <div className="flex items-center gap-3 text-white/40 font-bold uppercase tracking-[0.2em] text-[10px] mt-4">
-            <Sparkles className="h-4 w-4 animate-pulse text-[#c9a227]" />
-            Redirecting to selection...
-          </div>
-          <Button onClick={() => router.push('/kiosk/purpose')} className="mt-4 bg-[#c9a227] text-[#0a2a1a] font-black rounded-xl px-10 h-12 hover:opacity-90">
-            Continue Now
-          </Button>
-        </div>
+        <p className="text-[#c9a227] font-black uppercase tracking-widest text-sm">Initializing profile...</p>
       </div>
     );
   }
@@ -260,10 +199,10 @@ function RegisterForm() {
             <UserPlus className="h-7 w-7 text-[#c9a227]" />
           </div>
           <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">
-            {method === 'google' ? 'Complete Profile' : 'New Registration'}
+            {method === 'email' ? 'Complete Your Profile' : 'New Registration'}
           </h2>
           <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">
-            {method === 'google' ? 'Link your Google account to your NEU profile' : 'Please verify your details'}
+            {method === 'email' ? "First time? Let's set up your library profile." : 'Please verify your details'}
           </p>
         </div>
 
@@ -284,7 +223,7 @@ function RegisterForm() {
                   <Input 
                     value={email} 
                     readOnly 
-                    className="h-12 text-xs font-bold bg-black/40 border-[#c9a227] text-white/50 rounded-xl px-4 cursor-not-allowed" 
+                    className="h-12 text-xs font-bold bg-black/40 border-2 border-[#c9a227] text-[#c9a227] rounded-xl px-4 cursor-not-allowed" 
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2"><Lock className="h-4 w-4 text-[#c9a227]/50" /></div>
                 </div>
@@ -333,7 +272,7 @@ function RegisterForm() {
                     <Input 
                       autoFocus 
                       placeholder="Type to search..." 
-                      className="pl-9 h-10 bg-black/40 border-[#c9a227]/20 rounded-xl text-white font-bold text-xs focus:border-[#c9a227] text-white"
+                      className="pl-9 h-10 bg-[#071a0f] border-[#c9a227]/40 rounded-xl text-white font-bold text-xs focus:border-[#c9a227]"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onClick={(e) => e.stopPropagation()}

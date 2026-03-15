@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Search, Monitor, Users, GraduationCap, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
@@ -52,12 +53,12 @@ export default function PurposePage() {
     if (!visitor || isSubmitting || !db) return;
     setIsSubmitting(true);
     try {
-      // Ensure ALL fields are saved to the visits collection
       await addDoc(collection(db, 'visits'), {
         studentId: visitor.studentId || '',
         fullName: visitor.fullName || '',
         college: visitor.college || '',
         program: visitor.program || '',
+        email: visitor.email || '',
         purpose: purpose,
         loginMethod: visitor.loginMethod || 'id',
         timestamp: Timestamp.now(),
