@@ -162,7 +162,7 @@ export default function KioskEntry() {
           <CardContent className="p-6 space-y-4">
             <form onSubmit={handleIdSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                 <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Scan or Enter School ID</Label>
+                 <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Scan or Enter School ID (e.g. yr-XXXXX-XXX)</Label>
                  <Input
                     ref={inputRef}
                     placeholder="yr-XXXXX-XXX"

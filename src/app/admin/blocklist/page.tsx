@@ -62,7 +62,7 @@ export default function BlocklistPage() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="sid">School ID</Label>
+                  <Label htmlFor="sid">School ID (e.g. yr-XXXXX-XXX)</Label>
                   <Input 
                     id="sid" 
                     placeholder="yr-XXXXX-XXX" 
