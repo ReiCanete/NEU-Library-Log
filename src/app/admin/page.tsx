@@ -4,8 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Calendar, TrendingUp, Loader2, RefreshCcw, Sparkles, BookOpen, GraduationCap, Clock, ArrowUpRight, ArrowDownRight, Settings2, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCollection, useDoc } from '@/firebase';
-import { db, auth } from '@/firebase/config';
+import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { format, startOfDay, getHours, subDays } from 'date-fns';
@@ -75,15 +74,22 @@ const PURPOSE_COLORS: Record<string, string> = {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
+  const db = useFirestore();
+  const auth = useAuth();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
   const [newCapacity, setNewCapacity] = useState('');
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
-  const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
+  const visitsQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'visits'), orderBy('timestamp', 'desc'));
+  }, [db]);
   const { data: allVisits, loading: visitsLoading, error: visitsError } = useCollection(visitsQuery);
-  const { data: settings, error: settingsError } = useDoc(doc(db, 'settings', 'library'));
+  
+  const settingsRef = useMemo(() => db ? doc(db, 'settings', 'library') : null, [db]);
+  const { data: settings, error: settingsError } = useDoc(settingsRef);
 
   const dailyCapacity = settings?.dailyCapacity || 200;
 
@@ -97,6 +103,7 @@ export default function AdminDashboard() {
   };
 
   const updateCapacity = async () => {
+    if (!db) return;
     const val = parseInt(newCapacity);
     if (isNaN(val) || val <= 0) {
       toast({ title: "Validation Error", description: "Please enter a valid positive number.", variant: "destructive" });
@@ -105,7 +112,7 @@ export default function AdminDashboard() {
     try {
       await setDoc(doc(db, 'settings', 'library'), {
         dailyCapacity: val,
-        lastUpdatedBy: auth.currentUser?.email || 'Admin',
+        lastUpdatedBy: auth?.currentUser?.email || 'Admin',
         updatedAt: Timestamp.now()
       }, { merge: true });
       toast({ title: "Capacity Updated", description: `Limit set to ${val} visitors.` });

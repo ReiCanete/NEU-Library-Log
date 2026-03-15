@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen, Search, Monitor, Users, GraduationCap, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
-import { db } from '@/firebase/config';
+import { useFirestore } from '@/firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ const PURPOSES = [
 export default function PurposePage() {
   const router = useRouter();
   const { toast } = useToast();
+  const db = useFirestore();
   const [visitor, setVisitor] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState(100);
@@ -48,7 +49,7 @@ export default function PurposePage() {
   }, [progress, router]);
 
   const handleSelect = async (purpose: string) => {
-    if (!visitor || isSubmitting) return;
+    if (!visitor || isSubmitting || !db) return;
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'visits'), {

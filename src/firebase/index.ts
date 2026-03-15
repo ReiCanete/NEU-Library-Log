@@ -3,6 +3,9 @@
 import { app, auth, db as firestore } from './config';
 export { app, auth, firestore };
 
+/**
+ * Standard initialization function for the Firebase Provider.
+ */
 export function initializeFirebase() {
   return { app, firestore, auth };
 }

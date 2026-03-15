@@ -7,12 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, ShieldCheck, User, Megaphone, Info, ShieldX } from 'lucide-react';
-import { auth, db } from '@/firebase/config';
+import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, orderBy } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCollection, useDoc } from '@/firebase';
 import { format, startOfDay } from 'date-fns';
 import { validateStudentId, validateNEUEmail } from '@/lib/validation';
 import { getErrorMessage, logAppError } from '@/lib/errorMessages';
@@ -22,6 +21,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 function KioskEntryContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const auth = useAuth();
+  const db = useFirestore();
   const inputRef = useRef<HTMLInputElement>(null);
   
   const [studentId, setStudentId] = useState('');
@@ -37,18 +38,22 @@ function KioskEntryContent() {
   }, []);
 
   const visitsQuery = useMemo(() => {
-    if (!todayDate) return null;
+    if (!todayDate || !db) return null;
     return query(collection(db, 'visits'), where('timestamp', '>=', todayDate));
-  }, [todayDate]);
+  }, [todayDate, db]);
 
   const { data: todayVisits } = useCollection(visitsQuery);
-  const { data: settings } = useDoc(doc(db, 'settings', 'library'));
+  const settingsRef = useMemo(() => db ? doc(db, 'settings', 'library') : null, [db]);
+  const { data: settings } = useDoc(settingsRef);
   
-  const announcementsQuery = useMemo(() => query(
-    collection(db, 'announcements'), 
-    where('isActive', '==', true),
-    orderBy('startDate', 'desc')
-  ), []);
+  const announcementsQuery = useMemo(() => {
+    if (!db) return null;
+    return query(
+      collection(db, 'announcements'), 
+      where('isActive', '==', true),
+      orderBy('startDate', 'desc')
+    );
+  }, [db]);
   const { data: activeAnnouncements } = useCollection(announcementsQuery);
 
   const dailyCapacity = settings?.dailyCapacity || 200;
@@ -65,6 +70,7 @@ function KioskEntryContent() {
 
   useEffect(() => {
     const handleRedirect = async () => {
+      if (!auth) return;
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
@@ -98,7 +104,7 @@ function KioskEntryContent() {
       }
     };
     handleRedirect();
-  }, [router, toast]);
+  }, [router, toast, auth, db]);
 
   useEffect(() => {
     if (loginMode === 'admin') {
@@ -108,7 +114,7 @@ function KioskEntryContent() {
 
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (loading || isAtCapacity) return;
+    if (loading || isAtCapacity || !db) return;
 
     if (!studentId.trim()) {
       setError("Please enter your School ID to continue.");
@@ -258,6 +264,7 @@ function KioskEntryContent() {
                 variant="outline" 
                 className="w-full h-12 text-[10px] font-black border-white/10 bg-white text-[#0a2a1a] hover:bg-white/90 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3" 
                 onClick={() => {
+                  if (!auth) return;
                   setLoading(true);
                   signInWithRedirect(auth, new GoogleAuthProvider().setCustomParameters({ hd: 'neu.edu.ph' }));
                 }} 

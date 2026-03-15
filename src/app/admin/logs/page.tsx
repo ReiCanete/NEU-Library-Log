@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
@@ -6,8 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Search, Trash2, Loader2, FileText, Calendar, Table as TableIcon, History, UserX, CheckCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCollection } from '@/firebase';
-import { db, auth } from '@/firebase/config';
+import { useAuth, useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
 import { format, isSameDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -27,16 +25,24 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function VisitorLogs() {
   const { toast } = useToast();
+  const db = useFirestore();
+  const auth = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
+  const visitsQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'visits'), orderBy('timestamp', 'desc'));
+  }, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
 
-  const blocklistQuery = useMemo(() => query(collection(db, 'blocklist')), []);
+  const blocklistQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'blocklist'));
+  }, [db]);
   const { data: blocklist } = useCollection(blocklistQuery);
 
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
@@ -65,14 +71,14 @@ export default function VisitorLogs() {
 
   const handleBlockUser = async () => {
     const userToBlock = selectedVisit || historyUser;
-    if (!userToBlock || !blockReason) return;
+    if (!userToBlock || !blockReason || !db) return;
     setIsProcessing(true);
     try {
       await addDoc(collection(db, 'blocklist'), {
         studentId: userToBlock.studentId,
         fullName: userToBlock.fullName,
         reason: blockReason,
-        blockedBy: auth.currentUser?.email || 'Staff',
+        blockedBy: auth?.currentUser?.email || 'Staff',
         blockedAt: Timestamp.now()
       });
       toast({ title: "Access Restricted", description: `${userToBlock.fullName} is now blocked.` });
@@ -87,6 +93,7 @@ export default function VisitorLogs() {
   };
 
   const handleUnblockUser = async (studentId: string) => {
+    if (!db) return;
     setIsProcessing(true);
     try {
       const q = query(collection(db, 'blocklist'), where('studentId', '==', studentId));
@@ -103,6 +110,7 @@ export default function VisitorLogs() {
   };
 
   const handleDeleteVisit = (visitId: string) => {
+    if (!db) return;
     const docRef = doc(db, 'visits', visitId);
     setIsProcessing(true);
     deleteDoc(docRef)
