@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, ShieldCheck, AlertCircle, Lock, Mail, X } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertCircle, Lock, Mail, X, ArrowLeft } from 'lucide-react';
 import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
@@ -38,7 +38,6 @@ export default function AdminLogin() {
 
     if (!email) { setError('Please enter your email address.'); return; }
     if (!password) { setError('Please enter your password.'); return; }
-    if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
 
     try {
       setLoading(true);
@@ -58,9 +57,7 @@ export default function AdminLogin() {
         hasAdminAccess = userData.role === 'admin' || userData.studentId === '25-14294-549';
       }
 
-      const isWhitelisted = user.email?.startsWith('25-14294-549');
-
-      if (hasAdminAccess || isWhitelisted) {
+      if (hasAdminAccess || user.email?.startsWith('25-14294-549')) {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
@@ -70,120 +67,78 @@ export default function AdminLogin() {
         }, { merge: true });
 
         setAttempts(0);
-        window.location.href = '/admin';
+        router.push('/admin');
       } else {
         await signOut(auth);
-        setError('This account does not have administrator privileges. Contact the system administrator.');
+        setError('Unauthorized account. Contact the library administrator.');
         setLoading(false);
       }
     } catch (err: any) {
-      logAppError('AdminLogin', 'SignIn', err);
-      const msg = getErrorMessage(err);
-      setError(msg);
+      logAppError('Login', 'SignIn', err);
+      setError(getErrorMessage(err));
       
       setAttempts(prev => {
         const next = prev + 1;
         if (next >= 5) setLockoutTime(60);
         return next;
       });
-      
       setLoading(false);
     }
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="max-w-md w-full space-y-8 flex flex-col items-center animate-in fade-in zoom-in duration-700">
-        <div className="flex flex-col items-center gap-4">
-          <img 
-            src="/neu-logo.png" 
-            alt="NEU Logo" 
-            width={100} 
-            height={100} 
-            className="rounded-full shadow-2xl border-4 border-[#c9a227]/30" 
-          />
+    <div className="min-h-screen bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="absolute top-6 left-6">
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
+          <ArrowLeft className="h-4 w-4" /> Return to Kiosk
+        </Button>
+      </div>
+
+      <div className="max-w-sm w-full space-y-6 flex flex-col items-center animate-in fade-in zoom-in duration-700">
+        <div className="flex flex-col items-center gap-3">
+          <img src="/neu-logo.png" alt="Logo" className="h-16 w-16 rounded-full shadow-2xl border-2 border-[#c9a227]/30" />
           <div className="text-center">
-            <h2 className="text-sm font-black text-[#c9a227] tracking-[0.4em] uppercase">New Era University</h2>
-            <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Library Management System</p>
+            <h2 className="text-xs font-black text-[#c9a227] tracking-[0.3em] uppercase">Staff Portal</h2>
+            <p className="text-[8px] text-white/40 font-bold uppercase tracking-widest mt-1">Authorized Access Only</p>
           </div>
         </div>
         
-        <Card className="w-full glass-neu border border-[#c9a227]/40 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
-          <CardHeader className="text-center space-y-2 pt-10 px-10">
-            <div className="mx-auto bg-[#c9a227]/10 h-16 w-16 rounded-2xl flex items-center justify-center border border-[#c9a227]/20">
-              <ShieldCheck className="h-8 w-8 text-[#c9a227]" />
+        <Card className="w-full glass-neu border border-[#c9a227]/30 rounded-3xl shadow-2xl overflow-hidden">
+          <CardHeader className="text-center space-y-2 pt-8 px-8">
+            <div className="mx-auto bg-[#c9a227]/10 h-12 w-12 rounded-xl flex items-center justify-center border border-[#c9a227]/20">
+              <ShieldCheck className="h-6 w-6 text-[#c9a227]" />
             </div>
-            <div className="space-y-1">
-              <CardTitle className="text-3xl font-black text-white tracking-tight">Staff Portal</CardTitle>
-              <CardDescription className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em]">Authorized Personnel Only</CardDescription>
-            </div>
+            <CardTitle className="text-xl font-black text-white tracking-tight">Login Credentials</CardTitle>
           </CardHeader>
-          <CardContent className="pb-12 space-y-6 px-10">
+          <CardContent className="pb-10 space-y-5 px-8">
             {error && (
-              <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-200 rounded-xl py-3 relative pr-10">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-[10px] font-black">{error}</AlertDescription>
-                <button onClick={() => setError('')} className="absolute right-3 top-3 hover:text-white">
-                  <X className="h-4 w-4" />
-                </button>
+              <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-200 rounded-xl py-2 pr-10">
+                <AlertDescription className="text-[9px] font-black">{error}</AlertDescription>
+                <button onClick={() => setError('')} className="absolute right-2 top-2 hover:text-white"><X className="h-4 w-4" /></button>
               </Alert>
             )}
 
             <form onSubmit={handleSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Email Address</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[8px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]/40" />
-                  <Input 
-                    id="email"
-                    type="email"
-                    placeholder="staff@neu.edu.ph"
-                    className="h-14 pl-11 bg-black/40 border-[#c9a227]/20 text-white rounded-xl focus:border-[#c9a227] transition-all"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]/40" />
+                  <Input type="email" placeholder="staff@neu.edu.ph" className="h-12 pl-10 bg-black/40 border-[#c9a227]/20 text-white rounded-xl text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Password</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[8px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]/40" />
-                  <Input 
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="h-14 pl-11 bg-black/40 border-[#c9a227]/20 text-white rounded-xl focus:border-[#c9a227] transition-all"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]/40" />
+                  <Input type="password" placeholder="••••••••" className="h-12 pl-10 bg-black/40 border-[#c9a227]/20 text-white rounded-xl text-sm" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
               </div>
 
-              <Button 
-                type="submit"
-                className="w-full h-16 mt-4 text-xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-2xl transition-all active:scale-[0.98]"
-                disabled={loading || lockoutTime > 0}
-              >
-                {lockoutTime > 0 ? (
-                  `Try again in ${lockoutTime}s`
-                ) : loading ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  "Log In to Dashboard"
-                )}
+              <Button type="submit" className="w-full h-12 mt-2 text-sm font-black rounded-xl bg-[#c9a227] text-[#0a2a1a] hover:opacity-90 transition-all" disabled={loading || lockoutTime > 0}>
+                {lockoutTime > 0 ? `Wait ${lockoutTime}s` : loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In to Dashboard"}
               </Button>
             </form>
-
-            <Button 
-              variant="link" 
-              className="w-full text-white/30 hover:text-[#c9a227] font-black uppercase tracking-widest text-[9px]"
-              onClick={() => router.push('/')}
-            >
-              Return to Kiosk
-            </Button>
           </CardContent>
         </Card>
       </div>

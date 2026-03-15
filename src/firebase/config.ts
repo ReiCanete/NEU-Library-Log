@@ -13,11 +13,24 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Singleton pattern using globalThis to survive Next.js HMR cycles
-const G = globalThis as any;
+// Robust Singleton pattern for Next.js HMR stability
+const G = (typeof window !== 'undefined' ? window : globalThis) as any;
 
-const app: FirebaseApp = G._fapp || (typeof window !== 'undefined' ? (G._fapp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : undefined);
-const auth: Auth = G._fauth || (typeof window !== 'undefined' ? (G._fauth = getAuth(app)) : undefined);
-const db: Firestore = G._fdb || (typeof window !== 'undefined' ? (G._fdb = getFirestore(app)) : undefined);
+function getFirebaseInstance(): { app: FirebaseApp; auth: Auth; db: Firestore } {
+  if (!G._firebaseApp) {
+    G._firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    G._firebaseAuth = getAuth(G._firebaseApp);
+    G._firebaseDb = getFirestore(G._firebaseApp);
+  }
+  return {
+    app: G._firebaseApp,
+    auth: G._firebaseAuth,
+    db: G._firebaseDb
+  };
+}
+
+const { app, auth, db } = typeof window !== 'undefined' 
+  ? getFirebaseInstance() 
+  : { app: null as any, auth: null as any, db: null as any };
 
 export { app, auth, db };

@@ -27,7 +27,7 @@ function CountUp({ value, error }: { value: number; error?: boolean }) {
       return;
     }
     const duration = 1000;
-    const increment = Math.ceil(end / (duration / 16));
+    const increment = Math.ceil(end / (duration / 16)) || 1;
     const timer = setInterval(() => {
       start += increment;
       if (start >= end) {
@@ -40,7 +40,7 @@ function CountUp({ value, error }: { value: number; error?: boolean }) {
     return () => clearInterval(timer);
   }, [value, error]);
 
-  if (error) return <span className="flex items-center gap-2">— <AlertTriangle className="h-4 w-4 text-red-500" /></span>;
+  if (error) return <span className="flex items-center gap-2">— <AlertTriangle className="h-3 w-3 text-red-500" /></span>;
   return <>{count}</>;
 }
 
@@ -82,10 +82,12 @@ export default function AdminDashboard() {
   const [newCapacity, setNewCapacity] = useState('');
 
   const todayDate = useMemo(() => typeof window !== 'undefined' ? startOfDay(new Date()) : null, []);
+  
   const visitsQuery = useMemo(() => {
     if (typeof window === 'undefined' || !db) return null;
     return query(collection(db, 'visits'), orderBy('timestamp', 'desc'));
   }, [db]);
+  
   const { data: allVisits, loading: visitsLoading, error: visitsError } = useCollection(visitsQuery);
   
   const settingsRef = useMemo(() => (typeof window !== 'undefined' && db) ? doc(db, 'settings', 'library') : null, [db]);
@@ -98,15 +100,15 @@ export default function AdminDashboard() {
     setTimeout(() => {
       setLastUpdated(new Date());
       setIsRefreshing(false);
-      toast({ title: "Sync Complete", description: "Dashboard stats refreshed." });
-    }, 800);
+      toast({ title: "Dashboard Synchronized", description: "Latest metrics loaded." });
+    }, 600);
   };
 
   const updateCapacity = async () => {
-    if (!db) return;
+    if (!db || !auth) return;
     const val = parseInt(newCapacity);
     if (isNaN(val) || val <= 0) {
-      toast({ title: "Validation Error", description: "Please enter a valid positive number.", variant: "destructive" });
+      toast({ title: "Invalid Input", description: "Please enter a positive number.", variant: "destructive" });
       return;
     }
     try {
@@ -115,11 +117,11 @@ export default function AdminDashboard() {
         lastUpdatedBy: auth?.currentUser?.email || 'Admin',
         updatedAt: Timestamp.now()
       }, { merge: true });
-      toast({ title: "Capacity Updated", description: `Limit set to ${val} visitors.` });
+      toast({ title: "Settings Saved", description: `Daily capacity updated to ${val}.` });
       setIsEditingCapacity(false);
     } catch (e: any) {
-      logAppError('AdminDashboard', 'UpdateCapacity', e);
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      logAppError('Dashboard', 'UpdateCapacity', e);
+      toast({ title: "Update Failed", description: e.message, variant: "destructive" });
     }
   };
 
@@ -184,164 +186,126 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout>
-      <div className="space-y-12">
-        {(visitsError || settingsError) && (
-          <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-2xl flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5" />
-              <AlertDescription className="font-black text-xs uppercase tracking-widest">
-                Some data could not be loaded. Showing cached results.
-              </AlertDescription>
+      <div className="space-y-8 pb-10">
+        {visitsError && (
+          <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-xl mb-6">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="font-bold text-[10px] uppercase tracking-widest">
+                  Live data connection unstable. Showing cached metrics.
+                </AlertDescription>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 text-[9px] font-black" onClick={() => window.location.reload()}>Retry Sync</Button>
             </div>
-            <Button size="sm" variant="outline" className="h-8 border-amber-300 font-black text-[10px]" onClick={() => window.location.reload()}>
-              Click to retry
-            </Button>
           </Alert>
         )}
 
-        <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 border-b-4 border-[#c9a227]">
-          <div className="z-10 text-center md:text-left space-y-3">
-            <div className="flex items-center gap-4 justify-center md:justify-start">
-              <img src="/neu-logo.png" alt="Logo" className="h-10 w-10 rounded-full" />
-              <h2 className="text-4xl font-black tracking-tight flex items-center gap-3">
-                Staff Overview <Sparkles className="h-6 w-6 text-[#c9a227]" />
+        <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-6 border-b-2 border-[#c9a227]">
+          <div className="z-10 text-center sm:text-left space-y-2">
+            <div className="flex items-center gap-3 justify-center sm:justify-start">
+              <img src="/neu-logo.png" alt="Logo" className="h-8 w-8 rounded-full" />
+              <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                Overview <Sparkles className="h-4 w-4 text-[#c9a227]" />
               </h2>
             </div>
-            <p className="text-white/60 font-bold max-w-lg text-lg leading-tight">
-              Good day, Staff! The library log is active. Today: <span className="text-[#c9a227]">{stats.today}</span> entries.
+            <p className="text-white/60 font-medium text-sm">
+              Today: <span className="text-[#c9a227] font-black">{stats.today}</span> visitors logged in.
             </p>
           </div>
-          <div className="flex items-center gap-4 z-10">
+          <div className="flex items-center gap-3 z-10">
             <Dialog open={isEditingCapacity} onOpenChange={setIsEditingCapacity}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-2xl h-14 px-6 font-black flex gap-2">
-                  <Settings2 className="h-5 w-5 text-[#c9a227]" />
-                  Capacity: {dailyCapacity}
+                <Button variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-xl h-11 px-5 font-black flex gap-2 text-xs">
+                  <Settings2 className="h-4 w-4 text-[#c9a227]" />
+                  Limit: {dailyCapacity}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-[2rem] p-8 max-w-sm">
+              <DialogContent className="rounded-2xl p-6 max-w-sm">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Daily Capacity</DialogTitle>
-                  <DialogDescription className="font-bold text-[#4a6741]">Set the maximum number of daily visitors allowed.</DialogDescription>
+                  <DialogTitle className="text-xl font-black text-[#1a3a2a]">Daily Capacity</DialogTitle>
+                  <DialogDescription className="font-medium text-xs text-[#4a6741]">Max visitors allowed per day.</DialogDescription>
                 </DialogHeader>
-                <div className="py-6">
-                  <Input type="number" placeholder="e.g. 200" className="h-14 rounded-xl bg-[#f0f4f1] border-none font-black text-2xl text-center" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} />
+                <div className="py-4">
+                  <Input type="number" className="h-12 rounded-lg bg-[#f0f4f1] border-none font-black text-xl text-center" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} />
                 </div>
                 <DialogFooter>
-                  <Button className="w-full h-14 rounded-xl bg-[#1a3a2a] font-black" onClick={updateCapacity}>Save Limit</Button>
+                  <Button className="w-full h-11 rounded-lg bg-[#1a3a2a] font-black text-sm" onClick={updateCapacity}>Save Settings</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Button onClick={handleRefresh} disabled={isRefreshing} className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-2xl h-14 px-8 font-black">
-              {isRefreshing ? <Loader2 className="animate-spin h-5 w-5" /> : <RefreshCcw className="h-5 w-5 mr-2" />}
-              Refresh
+            <Button onClick={handleRefresh} disabled={isRefreshing} className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-xl h-11 px-5 font-black text-xs">
+              {isRefreshing ? <Loader2 className="animate-spin h-4 w-4" /> : <RefreshCcw className="h-4 w-4" />}
             </Button>
           </div>
-          <div className="absolute top-[-50%] right-[-10%] w-[400px] h-[400px] bg-[#c9a227]/10 rounded-full blur-[100px]" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
-            { label: 'Today\'s Visitors', value: stats.today, prev: stats.yesterday, icon: Users, circle: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
-            { label: 'Weekly Total', value: stats.week, icon: Calendar, circle: 'bg-[#c9a227]/10', iconColor: 'text-[#c9a227]' },
-            { label: 'Monthly Traffic', value: stats.month, icon: TrendingUp, circle: 'bg-[#0a2a1a]/10', iconColor: 'text-[#0a2a1a]' }
-          ].map((s, i) => {
-            const isUp = s.prev !== undefined ? s.value >= s.prev : true;
-            return (
-              <Card key={i} className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border-t-4 border-[#c9a227]">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-8">
-                  <div className={`p-4 rounded-2xl ${s.circle}`}>
-                    <s.icon className={`h-6 w-6 ${s.iconColor}`} />
+            { label: 'Today\'s Visits', value: stats.today, prev: stats.yesterday, icon: Users, circle: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+            { label: 'Weekly Total', value: stats.week, icon: Calendar, circle: 'bg-amber-50', iconColor: 'text-amber-600' },
+            { label: 'Monthly Traffic', value: stats.month, icon: TrendingUp, circle: 'bg-slate-100', iconColor: 'text-[#0a2a1a]' }
+          ].map((s, i) => (
+            <Card key={i} className="border-none shadow-lg rounded-2xl bg-white overflow-hidden group hover:translate-y-[-2px] transition-all border-t-2 border-[#c9a227]">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-6">
+                <div className={`p-3 rounded-xl ${s.circle}`}>
+                  <s.icon className={`h-5 w-5 ${s.iconColor}`} />
+                </div>
+                <div className="text-right">
+                  <CardTitle className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
+                  <div className="text-3xl font-black text-[#1a3a2a] mt-1 tabular-nums">
+                    {visitsLoading ? <Skeleton className="h-8 w-16 ml-auto" /> : <CountUp value={s.value} error={!!visitsError} />}
                   </div>
-                  <div className="text-right">
-                    <CardTitle className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
-                    <div className="text-5xl font-black text-[#1a3a2a] mt-1 tabular-nums">
-                      {visitsLoading ? <Skeleton className="h-12 w-20 ml-auto" /> : <CountUp value={s.value} error={!!visitsError} />}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-8 pb-8 pt-2 border-t border-[#f0f4f1] mt-2 flex justify-between items-center">
-                  <div className="flex items-center gap-1">
-                    {s.prev !== undefined && !visitsError && (
-                      <span className={`text-[9px] font-black uppercase flex items-center ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                        {isUp ? 'Trending Up' : 'Trending Down'}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[9px] text-[#4a6741]/50 font-black uppercase">Refreshed {format(lastUpdated, 'p')}</span>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 pb-5 pt-0 flex justify-between items-center text-[8px] font-bold text-[#4a6741]/50 uppercase tracking-widest">
+                <span>Updated recently</span>
+                {s.prev !== undefined && s.value >= s.prev ? <ArrowUpRight className="h-3 w-3 text-emerald-500" /> : <ArrowDownRight className="h-3 w-3 text-red-400" />}
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <Card className="rounded-[3rem] shadow-xl border border-[#d4e4d8] bg-white p-10 space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="rounded-3xl shadow-lg border border-[#d4e4d8] bg-white p-8 space-y-6">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-2xl font-black text-[#1a3a2a] tracking-tight">Visit Purpose Breakdown</h3>
-                <p className="text-[10px] text-[#4a6741] font-black uppercase tracking-widest mt-1">Total distribution by category</p>
+                <h3 className="text-lg font-black text-[#1a3a2a] tracking-tight">Visit Purpose</h3>
+                <p className="text-[9px] text-[#4a6741] font-bold uppercase tracking-widest">Category Distribution</p>
               </div>
-              <div className="p-3 bg-[#f0f4f1] rounded-2xl"><BookOpen className="h-5 w-5 text-[#1a3a2a]" /></div>
+              <BookOpen className="h-4 w-4 text-[#c9a227]" />
             </div>
-            <div className="h-[400px] w-full relative flex items-center justify-center">
-              {visitsLoading ? (
-                <Skeleton className="h-64 w-64 rounded-full" />
-              ) : visitsError || purposeData.length === 0 ? (
-                <div className="flex flex-col items-center gap-4 opacity-40">
-                  <Info className="h-12 w-12" />
-                  <p className="font-black uppercase text-[10px]">Chart data unavailable</p>
-                  <Button size="sm" variant="link" className="font-black h-4" onClick={() => window.location.reload()}>Click to retry</Button>
-                </div>
-              ) : (
-                <>
-                  <div className="absolute flex flex-col items-center">
-                    <span className="text-4xl font-black text-[#1a3a2a]">{allVisits?.length || 0}</span>
-                    <span className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest">Total Visits</span>
-                  </div>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={purposeData} cx="50%" cy="50%" innerRadius={85} outerRadius={125} paddingAngle={5} dataKey="value" stroke="none">
-                        {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#ccc'} />)}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px', fontWeight: '900' }}
-                        formatter={(value: number, name: string) => [`${value} visits (${((value/(allVisits?.length || 1))*100).toFixed(1)}%)`, name]}
-                      />
-                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </>
+            <div className="h-[300px] w-full relative flex items-center justify-center">
+              {visitsLoading ? <Skeleton className="h-48 w-48 rounded-full" /> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={purposeData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
+                      {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#ccc'} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               )}
             </div>
           </Card>
 
-          <Card className="rounded-[3rem] shadow-xl border border-[#d4e4d8] bg-white p-10 space-y-8">
+          <Card className="rounded-3xl shadow-lg border border-[#d4e4d8] bg-white p-8 space-y-6">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-2xl font-black text-[#1a3a2a] tracking-tight">Frequent Visitor Groups</h3>
-                <p className="text-[10px] text-[#4a6741] font-black uppercase tracking-widest mt-1">Top 5 active colleges</p>
+                <h3 className="text-lg font-black text-[#1a3a2a] tracking-tight">Active Colleges</h3>
+                <p className="text-[9px] text-[#4a6741] font-bold uppercase tracking-widest">Top Visitor Groups</p>
               </div>
-              <div className="p-3 bg-[#f0f4f1] rounded-2xl"><GraduationCap className="h-5 w-5 text-[#1a3a2a]" /></div>
+              <GraduationCap className="h-4 w-4 text-[#1a3a2a]" />
             </div>
-            <div className="h-[400px] w-full">
-              {visitsLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
-                </div>
-              ) : visitsError || collegeData.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center gap-4 opacity-40">
-                   <TrendingUp className="h-12 w-12" />
-                   <p className="font-black uppercase text-[10px]">No visitor data found for period</p>
-                </div>
-              ) : (
+            <div className="h-[300px] w-full">
+              {visitsLoading ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full rounded-lg" />)}</div> : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={collegeData} layout="vertical" margin={{ left: 20, right: 40 }}>
+                  <BarChart data={collegeData} layout="vertical" margin={{ left: 10, right: 30 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 11, fontWeight: 900 }} />
-                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }} />
-                    <Bar dataKey="count" radius={[0, 20, 20, 0]} barSize={32} label={{ position: 'right', fill: '#1a3a2a', fontSize: 12, fontWeight: 900, formatter: (val: number) => `${val} visits` }}>
+                    <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 10, fontWeight: 'bold' }} />
+                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }} />
+                    <Bar dataKey="count" radius={[0, 10, 10, 0]} barSize={24}>
                       {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />)}
                     </Bar>
                   </BarChart>
@@ -349,24 +313,6 @@ export default function AdminDashboard() {
               )}
             </div>
           </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { label: 'Peak Visit Hour', value: insights.peakHour, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Most Active Day', value: insights.activeDay, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'Top Visit Purpose', value: insights.topPurpose, icon: BookOpen, color: 'text-[#0a2a1a]', bg: 'bg-slate-100' }
-          ].map((item, i) => (
-            <div key={i} className="flex items-center gap-6 p-8 bg-white rounded-[2rem] shadow-lg border-l-8 border-[#c9a227] group hover:border-[#1a3a2a] transition-all">
-              <div className={`p-4 rounded-2xl ${item.bg} group-hover:scale-110 transition-transform`}>
-                <item.icon className={`h-6 w-6 ${item.color}`} />
-              </div>
-              <div>
-                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{item.label}</p>
-                <p className="text-xl font-black text-[#1a3a2a] tracking-tight">{item.value}</p>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </AdminLayout>
