@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -15,19 +14,33 @@ export default function WelcomePage() {
   useEffect(() => {
     setCurrentTime(new Date());
     const data = sessionStorage.getItem('kiosk_visitor');
-    if (!data) { router.push('/'); return; }
+    if (!data) {
+      router.push('/');
+      return;
+    }
     setVisitor(JSON.parse(data));
+
     const timeTimer = setInterval(() => setCurrentTime(new Date()), 1000);
     const countTimer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) { sessionStorage.removeItem('kiosk_visitor'); router.push('/'); return 0; }
-        return prev - 1;
-      });
+      setCountdown((prev) => Math.max(0, prev - 1));
     }, 1000);
-    return () => { clearInterval(timeTimer); clearInterval(countTimer); };
+
+    return () => {
+      clearInterval(timeTimer);
+      clearInterval(countTimer);
+    };
   }, [router]);
 
+  // Handle navigation side effect separately from state updates
+  useEffect(() => {
+    if (countdown === 0) {
+      sessionStorage.removeItem('kiosk_visitor');
+      router.push('/');
+    }
+  }, [countdown, router]);
+
   if (!visitor) return null;
+
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (countdown / 8) * circumference;
@@ -56,11 +69,17 @@ export default function WelcomePage() {
         <div className="flex gap-6 w-full max-w-[500px] pt-10 border-t border-white/10">
           <div className="bg-black/30 backdrop-blur-xl flex flex-1 items-center justify-center gap-4 p-6 rounded-3xl border border-white/5">
             <Calendar className="h-8 w-8 text-[#c9a227]" />
-            <div className="text-left"><p className="text-white/30 text-[9px] font-black uppercase tracking-widest">Date</p><p className="text-2xl font-black">{currentTime ? format(currentTime, 'MMM dd, yyyy') : '--'}</p></div>
+            <div className="text-left">
+              <p className="text-white/30 text-[9px] font-black uppercase tracking-widest">Date</p>
+              <p className="text-2xl font-black">{currentTime ? format(currentTime, 'MMM dd, yyyy') : '--'}</p>
+            </div>
           </div>
           <div className="bg-black/30 backdrop-blur-xl flex flex-1 items-center justify-center gap-4 p-6 rounded-3xl border border-white/5">
             <Clock className="h-8 w-8 text-[#c9a227]" />
-            <div className="text-left"><p className="text-white/30 text-[9px] font-black uppercase tracking-widest">Time</p><p className="text-2xl font-black tabular-nums">{currentTime ? format(currentTime, 'hh:mm a') : '--:--'}</p></div>
+            <div className="text-left">
+              <p className="text-white/30 text-[9px] font-black uppercase tracking-widest">Time</p>
+              <p className="text-2xl font-black tabular-nums">{currentTime ? format(currentTime, 'hh:mm a') : '--:--'}</p>
+            </div>
           </div>
         </div>
 
@@ -68,7 +87,9 @@ export default function WelcomePage() {
           <p className="text-[#c9a227]/50 text-xs font-black uppercase tracking-[0.5em]">Resetting kiosk in <span className="text-white">{countdown}</span>...</p>
         </div>
       </div>
-      <div className="fixed bottom-0 left-0 w-full h-3 bg-black/40"><div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_20px_#c9a227]" style={{ width: `${(countdown/8)*100}%` }} /></div>
+      <div className="fixed bottom-0 left-0 w-full h-3 bg-black/40">
+        <div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_20px_#c9a227]" style={{ width: `${(countdown/8)*100}%` }} />
+      </div>
     </div>
   );
 }

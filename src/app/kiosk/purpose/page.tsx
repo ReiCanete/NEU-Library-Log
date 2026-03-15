@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -28,24 +27,38 @@ export default function PurposePage() {
 
   useEffect(() => {
     const data = sessionStorage.getItem('kiosk_visitor');
-    if (!data) { router.push('/'); return; }
+    if (!data) {
+      router.push('/');
+      return;
+    }
     setVisitor(JSON.parse(data));
+
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev <= 0) { router.push('/'); return 0; }
-        return prev - (100 / 300);
-      });
+      setProgress((prev) => Math.max(0, prev - (100 / 300)));
     }, 100);
+
     return () => clearInterval(timer);
   }, [router]);
+
+  // Handle inactivity timeout separately from progress updates
+  useEffect(() => {
+    if (progress === 0) {
+      router.push('/');
+    }
+  }, [progress, router]);
 
   const handleSelect = async (purpose: string) => {
     if (!visitor || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'visits'), {
-        studentId: visitor.studentId, fullName: visitor.fullName, college: visitor.college || '—',
-        program: visitor.program || '—', purpose: purpose, loginMethod: visitor.loginMethod, timestamp: Timestamp.now(),
+        studentId: visitor.studentId,
+        fullName: visitor.fullName,
+        college: visitor.college || '—',
+        program: visitor.program || '—',
+        purpose: purpose,
+        loginMethod: visitor.loginMethod,
+        timestamp: Timestamp.now(),
       });
       router.push('/kiosk/welcome');
     } catch (err: any) {
