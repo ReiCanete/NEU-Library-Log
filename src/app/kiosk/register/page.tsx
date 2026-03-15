@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, Suspense, useEffect, useMemo } from 'react';
+import { useState, Suspense, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2, Mail } from 'lucide-react';
-import { validateFullName, validateStudentId, validateNEUEmail } from '@/lib/validation';
+import { validateFullName, validateStudentId } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -52,6 +52,7 @@ function RegisterForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   
   const method = searchParams.get('method');
   const idFromUrl = searchParams.get('id');
@@ -103,8 +104,24 @@ function RegisterForm() {
     return results;
   }, [search]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleStudentIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (studentId.trim().length > 0) {
+        document.getElementById('fullName-input')?.focus();
+      }
+    }
+  };
+
+  const handleFullNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsDropdownOpen(true);
+    }
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!db || submitting) return;
     setFormError(null);
 
@@ -125,7 +142,6 @@ function RegisterForm() {
 
     setSubmitting(true);
     try {
-      // 1. Check if student ID already exists
       const idSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', studentId), limit(1)));
       
       const userId = studentId; 
@@ -148,7 +164,6 @@ function RegisterForm() {
         await updateDoc(docRef, userData);
       }
 
-      // 2. Check blocklist
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', studentId), limit(1)));
       if (!blockSnap.empty) {
         setFormError("This student ID is restricted. Please contact library staff.");
@@ -156,7 +171,6 @@ function RegisterForm() {
         return;
       }
 
-      // 3. Complete session
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
         studentId: studentId,
         fullName: fullName,
@@ -185,8 +199,6 @@ function RegisterForm() {
 
   return (
     <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {isDropdownOpen && <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90]" onClick={() => setIsDropdownOpen(false)} />}
-      
       <div className="absolute top-6 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -233,11 +245,13 @@ function RegisterForm() {
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Student ID</Label>
               <Input 
+                id="studentId-input"
                 autoFocus={!email}
                 placeholder="XX-XXXXX-XXX" 
                 className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20" 
                 value={studentId} 
                 onChange={(e) => setStudentId(e.target.value)} 
+                onKeyDown={handleStudentIdIdKeyDown}
                 required 
               />
             </div>
@@ -245,10 +259,12 @@ function RegisterForm() {
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
               <Input 
+                id="fullName-input"
                 placeholder="Enter your full name" 
                 className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
                 value={fullName} 
                 onChange={(e) => setFullName(e.target.value)} 
+                onKeyDown={handleFullNameKeyDown}
                 required 
               />
             </div>
@@ -256,7 +272,7 @@ function RegisterForm() {
             <div className="space-y-1 relative">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program / Affiliation</Label>
               <div 
-                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all z-[101] relative ${isDropdownOpen ? 'ring-2 ring-[#c9a227]/30' : ''}`}
+                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all relative ${isDropdownOpen ? 'ring-2 ring-[#c9a227]/30' : ''}`}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 <span className={`font-bold text-xs truncate pr-2 ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
@@ -266,56 +282,99 @@ function RegisterForm() {
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute bottom-full mb-3 left-0 w-full bg-[#071a0f] rounded-[1.25rem] border border-[#c9a227] shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-3 z-[102] animate-in slide-in-from-bottom-2 duration-300">
-                  <div className="relative mb-2">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]" />
-                    <Input 
+                <div 
+                  className="absolute bottom-full mb-1 left-0 w-full z-50 rounded-xl overflow-hidden"
+                  style={{
+                    background: '#071a0f',
+                    border: '1px solid #c9a227',
+                    boxShadow: '0 25px 50px rgba(0,0,0,0.9)',
+                    maxHeight: '280px',
+                    overflowY: 'auto'
+                  }}
+                >
+                  <div className="sticky top-0 p-0 z-10">
+                    <input 
                       autoFocus 
+                      style={{
+                        background: '#0a2a1a',
+                        border: 'none',
+                        borderBottom: '1px solid #c9a227',
+                        color: 'white',
+                        padding: '12px 16px',
+                        width: '100%',
+                        outline: 'none',
+                        fontSize: '14px'
+                      }}
                       placeholder="Type to search..." 
-                      className="pl-9 h-10 bg-[#071a0f] border-[#c9a227]/40 rounded-xl text-white font-bold text-xs focus:border-[#c9a227]"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
-                  <ScrollArea className="h-[220px] pr-2">
-                    <div className="space-y-1">
-                      {filteredOptions.map((opt, i) => (
-                        <div key={i}>
-                          {opt.type === 'header' && (
-                            <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60">{opt.label}</div>
-                          )}
-                          {(opt.type === 'item' || opt.type === 'non-student') && (
-                            <div 
-                              className={`px-3 py-2 rounded-lg hover:bg-[#0d3d24] cursor-pointer flex items-center justify-between group transition-colors ${selectedProgram === opt.label ? 'border-l-2 border-[#c9a227] bg-[#c9a227]/10' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (opt.type === 'non-student') { 
-                                  setSelectedCollege(opt.label); 
-                                  setSelectedProgram(''); 
-                                } else { 
-                                  setSelectedCollege(opt.college!); 
-                                  setSelectedProgram(opt.label); 
-                                }
-                                setIsDropdownOpen(false); 
-                                setSearch(''); 
-                                setFormError(null);
-                              }}
-                            >
-                              <span className="text-xs font-bold text-white">{opt.label}</span>
-                              {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-[#c9a227]" />}
+                  <div className="py-2">
+                    {filteredOptions.map((opt, i) => (
+                      <div key={i}>
+                        {opt.type === 'header' && (
+                          <div style={{
+                            padding: '10px 16px 4px',
+                            color: '#c9a227',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            letterSpacing: '0.15em',
+                            textTransform: 'uppercase',
+                            background: '#071a0f',
+                            borderTop: i > 0 ? '1px solid rgba(201, 162, 39, 0.1)' : 'none'
+                          }}>
+                            {opt.label}
+                          </div>
+                        )}
+                        {(opt.type === 'item' || opt.type === 'non-student') && (
+                          <div 
+                            style={{
+                              padding: '12px 16px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              transition: 'all 0.2s',
+                              borderLeft: (selectedProgram === opt.label || selectedCollege === opt.label) ? '3px solid #c9a227' : '3px solid transparent',
+                              background: hoveredOption === opt.label ? '#0d3d24' : 'transparent',
+                            }}
+                            onMouseEnter={() => setHoveredOption(opt.label)}
+                            onMouseLeave={() => setHoveredOption(null)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (opt.type === 'non-student') { 
+                                setSelectedCollege(opt.label); 
+                                setSelectedProgram(''); 
+                              } else { 
+                                setSelectedCollege(opt.college!); 
+                                setSelectedProgram(opt.label); 
+                              }
+                              setIsDropdownOpen(false); 
+                              setSearch(''); 
+                              setFormError(null);
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="truncate pr-4">{opt.label}</span>
+                              {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-[#c9a227] shrink-0" />}
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          <Button className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg mt-2" disabled={submitting} type="submit">
+          <Button 
+            className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg mt-2" 
+            disabled={submitting} 
+            type="submit"
+          >
             {submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Registration"}
           </Button>
         </form>
