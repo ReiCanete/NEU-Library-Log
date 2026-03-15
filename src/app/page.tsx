@@ -115,7 +115,7 @@ function KioskEntryContent() {
         router.push('/kiosk/register?method=google');
       } catch (err: any) {
         if (err.code !== 'auth/popup-closed-by-user') {
-          console.error('[NEU Library Log] Google redirect error:', err);
+          console.error('[NEU Library Log Error] [Kiosk] [GoogleRedirectResult]:', err);
           setError('Sign-in failed. Please try again.');
         }
         setRedirectVerifying(false);
@@ -133,7 +133,7 @@ function KioskEntryContent() {
       provider.setCustomParameters({ hd: 'neu.edu.ph' });
       await signInWithRedirect(auth, provider);
     } catch (err) {
-      console.error('Google sign-in error:', err);
+      console.error('[NEU Library Log Error] [Kiosk] [GoogleSignInInitiate]:', err);
       setLoading(false);
     }
   };

@@ -95,7 +95,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       sessionStorage.clear();
       window.location.href = '/admin/login';
     } catch (err) {
-      console.error("Sign out failed:", err);
+      console.error("[NEU Library Log Error] [AdminLayout] [SignOut]:", err);
     }
   };
 
