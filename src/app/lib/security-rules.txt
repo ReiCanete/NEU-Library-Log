@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Explicit authorization for institutional staff
+    // Absolute authorization for designated institutional staff
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.email.lower() == 'reiangelo.canete@neu.edu.ph' ||
@@ -12,7 +12,7 @@ service cloud.firestore {
       );
     }
 
-    // Visitors collection - Public entry, Admin management
+    // Visitors collection - Public entry (create), Public monitoring (read), Admin management
     match /visits/{visitId} {
       allow create: if true;
       allow read: if true; 

@@ -14,7 +14,6 @@ export const firebaseConfig = {
 };
 
 // Robust Singleton pattern to survive Next.js HMR reloads
-// This prevents "INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9)"
 const G = (typeof window !== 'undefined' ? window : globalThis) as any;
 
 function getFirebaseInstance(): { app: FirebaseApp; auth: Auth; db: Firestore } {
