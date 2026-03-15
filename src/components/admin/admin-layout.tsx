@@ -59,6 +59,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     const email = user.email?.toLowerCase();
     const isWhitelisted = email === 'reiangelo.canete@neu.edu.ph' || email?.includes('25-14294-549');
 
+    // Subscribe to role updates
     const unsubscribe = onSnapshot(query(collection(db, 'users'), where('email', '==', user.email)), (snap) => {
       let hasAdminAccess = false;
       
@@ -87,8 +88,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   if (authLoading || checkingRole || isAdmin === null || !currentTime) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a2a1a]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#c9a227]" />
-        <p className="text-[#c9a227] font-black uppercase tracking-widest text-[8px]">Authenticating Admin Session...</p>
+        <Loader2 className="h-10 w-10 animate-spin text-[#c9a227]" />
+        <p className="text-[#c9a227] font-black uppercase tracking-widest text-xs">Authenticating Admin Session...</p>
       </div>
     );
   }
@@ -102,40 +103,40 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "200px" } as React.CSSProperties}>
+    <SidebarProvider style={{ "--sidebar-width": "240px" } as React.CSSProperties}>
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
         <Sidebar className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white">
-          <SidebarHeader className="p-3 border-b border-[#c9a227]/10 flex flex-col items-center gap-2">
+          <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-3">
             <img 
               src="/neu-logo.png" 
               alt="NEU Logo" 
-              width={32} 
-              height={32} 
-              className="rounded-full shadow-lg border border-[#c9a227]/40" 
+              width={48} 
+              height={48} 
+              className="rounded-full shadow-lg border-2 border-[#c9a227]/40" 
             />
             <div className="text-center w-full">
-              <h2 className="text-[9px] font-black text-[#c9a227] tracking-tight uppercase leading-none">NEU Library</h2>
-              <p className="text-[6px] text-white/40 font-bold uppercase tracking-widest mt-1">Portal</p>
+              <h2 className="text-sm font-black text-[#c9a227] tracking-tight uppercase leading-none">NEU Library</h2>
+              <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1.5">Staff Portal</p>
             </div>
           </SidebarHeader>
-          <SidebarContent className="p-1.5 space-y-0.5">
+          <SidebarContent className="p-3 space-y-1">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === item.path}
-                    className={`h-8 rounded-lg px-2.5 transition-all ${
+                    className={`h-11 rounded-xl px-4 transition-all ${
                       pathname === item.path 
                         ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' 
                         : 'text-white/60 hover:bg-white/5 hover:text-white font-bold'
                     }`}
                   >
-                    <Link href={item.path} className="flex items-center gap-2">
-                      <item.icon className={`h-3 w-3 ${pathname === item.path ? 'text-[#0a2a1a]' : 'text-[#c9a227]'}`} />
-                      <span className="text-[9px]">{item.label}</span>
+                    <Link href={item.path} className="flex items-center gap-3">
+                      <item.icon className={`h-4 w-4 ${pathname === item.path ? 'text-[#0a2a1a]' : 'text-[#c9a227]'}`} />
+                      <span className="text-xs">{item.label}</span>
                       {item.badge !== undefined && item.badge > 0 && (
-                        <Badge className={`ml-auto ${item.badgeColor} text-white border-none text-[6px] font-black px-1 py-0 rounded-full min-w-[14px] h-[14px] flex items-center justify-center`}>
+                        <Badge className={`ml-auto ${item.badgeColor} text-white border-none text-[9px] font-black px-1.5 py-0 rounded-full min-w-[18px] h-[18px] flex items-center justify-center`}>
                           {item.badge}
                         </Badge>
                       )}
@@ -145,64 +146,64 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="p-2">
+          <SidebarFooter className="p-4">
             <Button 
               variant="ghost" 
               onClick={() => setShowLogoutModal(true)}
-              className="w-full justify-start gap-2 h-8 rounded-lg text-red-400 hover:bg-red-400/10 hover:text-red-400 font-black transition-all"
+              className="w-full justify-start gap-3 h-11 rounded-xl text-red-400 hover:bg-red-400/10 hover:text-red-400 font-black transition-all"
             >
-              <LogOut className="h-3 w-3" />
-              <span className="text-[9px]">Sign Out</span>
+              <LogOut className="h-4 w-4" />
+              <span className="text-xs">Sign Out</span>
             </Button>
           </SidebarFooter>
         </Sidebar>
         
         <SidebarInset className="flex flex-col flex-1 bg-[#f0f4f1] overflow-hidden">
-          <header className="h-12 bg-white border-b border-[#d4e4d8] flex items-center justify-between px-4 sticky top-0 z-50 shadow-sm">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger className="text-[#1a3a2a] scale-75" />
-              <div className="h-4 w-px bg-[#d4e4d8]" />
+          <header className="h-16 bg-white border-b border-[#d4e4d8] flex items-center justify-between px-8 sticky top-0 z-50 shadow-sm">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="text-[#1a3a2a]" />
+              <div className="h-6 w-px bg-[#d4e4d8]" />
               <div>
-                <h1 className="text-[10px] font-black text-[#1a3a2a] tracking-tight uppercase">
+                <h1 className="text-sm font-black text-[#1a3a2a] tracking-tight uppercase">
                   {navItems.find(i => i.path === pathname)?.label || 'Administration'}
                 </h1>
-                <p className="text-[6px] font-bold text-[#4a6741] uppercase tracking-widest leading-none">
+                <p className="text-[10px] font-bold text-[#4a6741] uppercase tracking-widest leading-none">
                   {format(currentTime, 'EEEE, MMMM do')}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="text-[8px] font-black text-[#1a3a2a] leading-none">{user?.displayName || 'Admin'}</p>
-                <p className="text-[6px] font-black text-[#c9a227] uppercase tracking-widest tabular-nums mt-0.5">
+                <p className="text-xs font-black text-[#1a3a2a] leading-none">{user?.displayName || 'Admin'}</p>
+                <p className="text-[10px] font-black text-[#c9a227] uppercase tracking-widest tabular-nums mt-1">
                   {format(currentTime, 'hh:mm:ss a')}
                 </p>
               </div>
-              <div className="h-6 w-6 rounded-lg bg-[#0a2a1a] border border-[#c9a227]/30 flex items-center justify-center text-[#c9a227] font-black shadow-sm text-[8px]">
+              <div className="h-9 w-9 rounded-xl bg-[#0a2a1a] border-2 border-[#c9a227]/30 flex items-center justify-center text-[#c9a227] font-black shadow-sm text-xs">
                 {user?.displayName?.charAt(0) || 'A'}
               </div>
             </div>
           </header>
 
-          <main className="p-4 flex-1 bg-[#f0f4f1] overflow-y-auto">
+          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto custom-scrollbar">
             {children}
           </main>
         </SidebarInset>
 
         <AlertDialog open={showLogoutModal} onOpenChange={setShowLogoutModal}>
-          <AlertDialogContent className="rounded-xl border-none shadow-2xl p-5 max-w-xs">
-            <AlertDialogHeader className="space-y-1">
-              <AlertDialogTitle className="text-base font-black text-[#1a3a2a]">End Session?</AlertDialogTitle>
-              <AlertDialogDescription className="text-[#4a6741] font-medium text-[10px]">
-                Confirm that you want to sign out of the portal.
+          <AlertDialogContent className="rounded-2xl border-none shadow-2xl p-8 max-w-sm">
+            <AlertDialogHeader className="space-y-2">
+              <AlertDialogTitle className="text-xl font-black text-[#1a3a2a]">End Session?</AlertDialogTitle>
+              <AlertDialogDescription className="text-[#4a6741] font-bold text-xs uppercase tracking-widest">
+                Confirm that you want to sign out of the staff portal.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="mt-3 gap-2">
-              <AlertDialogCancel className="rounded-lg h-8 px-3 font-black border-[#d4e4d8] text-[#4a6741] text-[9px]">Stay Connected</AlertDialogCancel>
+            <AlertDialogFooter className="mt-6 gap-3">
+              <AlertDialogCancel className="rounded-xl h-11 px-6 font-black border-[#d4e4d8] text-[#4a6741] text-xs">Stay Connected</AlertDialogCancel>
               <AlertDialogAction 
                 onClick={handleLogout}
-                className="rounded-lg h-8 px-4 font-black bg-red-600 text-white hover:bg-red-700 text-[9px]"
+                className="rounded-xl h-11 px-8 font-black bg-red-600 text-white hover:bg-red-700 text-xs"
               >
                 Sign Out
               </AlertDialogAction>

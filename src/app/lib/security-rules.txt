@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // Comprehensive admin check
-    // Uses case-insensitive email matching and Firestore document fallback
+    // Explicitly whitelists the user email with a case-insensitive match
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.email.lower() == 'reiangelo.canete@neu.edu.ph' ||
@@ -13,27 +13,31 @@ service cloud.firestore {
       );
     }
 
-    // Visitors collection
+    // Visitors collection - Publicly readable/creatable for the Kiosk
     match /visits/{visitId} {
       allow create, read: if true; 
       allow update, delete: if isAdmin();
     }
 
-    // Users collection
+    // Users collection - Publicly readable/creatable for registration
     match /users/{userId} {
       allow read, create: if true; 
       allow update: if isAdmin() || request.auth.uid == userId; 
     }
 
-    // Blocklist, Announcements, Settings
+    // Blocklist - Publicly readable for the Kiosk to check status
     match /blocklist/{blockId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
+
+    // Announcements - Publicly readable for the Kiosk alerts
     match /announcements/{announcementId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
+
+    // Settings - Publicly readable for Kiosk capacity checks
     match /settings/{settingId} {
       allow read: if true; 
       allow write: if isAdmin();
