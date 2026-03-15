@@ -1,8 +1,8 @@
 'use client';
 
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyAhYX4rOSAwQx-ZQJvK9nDH7dFE8--wvK4",
@@ -13,31 +13,9 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-const G = (typeof window !== 'undefined' ? window : globalThis) as any;
-
-/**
- * Returns a robust, HMR-safe Firebase instance.
- * Attaches instances to globalThis to prevent multiple initializations during Next.js development reloads.
- */
-function getFirebaseInstance() {
-  if (typeof window === 'undefined') {
-    return { app: null as any, auth: null as any, db: null as any };
-  }
-
-  if (!G._firebaseApp) {
-    const apps = getApps();
-    G._firebaseApp = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
-    G._firebaseAuth = getAuth(G._firebaseApp);
-    G._firebaseDb = getFirestore(G._firebaseApp);
-  }
-
-  return {
-    app: G._firebaseApp,
-    auth: G._firebaseAuth,
-    db: G._firebaseDb
-  };
-}
-
-const { app, auth, db } = getFirebaseInstance();
+// HMR-safe singleton pattern
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 export { app, auth, db };

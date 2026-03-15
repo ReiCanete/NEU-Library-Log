@@ -47,14 +47,27 @@ export default function AnnouncementsPage() {
     setEditingId(null);
   };
 
-  const handleSave = () => {
-    if (!msg.trim() || !startDate || !endDate || !db) return;
-    
+  const handleSave = async () => {
+    if (!db) {
+      toast({ title: "System Offline", description: "Database is not available. Please refresh.", variant: "destructive" });
+      return;
+    }
+
+    if (!msg.trim()) {
+      toast({ title: "Validation Error", description: "Message content cannot be empty.", variant: "destructive" });
+      return;
+    }
+
     const sDate = new Date(startDate);
     const eDate = new Date(endDate);
 
     if (!isValid(sDate) || !isValid(eDate)) {
-      toast({ title: "Invalid Dates", description: "Please ensure the dates are formatted correctly.", variant: "destructive" });
+      toast({ title: "Invalid Dates", description: "Please ensure the start and end dates are correctly set.", variant: "destructive" });
+      return;
+    }
+
+    if (eDate <= sDate) {
+      toast({ title: "Timeline Error", description: "End date must be after the start date.", variant: "destructive" });
       return;
     }
 
@@ -66,38 +79,41 @@ export default function AnnouncementsPage() {
       startDate: Timestamp.fromDate(sDate),
       endDate: Timestamp.fromDate(eDate),
       isActive: true,
-      createdBy: auth?.currentUser?.email || 'Admin',
+      createdBy: auth?.currentUser?.email || 'reiangelo.canete@neu.edu.ph',
       updatedAt: Timestamp.now()
     };
 
-    const handleSuccess = (title: string, desc: string) => {
-      toast({ title, description: desc });
+    try {
+      if (editingId) {
+        const docRef = doc(db, 'announcements', editingId);
+        await updateDoc(docRef, announcementData);
+        toast({ title: "Broadcast Updated", description: "Changes have been published successfully." });
+      } else {
+        const newData = { ...announcementData, createdAt: Timestamp.now() };
+        await addDoc(collection(db, 'announcements'), newData);
+        toast({ title: "Broadcast Live", description: "Your message is now visible on the kiosk." });
+      }
+      
       setShowModal(false);
       resetForm();
-      setIsProcessing(false);
-    };
-
-    const handleError = (serverError: any, operation: 'create' | 'update', path: string, data: any) => {
-      setIsProcessing(false);
+    } catch (err: any) {
+      const operation = editingId ? 'update' : 'create';
+      const path = editingId ? `announcements/${editingId}` : 'announcements';
+      
       const permissionError = new FirestorePermissionError({
         path,
         operation,
-        requestResourceData: data
+        requestResourceData: announcementData
       });
+      
       errorEmitter.emit('permission-error', permissionError);
-      toast({ title: "Action Failed", description: "You might not have permission or there was a network error.", variant: "destructive" });
-    };
-
-    if (editingId) {
-      const docRef = doc(db, 'announcements', editingId);
-      updateDoc(docRef, announcementData)
-        .then(() => handleSuccess("Broadcast Updated", "Changes saved successfully."))
-        .catch((e) => handleError(e, 'update', docRef.path, announcementData));
-    } else {
-      const newData = { ...announcementData, createdAt: Timestamp.now() };
-      addDoc(collection(db, 'announcements'), newData)
-        .then(() => handleSuccess("Broadcast Live", "Message is now active on the kiosk."))
-        .catch((e) => handleError(e, 'create', '/announcements', newData));
+      toast({ 
+        title: "Action Denied", 
+        description: "You do not have permission to post broadcasts or a network error occurred.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -157,7 +173,7 @@ export default function AnnouncementsPage() {
                 <DialogTitle className="text-xl font-black text-[#1a3a2a]">
                   {editingId ? "Edit Broadcast" : "New Broadcast"}
                 </DialogTitle>
-                <DialogDescription className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">
+                <DialogDescription className="text-xs text-[#4a6741] font-bold">
                   Messages appear on the kiosk entry screen.
                 </DialogDescription>
               </DialogHeader>
@@ -198,11 +214,11 @@ export default function AnnouncementsPage() {
                   </div>
                 </div>
               </div>
-              <DialogFooter className="gap-2">
-                <Button variant="ghost" className="h-10 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)}>Cancel</Button>
+              <DialogFooter className="gap-2 pt-4">
+                <Button variant="ghost" className="h-10 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)} disabled={isProcessing}>Cancel</Button>
                 <Button className="h-10 px-6 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing || !msg.trim()} onClick={handleSave}>
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {editingId ? "Update" : "Broadcast"}
+                  {editingId ? "Update Broadcast" : "Post Broadcast"}
                 </Button>
               </DialogFooter>
             </DialogContent>
