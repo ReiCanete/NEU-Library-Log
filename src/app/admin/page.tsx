@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Users, Calendar, TrendingUp, Download, Loader2, Library, LayoutDashboard, History, LogOut, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCollection } from '@/firebase';
-import { auth, db as firestore } from '@/firebase/config';
+import { auth, db } from '@/firebase/config';
 import { collection, query, orderBy, where, Timestamp, addDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { format, startOfDay, subDays, isSameDay, startOfWeek, startOfMonth, endOfDay } from 'date-fns';
@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const { toast } = useToast();
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
+  const [adminName, setAdminName] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
 
@@ -40,11 +41,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const email = sessionStorage.getItem('adminEmail');
+    const name = sessionStorage.getItem('adminName');
     if (!email) {
       window.location.href = '/admin/login';
       return;
     }
     setAdminEmail(email);
+    setAdminName(name);
     setAuthLoading(false);
   }, []);
 
@@ -53,7 +56,7 @@ export default function AdminDashboard() {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const monthStart = startOfMonth(new Date());
 
-  const visitsQuery = useMemo(() => query(collection(firestore, 'visits'), orderBy('timestamp', 'desc')), []);
+  const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
 
   // Stats derivation
@@ -95,7 +98,7 @@ export default function AdminDashboard() {
     if (!selectedVisit || !blockReason || !adminEmail) return;
     setIsBlocking(true);
     try {
-      await addDoc(collection(firestore, 'blocklist'), {
+      await addDoc(collection(db, 'blocklist'), {
         studentId: selectedVisit.studentId,
         fullName: selectedVisit.fullName,
         reason: blockReason,
@@ -161,6 +164,7 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await signOut(auth);
     sessionStorage.removeItem('adminEmail');
+    sessionStorage.removeItem('adminName');
     window.location.href = '/admin/login';
   };
 
@@ -178,7 +182,13 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside className="w-72 bg-[#0a2a1a] text-white flex flex-col fixed inset-y-0 shadow-2xl z-40">
         <div className="p-8 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
-          <img src="/neu-logo.png" alt="NEU Logo" className="w-16 h-16 object-contain" />
+          <img 
+            src="/neu-logo.png" 
+            alt="NEU Logo" 
+            width={80} 
+            height={80} 
+            className="rounded-full shadow-lg" 
+          />
           <div className="text-center">
             <h1 className="text-lg font-black text-[#c9a227] tracking-tight leading-none uppercase">NEU Library</h1>
             <span className="text-[10px] text-[#c9a227]/40 font-bold uppercase tracking-widest">Admin Dashboard</span>
@@ -206,10 +216,10 @@ export default function AdminDashboard() {
         <div className="p-6 border-t border-[#c9a227]/10 space-y-4">
           <div className="flex items-center gap-3 px-2">
             <div className="h-10 w-10 rounded-full bg-[#c9a227] flex items-center justify-center font-black text-[#0a2a1a]">
-              {adminEmail?.charAt(0).toUpperCase()}
+              {adminName?.charAt(0).toUpperCase() || 'A'}
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-bold truncate">Administrator</p>
+              <p className="text-sm font-bold truncate">{adminName || 'Administrator'}</p>
               <p className="text-[10px] text-white/30 truncate">{adminEmail}</p>
             </div>
           </div>

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, ShieldCheck, User } from 'lucide-react';
-import { auth, db as firestore } from '@/firebase/config';
+import { auth, db } from '@/firebase/config';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -35,7 +35,7 @@ export default function KioskEntry() {
           }
 
           const cleanId = user.email.split('@')[0];
-          const blockQuery = query(collection(firestore, 'blocklist'), where('studentId', '==', cleanId), limit(1));
+          const blockQuery = query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1));
           const blockSnap = await getDocs(blockQuery);
           
           if (!blockSnap.empty) {
@@ -73,7 +73,7 @@ export default function KioskEntry() {
     const cleanId = studentId.trim();
 
     try {
-      const blockQuery = query(collection(firestore, 'blocklist'), where('studentId', '==', cleanId), limit(1));
+      const blockQuery = query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1));
       const blockSnap = await getDocs(blockQuery);
       
       if (!blockSnap.empty) {
@@ -83,16 +83,16 @@ export default function KioskEntry() {
         return;
       }
 
-      const userQuery = query(collection(firestore, 'users'), where('studentId', '==', cleanId), limit(1));
+      const userQuery = query(collection(db, 'users'), where('studentId', '==', cleanId), limit(1));
       const userSnap = await getDocs(userQuery);
       
       if (!userSnap.empty) {
-        const user = userSnap.docs[0].data();
+        const userDoc = userSnap.docs[0].data();
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-          studentId: user.studentId,
-          fullName: user.displayName,
-          college: user.college,
-          program: user.program || 'N/A',
+          studentId: userDoc.studentId,
+          fullName: userDoc.displayName,
+          college: userDoc.college,
+          program: userDoc.program || 'N/A',
           loginMethod: 'id'
         }));
         router.push('/kiosk/purpose');
@@ -144,8 +144,9 @@ export default function KioskEntry() {
           <img 
             src="/neu-logo.png" 
             alt="NEU Logo" 
-            className="w-[80px] h-[80px] object-contain"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            width={80} 
+            height={80} 
+            className="rounded-full shadow-xl" 
           />
           <div className="text-center space-y-1">
             <h1 className="text-4xl font-black tracking-tight text-[#c9a227] drop-shadow-lg">
