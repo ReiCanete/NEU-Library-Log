@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, ChevronRight, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { auth, db as firestore } from '@/firebase/config';
