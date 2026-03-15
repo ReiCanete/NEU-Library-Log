@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, Suspense, useEffect, useRef, useMemo } from 'react';
@@ -52,12 +53,25 @@ function RegisterForm() {
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
     const results: { type: 'header' | 'item' | 'non-student'; label: string; college?: string }[] = [];
-    NON_STUDENT_OPTIONS.forEach(opt => { if (opt.toLowerCase().includes(term)) results.push({ type: 'non-student', label: opt }); });
+    
+    // Add non-student options if they match
+    NON_STUDENT_OPTIONS.forEach(opt => { 
+      if (opt.toLowerCase().includes(term)) {
+        results.push({ type: 'non-student', label: opt }); 
+      }
+    });
+
+    // Add college and program options
     COLLEGES.forEach(college => {
-      const matchedPrograms = college.programs.filter(p => p.toLowerCase().includes(term) || college.name.toLowerCase().includes(term));
+      const matchedPrograms = college.programs.filter(p => 
+        p.toLowerCase().includes(term) || college.name.toLowerCase().includes(term)
+      );
+      
       if (matchedPrograms.length > 0) {
         results.push({ type: 'header', label: college.name });
-        matchedPrograms.forEach(p => { results.push({ type: 'item', label: p, college: college.name }); });
+        matchedPrograms.forEach(p => { 
+          results.push({ type: 'item', label: p, college: college.name }); 
+        });
       }
     });
     return results;
@@ -128,11 +142,6 @@ function RegisterForm() {
           {formError && (
             <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-300">
               <p className="text-red-200 text-[10px] font-black uppercase tracking-widest">{formError}</p>
-              {formError.includes("Registration failed") && (
-                <Button size="sm" variant="outline" className="h-7 text-[9px] border-red-500/30 text-white" onClick={handleSubmit}>
-                  <RefreshCw className="h-3 w-3 mr-1" /> Retry
-                </Button>
-              )}
             </div>
           )}
 
@@ -146,7 +155,7 @@ function RegisterForm() {
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
               <Input 
                 placeholder="Enter your full name" 
-                className={`h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:border-[#c9a227] ${formError?.includes("full name") ? 'border-red-500' : ''}`}
+                className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:border-[#c9a227]"
                 value={fullName}
                 onChange={(e) => {
                   setFullName(e.target.value);
@@ -159,7 +168,7 @@ function RegisterForm() {
             <div className="space-y-1 relative">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program / Affiliation</Label>
               <div 
-                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] ${formError?.includes("college") ? 'border-red-500' : ''}`}
+                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] ${isDropdownOpen ? 'border-[#c9a227]' : ''}`}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 <span className={`font-bold text-xs truncate pr-2 ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
@@ -169,40 +178,63 @@ function RegisterForm() {
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute top-[calc(100%+8px)] left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-top-4 duration-300 max-h-[260px] flex flex-col">
+                <div className="absolute top-[calc(100%+8px)] left-0 w-full glass-neu rounded-[1.5rem] border border-[#c9a227]/20 shadow-2xl p-3 z-[100] animate-in slide-in-from-top-4 duration-300 flex flex-col">
                   <div className="relative mb-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#c9a227]" />
                     <Input 
                       autoFocus
-                      placeholder="Type to filter..." 
+                      placeholder="Type to search..." 
                       className="pl-9 h-10 bg-black/20 border-none rounded-xl text-white font-bold text-xs"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
-                  <ScrollArea className="flex-1 pr-1">
-                    <div className="space-y-1">
-                      {filteredOptions.map((opt, i) => (
-                        <div key={i}>
-                          {opt.type === 'header' && <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60 mt-1">{opt.label}</div>}
-                          {(opt.type === 'item' || opt.type === 'non-student') && (
-                            <div className="px-3 py-2 rounded-lg hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (opt.type === 'non-student') { setSelectedCollege(opt.label); setSelectedProgram(''); }
-                                else { setSelectedCollege(opt.college!); setSelectedProgram(opt.label); }
-                                setIsDropdownOpen(false); setSearch(''); setFormError(null);
-                              }}>
-                              <span className="text-xs font-bold text-white group-hover:translate-x-1 transition-transform">{opt.label}</span>
-                              {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-[#c9a227]" />}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      {filteredOptions.length === 0 && <div className="p-6 text-center text-white/20 font-bold text-xs">No results found</div>}
-                    </div>
-                  </ScrollArea>
+                  <div className="max-h-[220px] overflow-hidden">
+                    <ScrollArea className="h-[220px] pr-1">
+                      <div className="space-y-1 pb-2">
+                        {filteredOptions.map((opt, i) => (
+                          <div key={i}>
+                            {opt.type === 'header' && (
+                              <div className="px-3 py-2 text-[8px] font-black uppercase tracking-widest text-[#c9a227] opacity-60 mt-1">
+                                {opt.label}
+                              </div>
+                            )}
+                            {(opt.type === 'item' || opt.type === 'non-student') && (
+                              <div 
+                                className="px-3 py-2 rounded-lg hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (opt.type === 'non-student') { 
+                                    setSelectedCollege(opt.label); 
+                                    setSelectedProgram(''); 
+                                  } else { 
+                                    setSelectedCollege(opt.college!); 
+                                    setSelectedProgram(opt.label); 
+                                  }
+                                  setIsDropdownOpen(false); 
+                                  setSearch(''); 
+                                  setFormError(null);
+                                }}
+                              >
+                                <span className="text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
+                                  {opt.label}
+                                </span>
+                                {(selectedProgram === opt.label || selectedCollege === opt.label) && (
+                                  <Check className="h-4 w-4 text-[#c9a227]" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {filteredOptions.length === 0 && (
+                          <div className="p-6 text-center text-white/20 font-bold text-xs">
+                            No results found
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
                 </div>
               )}
             </div>
@@ -213,7 +245,7 @@ function RegisterForm() {
             disabled={loading}
             type="submit"
           >
-            {loading ? <><Loader2 className="animate-spin mr-2 h-5 w-5" /> Verifying...</> : "Complete Registration"}
+            {loading ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Registration"}
           </Button>
         </form>
       </div>
