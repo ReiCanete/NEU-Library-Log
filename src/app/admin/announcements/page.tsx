@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Megaphone, Plus, Trash2, Edit2, Send, Loader2 } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Edit2, Send, Loader2, AlertCircle, Clock, Calendar, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
-import { format, isValid } from 'date-fns';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { format, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -18,71 +17,84 @@ import { Textarea } from '@/components/ui/textarea';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTrigger, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function AnnouncementsPage() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   
-  const [msg, setMsg] = useState('');
+  const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
-  const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
-  const [endDate, setEndDate] = useState(format(new Date(Date.now() + 86400000), "yyyy-MM-dd'T'HH:mm"));
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Set default dates on mount
+  useEffect(() => {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 86400000);
+    setStartDate(format(now, "yyyy-MM-dd'T'HH:mm"));
+    setEndDate(format(tomorrow, "yyyy-MM-dd'T'HH:mm"));
+  }, []);
 
   const announcementsQuery = useMemo(() => {
     if (!db) return null;
-    return query(collection(db, 'announcements'), orderBy('startDate', 'desc'));
+    return query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
   }, [db]);
-  const { data: announcements, loading } = useCollection(announcementsQuery);
+
+  const { data: allAnnouncements, loading } = useCollection(announcementsQuery);
+
+  const { active, past } = useMemo(() => {
+    if (!allAnnouncements) return { active: [], past: [] };
+    const now = new Date();
+    return {
+      active: allAnnouncements.filter(a => a.isActive && !isPast(a.endDate.toDate())),
+      past: allAnnouncements.filter(a => !a.isActive || isPast(a.endDate.toDate()))
+    };
+  }, [allAnnouncements]);
 
   const resetForm = () => {
-    setMsg('');
+    setMessage('');
     setPriority('normal');
-    setStartDate(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
-    setEndDate(format(new Date(Date.now() + 86400000), "yyyy-MM-dd'T'HH:mm"));
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 86400000);
+    setStartDate(format(now, "yyyy-MM-dd'T'HH:mm"));
+    setEndDate(format(tomorrow, "yyyy-MM-dd'T'HH:mm"));
     setEditingId(null);
+    setFormError(null);
   };
 
   const handleSave = () => {
-    if (!db) {
-      toast({ title: "System Offline", description: "Database is not available.", variant: "destructive" });
-      return;
-    }
+    if (!db) return;
+    setFormError(null);
 
-    if (!msg.trim()) {
-      toast({ title: "Validation Error", description: "Message content cannot be empty.", variant: "destructive" });
-      return;
-    }
-
-    const sDate = new Date(startDate);
-    const eDate = new Date(endDate);
-
-    if (!isValid(sDate) || !isValid(eDate)) {
-      toast({ title: "Invalid Dates", description: "Please ensure the dates are correct.", variant: "destructive" });
+    if (!message.trim()) {
+      setFormError("Please enter a message");
       return;
     }
 
     setIsProcessing(true);
 
-    const announcementData = {
-      message: msg.trim(),
+    const data = {
+      message: message.trim(),
       priority,
-      startDate: Timestamp.fromDate(sDate),
-      endDate: Timestamp.fromDate(eDate),
       isActive: true,
-      createdBy: auth?.currentUser?.email || 'reiangelo.canete@neu.edu.ph',
+      startDate: Timestamp.fromDate(new Date(startDate)),
+      endDate: Timestamp.fromDate(new Date(endDate)),
+      createdBy: auth?.currentUser?.email || 'Admin',
       updatedAt: Timestamp.now()
     };
 
     if (editingId) {
       const docRef = doc(db, 'announcements', editingId);
-      updateDoc(docRef, announcementData)
+      updateDoc(docRef, data)
         .then(() => {
-          toast({ title: "Broadcast Updated", description: "Changes have been published." });
+          toast({ title: "Updated", description: "Announcement updated successfully.", className: "bg-emerald-500 text-white border-none" });
           setShowModal(false);
           resetForm();
         })
@@ -90,15 +102,16 @@ export default function AnnouncementsPage() {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: docRef.path,
             operation: 'update',
-            requestResourceData: announcementData
+            requestResourceData: data
           }));
+          toast({ title: "Error", description: "Failed to update. Please try again.", variant: "destructive" });
         })
         .finally(() => setIsProcessing(false));
     } else {
-      const newData = { ...announcementData, createdAt: Timestamp.now() };
+      const newData = { ...data, createdAt: Timestamp.now() };
       addDoc(collection(db, 'announcements'), newData)
         .then(() => {
-          toast({ title: "Broadcast Live", description: "Your message is now visible." });
+          toast({ title: "Success", description: "Announcement posted successfully!", className: "bg-emerald-500 text-white border-none" });
           setShowModal(false);
           resetForm();
         })
@@ -108,6 +121,7 @@ export default function AnnouncementsPage() {
             operation: 'create',
             requestResourceData: newData
           }));
+          toast({ title: "Error", description: "Failed to post. Please try again.", variant: "destructive" });
         })
         .finally(() => setIsProcessing(false));
     }
@@ -115,22 +129,22 @@ export default function AnnouncementsPage() {
 
   const handleEdit = (a: any) => {
     setEditingId(a.id);
-    setMsg(a.message);
+    setMessage(a.message);
     setPriority(a.priority);
     setStartDate(format(a.startDate.toDate(), "yyyy-MM-dd'T'HH:mm"));
     setEndDate(format(a.endDate.toDate(), "yyyy-MM-dd'T'HH:mm"));
     setShowModal(true);
   };
 
-  const toggleStatus = (id: string, current: boolean) => {
+  const toggleActive = (id: string, currentState: boolean) => {
     if (!db) return;
     const docRef = doc(db, 'announcements', id);
-    updateDoc(docRef, { isActive: !current })
+    updateDoc(docRef, { isActive: !currentState })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: docRef.path,
           operation: 'update',
-          requestResourceData: { isActive: !current }
+          requestResourceData: { isActive: !currentState }
         }));
       });
   };
@@ -140,7 +154,7 @@ export default function AnnouncementsPage() {
     const docRef = doc(db, 'announcements', id);
     deleteDoc(docRef)
       .then(() => {
-        toast({ title: "Post Removed", description: "Announcement deleted." });
+        toast({ title: "Deleted", description: "Record permanently removed." });
       })
       .catch(async () => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -150,9 +164,71 @@ export default function AnnouncementsPage() {
       });
   };
 
+  const AnnouncementCard = ({ a, isPast = false }: { a: any, isPast?: boolean }) => (
+    <Card className={`p-6 rounded-2xl border border-[#d4e4d8] shadow-sm transition-all hover:shadow-md ${isPast ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
+      <div className="flex justify-between items-start gap-4">
+        <div className="space-y-3 flex-1">
+          <div className="flex items-center gap-2">
+            <Badge className={`${a.priority === 'urgent' ? 'bg-red-600' : 'bg-[#c9a227]'} text-white font-black uppercase text-[10px] px-2.5 py-1 rounded-lg`}>
+              {a.priority}
+            </Badge>
+            {isPast && (
+              <Badge variant="outline" className="border-slate-300 text-slate-500 font-black uppercase text-[10px] px-2.5 py-1 rounded-lg">
+                EXPIRED
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm font-bold text-[#1a3a2a] leading-relaxed">{a.message}</p>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
+              <Calendar className="h-3 w-3" />
+              Active: {format(a.startDate.toDate(), 'PP p')} — {format(a.endDate.toDate(), 'PP p')}
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <Clock className="h-3 w-3" />
+              Posted by: {a.createdBy}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-4">
+          {!isPast && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-[#4a6741] tracking-widest">Status</span>
+              <Switch checked={a.isActive} onCheckedChange={() => toggleActive(a.id, a.isActive)} />
+            </div>
+          )}
+          <div className="flex gap-1">
+            {!isPast && (
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-[#1a3a2a] hover:bg-[#f0f4f1]" onClick={() => handleEdit(a)}>
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            )}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-2xl p-6">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>This cannot be undone. This announcement will be permanently deleted.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 mt-4">
+                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDelete(a.id)} className="bg-red-600 text-white hover:bg-red-700 rounded-xl">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-10">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-black text-[#1a3a2a] tracking-tight uppercase">Broadcast Center</h2>
@@ -164,135 +240,96 @@ export default function AnnouncementsPage() {
                 <Plus className="h-5 w-5" /> New Broadcast
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-2xl p-6 max-w-md border-none shadow-2xl">
-              <DialogHeader className="space-y-1">
+            <DialogContent className="rounded-2xl p-6 max-w-md">
+              <DialogHeader>
                 <DialogTitle className="text-xl font-black text-[#1a3a2a]">
                   {editingId ? "Edit Broadcast" : "New Broadcast"}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-[#4a6741] font-bold">
-                  Messages appear on the kiosk entry screen.
+                  Enter message and schedule for the kiosk display.
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Message</Label>
-                  <Textarea placeholder="Type message..." className="rounded-xl bg-[#f0f4f1] min-h-[100px] p-3 text-sm font-bold border-none" value={msg} onChange={(e) => setMsg(e.target.value)} />
+                  <Textarea 
+                    placeholder="Type broadcast message..." 
+                    className={`rounded-xl bg-[#f0f4f1] min-h-[100px] p-4 text-sm font-bold border-none ${formError ? 'ring-2 ring-red-500' : ''}`} 
+                    value={message} 
+                    onChange={(e) => { setMessage(e.target.value); setFormError(null); }} 
+                  />
+                  {formError && <p className="text-[10px] font-black text-red-500 uppercase flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {formError}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Priority</Label>
+                  <Select value={priority} onValueChange={(v: any) => setPriority(v)}>
+                    <SelectTrigger className="h-12 rounded-xl bg-[#f0f4f1] border-none text-xs font-bold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="normal">Normal Priority (Gold)</SelectItem>
+                      <SelectItem value="urgent">Urgent Priority (Red Pulsing)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Priority</Label>
-                    <Select value={priority} onValueChange={(v: any) => setPriority(v)}>
-                      <SelectTrigger className="h-10 rounded-xl bg-[#f0f4f1] border-none text-xs font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none">
-                        <SelectItem value="normal" className="text-xs font-bold">Normal</SelectItem>
-                        <SelectItem value="urgent" className="text-xs font-bold">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Start Date</Label>
+                    <Input type="datetime-local" className="h-12 rounded-xl bg-[#f0f4f1] border-none text-[11px] font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Visibility</Label>
-                    <div className="h-10 bg-[#f0f4f1] rounded-xl px-4 flex items-center justify-between">
-                      <span className="font-bold text-[10px] text-[#1a3a2a]">LIVE</span>
-                      <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Start</Label>
-                    <Input type="datetime-local" className="h-10 rounded-xl bg-[#f0f4f1] border-none text-[10px] font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">End</Label>
-                    <Input type="datetime-local" className="h-10 rounded-xl bg-[#f0f4f1] border-none text-[10px] font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">End Date</Label>
+                    <Input type="datetime-local" className="h-12 rounded-xl bg-[#f0f4f1] border-none text-[11px] font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                   </div>
                 </div>
               </div>
               <DialogFooter className="gap-2 pt-4">
-                <Button variant="ghost" className="h-10 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)} disabled={isProcessing}>Cancel</Button>
-                <Button className="h-10 px-6 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing || !msg.trim()} onClick={handleSave}>
+                <Button variant="ghost" className="h-12 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)} disabled={isProcessing}>Cancel</Button>
+                <Button className="h-12 px-8 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing} onClick={handleSave}>
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {editingId ? "Update Broadcast" : "Post Broadcast"}
+                  {isProcessing ? (editingId ? "Updating..." : "Posting...") : (editingId ? "Update Broadcast" : "Post Broadcast")}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
 
-        <Card className="rounded-2xl shadow-xl border border-[#d4e4d8] bg-white overflow-hidden">
-          <Table>
-            <TableHeader className="bg-[#f0f4f1]">
-              <TableRow className="border-none">
-                <TableHead className="px-6 h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Active</TableHead>
-                <TableHead className="h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Priority</TableHead>
-                <TableHead className="h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Message</TableHead>
-                <TableHead className="h-12 font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Schedule</TableHead>
-                <TableHead className="px-6 h-12 text-right font-black text-[#4a6741] uppercase tracking-widest text-[10px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <div className="space-y-12">
+          {/* Active Section */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-black text-[#4a6741] uppercase tracking-[0.2em] flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Active Announcements
+            </h3>
+            <div className="grid gap-4">
               {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={5} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
-                ))
-              ) : announcements?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-3 opacity-20">
-                      <Megaphone className="h-12 w-12" />
-                      <p className="text-sm font-black uppercase tracking-widest">No Broadcasts</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : announcements?.map((a) => (
-                <TableRow key={a.id} className="group hover:bg-[#f0f4f1]/30 border-b-[#f0f4f1]">
-                  <TableCell className="px-6">
-                    <Switch checked={a.isActive} onCheckedChange={() => toggleStatus(a.id, a.isActive)} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${a.priority === 'urgent' ? 'bg-red-600' : 'bg-[#c9a227]'} text-white font-black uppercase text-[9px] px-2 py-0.5 rounded`}>
-                      {a.priority}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-[300px] py-4">
-                    <p className="font-bold text-sm text-[#1a3a2a] line-clamp-2">{a.message}</p>
-                    <p className="text-[9px] font-black text-[#4a6741]/50 uppercase tracking-widest mt-1">Admin: {a.createdBy}</p>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-0.5 text-[9px] font-black uppercase tabular-nums">
-                      <div className="text-emerald-600">IN: {format(a.startDate.toDate(), 'MMM dd, HH:mm')}</div>
-                      <div className="text-red-400">OUT: {format(a.endDate.toDate(), 'MMM dd, HH:mm')}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-6 text-right space-x-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-[#4a6741] hover:text-[#1a3a2a]" onClick={() => handleEdit(a)}>
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-[#4a6741] hover:text-red-600">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-2xl p-6 max-w-sm border-none shadow-2xl">
-                        <AlertDialogHeader className="space-y-2">
-                          <AlertDialogTitle className="text-lg font-black text-[#1a3a2a]">Delete Post?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-xs font-bold text-[#4a6741] uppercase tracking-widest">Permanently stop this broadcast.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="mt-4 gap-2">
-                          <AlertDialogCancel className="rounded-xl h-10 px-4 font-black text-xs border-[#d4e4d8]">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(a.id)} className="rounded-xl h-10 px-6 font-black text-xs bg-red-600 text-white hover:bg-red-700">Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)
+              ) : active.length === 0 ? (
+                <div className="p-12 border-2 border-dashed border-[#d4e4d8] rounded-[2rem] text-center space-y-3">
+                  <Megaphone className="h-12 w-12 text-slate-200 mx-auto" />
+                  <p className="text-sm font-bold text-slate-400">No active announcements. Click '+ New Broadcast' to create one.</p>
+                </div>
+              ) : (
+                active.map(a => <AnnouncementCard key={a.id} a={a} />)
+              )}
+            </div>
+          </div>
+
+          {/* Past Section */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Clock className="h-4 w-4" /> Past & Inactive
+            </h3>
+            <div className="grid gap-4">
+              {loading ? (
+                <Skeleton className="h-32 w-full rounded-2xl" />
+              ) : past.length === 0 ? (
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest text-center py-8 italic">No records in archive</p>
+              ) : (
+                past.map(a => <AnnouncementCard key={a.id} a={a} isPast />)
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );

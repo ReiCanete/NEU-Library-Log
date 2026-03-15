@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, AlertCircle, User, Megaphone, Info, ShieldX } from 'lucide-react';
+import { Loader2, AlertCircle, Megaphone, ShieldX, Info } from 'lucide-react';
 import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
-import { collection, query, where, limit, getDocs, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { startOfDay } from 'date-fns';
@@ -30,41 +30,51 @@ function KioskEntryContent() {
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
 
+  // Announcement State
+  const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
   const todayDate = useMemo(() => startOfDay(new Date()), []);
-
-  const visitsQuery = useMemo(() => {
-    if (!todayDate || !db) return null;
-    return query(collection(db, 'visits'), where('timestamp', '>=', todayDate));
-  }, [todayDate, db]);
-
+  const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
   const { data: todayVisits } = useCollection(visitsQuery);
   const settingsRef = useMemo(() => (db ? doc(db, 'settings', 'library') : null), [db]);
   const { data: settings } = useDoc(settingsRef);
-  
-  const announcementsQuery = useMemo(() => {
-    if (!db) return null;
-    // Simplify query for initial kiosk stability
-    return query(collection(db, 'announcements'), where('isActive', '==', true));
-  }, [db]);
-  const { data: activeAnnouncements } = useCollection(announcementsQuery);
 
   const dailyCapacity = settings?.dailyCapacity || 200;
   const currentCount = todayVisits?.length || 0;
   const isAtCapacity = currentCount >= dailyCapacity;
 
-  const latestAnnouncement = useMemo(() => {
-    if (!activeAnnouncements) return null;
-    const now = new Date();
-    // Filter in memory to avoid complex indexing requirements
-    return activeAnnouncements
-      .sort((a, b) => b.startDate.toMillis() - a.startDate.toMillis())
-      .find(a => now >= a.startDate.toDate() && now <= a.endDate.toDate());
+  // Real-time Announcement Listener
+  useEffect(() => {
+    if (!db) return;
+    const now = Timestamp.now();
+    const q = query(
+      collection(db, 'announcements'),
+      where('isActive', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((a: any) => a.startDate.toDate() <= new Date() && a.endDate.toDate() >= new Date());
+      setActiveAnnouncements(docs);
+      setCurrentIndex(0);
+    });
+
+    return () => unsubscribe();
+  }, [db]);
+
+  // Announcement Cycle
+  useEffect(() => {
+    if (activeAnnouncements.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % activeAnnouncements.length);
+    }, 5000);
+    return () => clearInterval(interval);
   }, [activeAnnouncements]);
 
   useEffect(() => {
-    if (loginMode === 'admin') {
-      router.push('/admin/login');
-    }
+    if (loginMode === 'admin') router.push('/admin/login');
   }, [loginMode, router]);
 
   useEffect(() => {
@@ -77,15 +87,15 @@ function KioskEntryContent() {
           if (!validateNEUEmail(user.email || '')) {
             setError("Only NEU accounts (@neu.edu.ph) are allowed.");
             await signOut(auth);
-            setLoading(false); 
+            setLoading(false);
             return;
           }
           const cleanId = user.email!.split('@')[0];
           const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
           if (!blockSnap.empty) {
             setBlockedData(blockSnap.docs[0].data());
-            await signOut(auth); 
-            setLoading(false); 
+            await signOut(auth);
+            setLoading(false);
             return;
           }
           sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
@@ -94,8 +104,7 @@ function KioskEntryContent() {
             college: 'Institutional Account', 
             loginMethod: 'google' 
           }));
-          router.push('/kiosk/purpose'); 
-          return;
+          router.push('/kiosk/purpose');
         }
       } catch (err: any) { 
         if (err.code !== 'auth/popup-closed-by-user') {
@@ -124,7 +133,7 @@ function KioskEntryContent() {
       return;
     }
 
-    setLoading(true); 
+    setLoading(true);
     setError(null);
     const cleanId = studentId.trim();
 
@@ -132,7 +141,7 @@ function KioskEntryContent() {
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
       if (!blockSnap.empty) {
         setBlockedData(blockSnap.docs[0].data());
-        setLoading(false); 
+        setLoading(false);
         return;
       }
 
@@ -153,22 +162,23 @@ function KioskEntryContent() {
     } catch (err: any) { 
       logAppError('KioskEntry', 'IdSubmit', err);
       setError("Connection error. Please try again.");
-      setLoading(false); 
+      setLoading(false);
     }
   };
+
+  const currentAnnouncement = activeAnnouncements[currentIndex];
 
   if (blockedData) {
     return (
       <div className="h-screen bg-[#0a2a1a] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
-        <div className="bg-red-500/10 p-10 rounded-[3rem] border-2 border-red-500/30 flex flex-col items-center max-w-md">
+        <div className="bg-red-500/10 p-10 rounded-[3rem] border-2 border-red-500/30 flex flex-col items-center max-w-md animate-in zoom-in duration-300">
           <ShieldX className="h-16 w-16 text-red-500 mb-4" />
           <h2 className="text-2xl font-black mb-2 uppercase tracking-tighter">Access Restricted</h2>
-          <p className="text-[#c9a227] font-bold mb-4 text-xs uppercase tracking-widest">Entry denied for this ID</p>
           <div className="bg-black/30 p-6 rounded-2xl w-full text-left mb-6 border border-white/10">
             <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-1">Reason</p>
             <p className="font-bold text-sm italic">{blockedData.reason || 'Safety/Policy Violation'}</p>
           </div>
-          <Button onClick={() => setBlockedData(null)} className="w-full h-12 bg-white text-[#0a2a1a] font-black rounded-xl hover:bg-white/90">Return</Button>
+          <Button onClick={() => setBlockedData(null)} className="w-full h-12 bg-white text-[#0a2a1a] font-black rounded-xl">Return</Button>
         </div>
       </div>
     );
@@ -176,18 +186,30 @@ function KioskEntryContent() {
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col items-center justify-center p-4 relative">
-      {latestAnnouncement && (
-        <div className={`fixed top-0 left-0 w-full z-[100] p-4 flex items-center justify-center gap-4 transition-all ${latestAnnouncement.priority === 'urgent' ? 'bg-red-600 text-white animate-pulse' : 'bg-[#c9a227] text-[#0a2a1a]'} font-black uppercase text-sm tracking-widest shadow-2xl`}>
-          <Megaphone className="h-5 w-5" />
-          {latestAnnouncement.message}
+      {/* Announcement Banner */}
+      {currentAnnouncement && (
+        <div className={`fixed top-0 left-0 w-full z-[100] py-3 px-6 flex items-center justify-center gap-3 transition-all duration-1000 animate-in slide-in-from-top ${
+          currentAnnouncement.priority === 'urgent' 
+            ? 'bg-[#dc2626] text-white animate-pulse' 
+            : 'bg-[#c9a227] text-[#0a2a1a]'
+        } shadow-xl`}>
+          <Megaphone className="h-4 w-4 shrink-0" />
+          <p className="text-sm font-black uppercase tracking-widest text-center truncate max-w-4xl">
+            {currentAnnouncement.priority === 'urgent' && "⚠ URGENT: "}{currentAnnouncement.message}
+          </p>
+          {activeAnnouncements.length > 1 && (
+            <span className="text-[10px] font-black opacity-50 whitespace-nowrap ml-2">
+              {currentIndex + 1}/{activeAnnouncements.length}
+            </span>
+          )}
         </div>
       )}
 
-      <div className="absolute top-12 right-6 z-50">
+      <div className="absolute top-16 right-6 z-50">
         <Tabs value={loginMode} onValueChange={(v) => setLoginMode(v as any)} className="w-[160px]">
           <TabsList className="grid w-full grid-cols-2 bg-black/40 border border-[#c9a227]/30 h-10 p-1 rounded-xl">
-            <TabsTrigger value="user" className="data-[state=active]:bg-[#c9a227] data-[state=active]:text-[#0a2a1a] font-black text-xs rounded-lg">Kiosk</TabsTrigger>
-            <TabsTrigger value="admin" className="data-[state=active]:bg-[#c9a227] data-[state=active]:text-[#0a2a1a] font-black text-xs rounded-lg">Staff</TabsTrigger>
+            <TabsTrigger value="user" className="data-[state=active]:bg-[#c9a227] data-[state=active]:text-[#0a2a1a] font-black text-xs">Kiosk</TabsTrigger>
+            <TabsTrigger value="admin" className="data-[state=active]:bg-[#c9a227] data-[state=active]:text-[#0a2a1a] font-black text-xs">Staff</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -229,14 +251,14 @@ function KioskEntryContent() {
                   />
                   {error && <p className="text-red-400 text-xs font-black uppercase tracking-widest text-center mt-3">{error}</p>}
                 </div>
-                <Button className="w-full h-16 text-2xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-2xl transition-all" disabled={loading} type="submit">
+                <Button className="w-full h-16 text-2xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-2xl" disabled={loading} type="submit">
                   {loading && studentId.trim() ? "Verifying..." : "Continue"}
                 </Button>
               </form>
-              <div className="relative flex items-center gap-4 py-2"><div className="flex-grow border-t border-white/5"></div><span className="text-white/20 text-[10px] font-black tracking-widest uppercase">OR</span><div className="flex-grow border-t border-white/5"></div></div>
+              <div className="relative flex items-center gap-4"><div className="flex-grow border-t border-white/5"></div><span className="text-white/20 text-[10px] font-black uppercase tracking-widest">OR</span><div className="flex-grow border-t border-white/5"></div></div>
               <Button 
                 variant="outline" 
-                className="w-full h-14 text-sm font-black border-white/10 bg-white text-[#0a2a1a] hover:bg-white/90 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3" 
+                className="w-full h-14 text-sm font-black bg-white text-[#0a2a1a] rounded-2xl flex items-center justify-center gap-3" 
                 onClick={() => { if (!auth) return; setLoading(true); signInWithRedirect(auth, new GoogleAuthProvider().setCustomParameters({ hd: 'neu.edu.ph' })); }} 
                 disabled={loading}
               >
