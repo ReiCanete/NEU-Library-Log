@@ -2,12 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Function to check if the user is an admin
+    // Robust check for administrative access
     function isAdmin() {
       return request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        request.auth.token.email.startsWith('25-14294-549') ||
-        request.auth.token.email == 'reiangelo.canete@neu.edu.ph'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        request.auth.token.email == 'reiangelo.canete@neu.edu.ph' ||
+        request.auth.token.email.startsWith('25-14294-549')
       );
     }
 
