@@ -13,7 +13,7 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Extremely robust Singleton pattern for Next.js 15 HMR stability
+// Robust Singleton pattern to survive Next.js HMR reloads
 // This prevents "INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9)"
 const G = (typeof window !== 'undefined' ? window : globalThis) as any;
 

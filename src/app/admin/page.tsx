@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -41,7 +40,7 @@ function CountUp({ value, error }: { value: number; error?: boolean }) {
     return () => clearInterval(timer);
   }, [value, error]);
 
-  if (error) return <span className="flex items-center gap-2">— <AlertTriangle className="h-2 w-2 text-red-500" /></span>;
+  if (error) return <span className="flex items-center gap-2">— <AlertTriangle className="h-4 w-4 text-red-500" /></span>;
   return <>{count}</>;
 }
 
@@ -101,15 +100,15 @@ export default function AdminDashboard() {
     setTimeout(() => {
       setLastUpdated(new Date());
       setIsRefreshing(false);
-      toast({ title: "Synchronized", description: "Latest metrics loaded." });
-    }, 600);
+      toast({ title: "Metrics Updated", description: "Latest database snapshots loaded." });
+    }, 800);
   };
 
   const updateCapacity = async () => {
     if (!db || !auth) return;
     const val = parseInt(newCapacity);
     if (isNaN(val) || val <= 0) {
-      toast({ title: "Invalid", description: "Enter a positive number.", variant: "destructive" });
+      toast({ title: "Invalid Input", description: "Capacity must be a positive number.", variant: "destructive" });
       return;
     }
     try {
@@ -118,11 +117,11 @@ export default function AdminDashboard() {
         lastUpdatedBy: auth?.currentUser?.email || 'Admin',
         updatedAt: Timestamp.now()
       }, { merge: true });
-      toast({ title: "Updated", description: `Capacity set to ${val}.` });
+      toast({ title: "Threshold Updated", description: `Daily capacity set to ${val}.` });
       setIsEditingCapacity(false);
     } catch (e: any) {
       logAppError('Dashboard', 'UpdateCapacity', e);
-      toast({ title: "Failed", description: e.message, variant: "destructive" });
+      toast({ title: "Failed", description: "Could not update capacity. Check permissions.", variant: "destructive" });
     }
   };
 
@@ -164,112 +163,112 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout>
-      <div className="space-y-4 pb-4">
-        <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-xl p-4 text-white shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-3 border-b-2 border-[#c9a227]">
-          <div className="z-10 text-center sm:text-left space-y-0.5">
-            <div className="flex items-center gap-2 justify-center sm:justify-start">
-              <img src="/neu-logo.png" alt="Logo" className="h-5 w-5 rounded-full" />
-              <h2 className="text-sm font-black tracking-tight flex items-center gap-1.5 uppercase">
-                Staff Dashboard <Sparkles className="h-2.5 w-2.5 text-[#c9a227]" />
-              </h2>
+      <div className="space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[2rem] border border-[#d4e4d8] shadow-sm gap-6">
+          <div className="flex items-center gap-6">
+            <div className="h-20 w-20 bg-[#0a2a1a] rounded-[1.5rem] flex items-center justify-center shadow-xl">
+              <Sparkles className="h-10 w-10 text-[#c9a227]" />
             </div>
-            <p className="text-white/60 font-medium text-[10px] uppercase tracking-widest">
-              Live Monitor: <span className="text-[#c9a227] font-black">{stats.today}</span> Visitors Recorded
-            </p>
+            <div>
+              <h2 className="text-3xl font-black text-[#1a3a2a] tracking-tight uppercase">System Overview</h2>
+              <p className="text-sm font-bold text-[#4a6741] uppercase tracking-widest mt-1 flex items-center gap-2">
+                Live Metrics • <span className="text-[#c9a227]">{stats.today} recorded today</span>
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 z-10">
+          <div className="flex gap-4">
             <Dialog open={isEditingCapacity} onOpenChange={setIsEditingCapacity}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-lg h-8 px-3 font-black flex gap-1.5 text-[9px]">
-                  <Settings2 className="h-3 w-3 text-[#c9a227]" />
+                <Button variant="outline" className="h-14 px-8 rounded-2xl border-[#d4e4d8] font-black flex gap-3 text-sm">
+                  <Settings2 className="h-5 w-5 text-[#c9a227]" />
                   CAPACITY: {dailyCapacity}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-xl p-5 max-w-xs">
-                <DialogHeader>
-                  <DialogTitle className="text-base font-black text-[#1a3a2a]">Daily Threshold</DialogTitle>
-                  <DialogDescription className="font-medium text-[10px] text-[#4a6741] uppercase">Set the maximum visitors for the kiosk.</DialogDescription>
+              <DialogContent className="rounded-[2rem] p-8 max-w-sm border-none shadow-2xl">
+                <DialogHeader className="space-y-2">
+                  <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Daily Threshold</DialogTitle>
+                  <DialogDescription className="font-bold text-xs text-[#4a6741] uppercase tracking-widest">Configure maximum kiosk entries.</DialogDescription>
                 </DialogHeader>
-                <div className="py-2">
-                  <Input type="number" className="h-10 rounded-lg bg-[#f0f4f1] border-none font-black text-lg text-center" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} />
+                <div className="py-6">
+                  <Input type="number" placeholder="200" className="h-16 rounded-2xl bg-[#f0f4f1] border-none font-black text-2xl text-center" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} />
                 </div>
                 <DialogFooter>
-                  <Button className="w-full h-9 rounded-lg bg-[#1a3a2a] font-black text-[10px]" onClick={updateCapacity}>Update Settings</Button>
+                  <Button className="w-full h-14 rounded-2xl bg-[#1a3a2a] font-black text-base" onClick={updateCapacity}>Apply Settings</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <Button onClick={handleRefresh} disabled={isRefreshing} className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-lg h-8 w-8 p-0 font-black">
-              {isRefreshing ? <Loader2 className="animate-spin h-3 w-3" /> : <RefreshCcw className="h-3 w-3" />}
+            <Button onClick={handleRefresh} disabled={isRefreshing} className="h-14 w-14 rounded-2xl bg-[#f0f4f1] text-[#1a3a2a] hover:bg-[#d4e4d8] border-none p-0">
+              {isRefreshing ? <Loader2 className="animate-spin h-6 w-6" /> : <RefreshCcw className="h-6 w-6" />}
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { label: 'Visits Today', value: stats.today, prev: stats.yesterday, icon: Users, circle: 'bg-emerald-50', iconColor: 'text-emerald-600' },
-            { label: 'Weekly Traffic', value: stats.week, icon: Calendar, circle: 'bg-amber-50', iconColor: 'text-amber-600' },
-            { label: 'Monthly Total', value: stats.month, icon: TrendingUp, circle: 'bg-slate-100', iconColor: 'text-[#0a2a1a]' }
+            { label: 'Visits Today', value: stats.today, prev: stats.yesterday, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
+            { label: 'Monthly Total', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100' }
           ].map((s, i) => (
-            <Card key={i} className="border-none shadow-sm rounded-xl bg-white overflow-hidden group hover:translate-y-[-1px] transition-all border-t-2 border-[#c9a227]">
-              <CardHeader className="flex flex-row items-center justify-between pb-1 p-4">
-                <div className={`p-2 rounded-lg ${s.circle}`}>
-                  <s.icon className={`h-3 w-3 ${s.iconColor}`} />
+            <Card key={i} className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden group hover:translate-y-[-4px] transition-all duration-300">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-8">
+                <div className={`p-4 rounded-2xl ${s.bg}`}>
+                  <s.icon className={`h-8 w-8 ${s.color}`} />
                 </div>
                 <div className="text-right">
-                  <CardTitle className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
-                  <div className="text-xl font-black text-[#1a3a2a] mt-0.5 tabular-nums">
-                    {visitsLoading ? <Skeleton className="h-5 w-10 ml-auto" /> : <CountUp value={s.value} error={!!visitsError} />}
+                  <CardTitle className="text-xs font-black text-[#4a6741] uppercase tracking-widest leading-none">{s.label}</CardTitle>
+                  <div className="text-4xl font-black text-[#1a3a2a] mt-2 tabular-nums">
+                    {visitsLoading ? <Skeleton className="h-10 w-24 ml-auto rounded-xl" /> : <CountUp value={s.value} error={!!visitsError} />}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="px-4 pb-3 pt-0 flex justify-between items-center text-[9px] font-bold text-[#4a6741]/40 uppercase tracking-widest">
-                <span>Database Sync</span>
-                {s.prev !== undefined && s.value >= s.prev ? <ArrowUpRight className="h-2 w-2 text-emerald-500" /> : <ArrowDownRight className="h-2 w-2 text-red-400" />}
+              <CardContent className="px-8 pb-8 pt-0 flex justify-between items-center text-[10px] font-black text-[#4a6741]/40 uppercase tracking-[0.2em]">
+                <span>Cloud Synced</span>
+                {s.prev !== undefined && s.value >= s.prev ? <ArrowUpRight className="h-4 w-4 text-emerald-500" /> : <ArrowDownRight className="h-4 w-4 text-red-400" />}
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="rounded-xl shadow-sm border border-[#d4e4d8] bg-white p-5 space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="rounded-[3rem] shadow-xl border border-[#d4e4d8] bg-white p-10 space-y-8">
             <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-sm font-black text-[#1a3a2a] tracking-tight uppercase">Visit Statistics</h3>
-                <p className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">By Activity Purpose</p>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-[#1a3a2a] tracking-tight uppercase">Activity Analytics</h3>
+                <p className="text-xs text-[#4a6741] font-bold uppercase tracking-widest">Visit purpose distribution</p>
               </div>
-              <BookOpen className="h-3 w-3 text-[#c9a227]" />
+              <BookOpen className="h-8 w-8 text-[#c9a227]" />
             </div>
-            <div className="h-[250px] w-full">
-              {visitsLoading ? <Skeleton className="h-full w-full rounded-lg" /> : (
+            <div className="h-[350px] w-full">
+              {visitsLoading ? <Skeleton className="h-full w-full rounded-3xl" /> : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={purposeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                    <Pie data={purposeData} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={8} dataKey="value" stroke="none">
                       {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#ccc'} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 'bold' }} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                    <Tooltip contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </div>
           </Card>
 
-          <Card className="rounded-xl shadow-sm border border-[#d4e4d8] bg-white p-5 space-y-3">
+          <Card className="rounded-[3rem] shadow-xl border border-[#d4e4d8] bg-white p-10 space-y-8">
             <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-sm font-black text-[#1a3a2a] tracking-tight uppercase">College Distribution</h3>
-                <p className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">Top 5 Visitor Groups</p>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-[#1a3a2a] tracking-tight uppercase">College Metrics</h3>
+                <p className="text-xs text-[#4a6741] font-bold uppercase tracking-widest">Top 5 visitor demographics</p>
               </div>
-              <GraduationCap className="h-3 w-3 text-[#1a3a2a]" />
+              <GraduationCap className="h-8 w-8 text-[#1a3a2a]" />
             </div>
-            <div className="h-[250px] w-full">
-              {visitsLoading ? <div className="space-y-1.5">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-5 w-full rounded-md" />)}</div> : (
+            <div className="h-[350px] w-full">
+              {visitsLoading ? <div className="space-y-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}</div> : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={collegeData} layout="vertical" margin={{ left: 0, right: 20 }}>
+                  <BarChart data={collegeData} layout="vertical" margin={{ left: 20, right: 40, top: 0, bottom: 0 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={60} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 10, fontWeight: 'bold' }} />
-                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '10px' }} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={18}>
+                    <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 11, fontWeight: 'bold' }} />
+                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }} />
+                    <Bar dataKey="count" radius={[0, 12, 12, 0]} barSize={28}>
                       {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />)}
                     </Bar>
                   </BarChart>
