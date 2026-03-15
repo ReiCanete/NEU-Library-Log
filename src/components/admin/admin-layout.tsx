@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -7,7 +8,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { auth, db as firestore } from '@/firebase/config';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useUser } from '@/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
@@ -37,11 +38,21 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
     const checkAdminRole = async () => {
       try {
-        const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-        const userData = userDoc.data();
-        const hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
+        // Query users collection by email because document IDs are not the Auth UID
+        const q = query(collection(firestore, 'users'), where('email', '==', user.email));
+        const snap = await getDocs(q);
+        
+        let hasAdminAccess = false;
+        
+        // Whitelist check based on email (matching login page logic)
+        const isWhitelisted = user.email?.startsWith('25-14294-549');
 
-        if (userDoc.exists() && hasAdminAccess) {
+        if (!snap.empty) {
+          const userData = snap.docs[0].data();
+          hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
+        }
+
+        if (hasAdminAccess || isWhitelisted) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
@@ -49,6 +60,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           router.push('/admin/login?error=Unauthorized access');
         }
       } catch (error) {
+        console.error("Role check error:", error);
         setIsAdmin(false);
       } finally {
         setCheckingRole(false);

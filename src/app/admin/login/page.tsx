@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -27,11 +28,10 @@ export default function AdminLogin() {
       setLoading(true);
       setError('');
       
-      // Standard Firebase Email/Password Auth
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
 
-      // Verify domain (optional but recommended for consistency)
+      // Only @neu.edu.ph accounts are allowed
       if (!user.email?.endsWith('@neu.edu.ph')) {
         await signOut(auth);
         setError('Only @neu.edu.ph accounts are allowed.');
@@ -39,22 +39,26 @@ export default function AdminLogin() {
         return;
       }
 
-      // Role check in Firestore
+      // Query users collection for role
       const q = query(collection(db, 'users'), where('email', '==', user.email));
       const snap = await getDocs(q);
 
       let role = '';
+      let isStaffId = false;
+      
       if (!snap.empty) {
-        role = snap.docs[0].data().role;
+        const userData = snap.docs[0].data();
+        role = userData.role;
+        isStaffId = userData.studentId === '25-14294-549';
       }
 
-      // Whitelist check for specific ID if role isn't set yet
+      // Whitelist check
       const isWhitelisted = user.email.startsWith('25-14294-549');
 
-      if (role === 'admin' || isWhitelisted) {
+      if (role === 'admin' || isWhitelisted || isStaffId) {
         sessionStorage.setItem('adminEmail', user.email);
         sessionStorage.setItem('adminName', user.displayName || user.email.split('@')[0]);
-        // Use window.location.href for a clean navigation state after auth changes
+        // Clean navigation to admin
         window.location.href = '/admin';
       } else {
         await signOut(auth);
@@ -62,6 +66,7 @@ export default function AdminLogin() {
         setLoading(false);
       }
     } catch (err: any) {
+      console.error("Login error:", err);
       let message = 'Failed to sign in. Please check your credentials.';
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         message = 'Invalid email or password.';
