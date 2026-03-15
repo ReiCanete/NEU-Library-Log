@@ -2,43 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Robust check for administrative access
+    // Comprehensive admin check
     function isAdmin() {
       return request.auth != null && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
         request.auth.token.email == 'reiangelo.canete@neu.edu.ph' ||
-        request.auth.token.email.startsWith('25-14294-549')
+        request.auth.token.email.matches('.*25-14294-549.*') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
-    // Visitors collection - logging entries
+    // Visitors collection
     match /visits/{visitId} {
-      allow create: if true; 
-      allow read: if true; 
+      allow create, read: if true; 
       allow update, delete: if isAdmin();
     }
 
-    // Users collection - profiles and roles
+    // Users collection
     match /users/{userId} {
-      allow read: if true; 
-      allow create: if true; 
-      allow update: if isAdmin() || (request.auth != null && request.auth.uid == userId); 
+      allow read, create: if true; 
+      allow update: if isAdmin() || request.auth.uid == userId; 
     }
 
-    // Blocklist collection
+    // Blocklist, Announcements, Settings
     match /blocklist/{blockId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
-
-    // Announcements collection
     match /announcements/{announcementId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
-
-    // Settings collection
     match /settings/{settingId} {
       allow read: if true; 
       allow write: if isAdmin();
