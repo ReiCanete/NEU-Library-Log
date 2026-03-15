@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Calendar, TrendingUp, Loader2, RefreshCcw, Sparkles, BookOpen, GraduationCap, Clock, ArrowUpRight, ArrowDownRight, Settings2, Edit3 } from 'lucide-react';
+import { Users, Calendar, TrendingUp, Loader2, RefreshCcw, Sparkles, BookOpen, GraduationCap, Clock, ArrowUpRight, ArrowDownRight, Settings2, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCollection, useDoc } from '@/firebase';
 import { db, auth } from '@/firebase/config';
@@ -15,10 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { logAppError } from '@/lib/errorMessages';
 
-function CountUp({ value }: { value: number }) {
+function CountUp({ value, error }: { value: number; error?: boolean }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
+    if (error) return;
     let start = 0;
     const end = value;
     if (start === end) {
@@ -37,7 +39,9 @@ function CountUp({ value }: { value: number }) {
       }
     }, 16);
     return () => clearInterval(timer);
-  }, [value]);
+  }, [value, error]);
+
+  if (error) return <span className="flex items-center gap-2">— <AlertTriangle className="h-4 w-4 text-red-500" /></span>;
   return <>{count}</>;
 }
 
@@ -78,8 +82,8 @@ export default function AdminDashboard() {
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
-  const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
-  const { data: settings } = useDoc(doc(db, 'settings', 'library'));
+  const { data: allVisits, loading: visitsLoading, error: visitsError } = useCollection(visitsQuery);
+  const { data: settings, error: settingsError } = useDoc(doc(db, 'settings', 'library'));
 
   const dailyCapacity = settings?.dailyCapacity || 200;
 
@@ -94,7 +98,10 @@ export default function AdminDashboard() {
 
   const updateCapacity = async () => {
     const val = parseInt(newCapacity);
-    if (isNaN(val) || val <= 0) return;
+    if (isNaN(val) || val <= 0) {
+      toast({ title: "Validation Error", description: "Please enter a valid positive number.", variant: "destructive" });
+      return;
+    }
     try {
       await setDoc(doc(db, 'settings', 'library'), {
         dailyCapacity: val,
@@ -104,6 +111,7 @@ export default function AdminDashboard() {
       toast({ title: "Capacity Updated", description: `Limit set to ${val} visitors.` });
       setIsEditingCapacity(false);
     } catch (e: any) {
+      logAppError('AdminDashboard', 'UpdateCapacity', e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
@@ -170,6 +178,20 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="space-y-12">
+        {(visitsError || settingsError) && (
+          <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5" />
+              <AlertDescription className="font-black text-xs uppercase tracking-widest">
+                Some data could not be loaded. Showing cached results.
+              </AlertDescription>
+            </div>
+            <Button size="sm" variant="outline" className="h-8 border-amber-300 font-black text-[10px]" onClick={() => window.location.reload()}>
+              Click to retry
+            </Button>
+          </Alert>
+        )}
+
         <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 border-b-4 border-[#c9a227]">
           <div className="z-10 text-center md:text-left space-y-3">
             <div className="flex items-center gap-4 justify-center md:justify-start">
@@ -227,13 +249,13 @@ export default function AdminDashboard() {
                   <div className="text-right">
                     <CardTitle className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
                     <div className="text-5xl font-black text-[#1a3a2a] mt-1 tabular-nums">
-                      {visitsLoading ? <Skeleton className="h-12 w-20 ml-auto" /> : <CountUp value={s.value} />}
+                      {visitsLoading ? <Skeleton className="h-12 w-20 ml-auto" /> : <CountUp value={s.value} error={!!visitsError} />}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="px-8 pb-8 pt-2 border-t border-[#f0f4f1] mt-2 flex justify-between items-center">
                   <div className="flex items-center gap-1">
-                    {s.prev !== undefined && (
+                    {s.prev !== undefined && !visitsError && (
                       <span className={`text-[9px] font-black uppercase flex items-center ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
                         {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                         {isUp ? 'Trending Up' : 'Trending Down'}
@@ -257,22 +279,34 @@ export default function AdminDashboard() {
               <div className="p-3 bg-[#f0f4f1] rounded-2xl"><BookOpen className="h-5 w-5 text-[#1a3a2a]" /></div>
             </div>
             <div className="h-[400px] w-full relative flex items-center justify-center">
-              <div className="absolute flex flex-col items-center">
-                <span className="text-4xl font-black text-[#1a3a2a]">{allVisits?.length || 0}</span>
-                <span className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest">Total Visits</span>
-              </div>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={purposeData} cx="50%" cy="50%" innerRadius={85} outerRadius={125} paddingAngle={5} dataKey="value" stroke="none">
-                    {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#ccc'} />)}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px', fontWeight: '900' }}
-                    formatter={(value: number, name: string) => [`${value} visits (${((value/(allVisits?.length || 1))*100).toFixed(1)}%)`, name]}
-                  />
-                  <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' }} />
-                </PieChart>
-              </ResponsiveContainer>
+              {visitsLoading ? (
+                <Skeleton className="h-64 w-64 rounded-full" />
+              ) : visitsError || purposeData.length === 0 ? (
+                <div className="flex flex-col items-center gap-4 opacity-40">
+                  <Info className="h-12 w-12" />
+                  <p className="font-black uppercase text-[10px]">Chart data unavailable</p>
+                  <Button size="sm" variant="link" className="font-black h-4" onClick={() => window.location.reload()}>Click to retry</Button>
+                </div>
+              ) : (
+                <>
+                  <div className="absolute flex flex-col items-center">
+                    <span className="text-4xl font-black text-[#1a3a2a]">{allVisits?.length || 0}</span>
+                    <span className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest">Total Visits</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={purposeData} cx="50%" cy="50%" innerRadius={85} outerRadius={125} paddingAngle={5} dataKey="value" stroke="none">
+                        {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#ccc'} />)}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px', fontWeight: '900' }}
+                        formatter={(value: number, name: string) => [`${value} visits (${((value/(allVisits?.length || 1))*100).toFixed(1)}%)`, name]}
+                      />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </>
+              )}
             </div>
           </Card>
 
@@ -285,16 +319,27 @@ export default function AdminDashboard() {
               <div className="p-3 bg-[#f0f4f1] rounded-2xl"><GraduationCap className="h-5 w-5 text-[#1a3a2a]" /></div>
             </div>
             <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={collegeData} layout="vertical" margin={{ left: 20, right: 40 }}>
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 11, fontWeight: 900 }} />
-                  <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }} />
-                  <Bar dataKey="count" radius={[0, 20, 20, 0]} barSize={32} label={{ position: 'right', fill: '#1a3a2a', fontSize: 12, fontWeight: 900, formatter: (val: number) => `${val} visits` }}>
-                    {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {visitsLoading ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
+                </div>
+              ) : visitsError || collegeData.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 opacity-40">
+                   <TrendingUp className="h-12 w-12" />
+                   <p className="font-black uppercase text-[10px]">No visitor data found for period</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={collegeData} layout="vertical" margin={{ left: 20, right: 40 }}>
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 11, fontWeight: 900 }} />
+                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }} />
+                    <Bar dataKey="count" radius={[0, 20, 20, 0]} barSize={32} label={{ position: 'right', fill: '#1a3a2a', fontSize: 12, fontWeight: 900, formatter: (val: number) => `${val} visits` }}>
+                      {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </Card>
         </div>

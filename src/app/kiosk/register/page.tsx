@@ -8,106 +8,27 @@ import { Label } from '@/components/ui/label';
 import { db as firestore } from '@/firebase/config';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, RefreshCw } from 'lucide-react';
+import { validateFullName } from '@/lib/validation';
+import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 
 const COLLEGES = [
-  {
-    name: "College of Accountancy",
-    programs: ["BS Accountancy", "BS Accounting Information System"]
-  },
-  {
-    name: "College of Agriculture",
-    programs: ["BS Agriculture"]
-  },
-  {
-    name: "College of Arts and Sciences",
-    programs: ["BA Economics", "BA Political Science", "BS Biology", "BS Psychology", "BS Public Administration"]
-  },
-  {
-    name: "College of Business Administration",
-    programs: [
-      "BS Business Administration Major in Financial Management",
-      "BS Business Administration Major in Human Resource Development Management",
-      "BS Business Administration Major in Legal Management",
-      "BS Business Administration Major in Marketing Management",
-      "BS Entrepreneurship",
-      "BS Real Estate Management"
-    ]
-  },
-  {
-    name: "College of Communication",
-    programs: ["BA Broadcasting", "BA Communication", "BA Journalism"]
-  },
-  {
-    name: "College of Informatics and Computing Studies",
-    programs: [
-      "BS Library and Information Science",
-      "BS Computer Science",
-      "BS Entertainment and Multimedia Computing (Digital Animation Technology)",
-      "BS Entertainment and Multimedia Computing (Game Development)",
-      "BS Information Technology",
-      "BS Information System"
-    ]
-  },
-  {
-    name: "College of Criminology",
-    programs: ["BS Criminology"]
-  },
-  {
-    name: "College of Education",
-    programs: [
-      "BS Elementary Education",
-      "BS Elementary Education (Preschool Education)",
-      "BS Elementary Education (Special Education)",
-      "BS Secondary Education Major in Music Arts and Physical Education",
-      "BS Secondary Education Major in English",
-      "BS Secondary Education Major in Filipino",
-      "BS Secondary Education Major in Mathematics",
-      "BS Secondary Education Major in Science",
-      "BS Secondary Education Major in Social Studies",
-      "BS Secondary Education Major in Technology and Livelihood Education"
-    ]
-  },
-  {
-    name: "College of Engineering and Architecture",
-    programs: [
-      "BS Architecture",
-      "BS Astronomy",
-      "BS Civil Engineering",
-      "BS Electrical Engineering",
-      "BS Electronics Engineering",
-      "BS Industrial Engineering",
-      "BS Mechanical Engineering"
-    ]
-  },
-  {
-    name: "College of Medical Technology",
-    programs: ["BS Medical Technology"]
-  },
-  {
-    name: "College of Midwifery",
-    programs: ["Diploma in Midwifery"]
-  },
-  {
-    name: "College of Music",
-    programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"]
-  },
-  {
-    name: "College of Nursing",
-    programs: ["BS Nursing"]
-  },
-  {
-    name: "College of Physical Therapy",
-    programs: ["BS Physical Therapy"]
-  },
-  {
-    name: "College of Respiratory Therapy",
-    programs: ["BS Respiratory Therapy"]
-  },
-  {
-    name: "School of International Relations",
-    programs: ["BA Foreign Service"]
-  }
+  { name: "College of Accountancy", programs: ["BS Accountancy", "BS Accounting Information System"] },
+  { name: "College of Agriculture", programs: ["BS Agriculture"] },
+  { name: "College of Arts and Sciences", programs: ["BA Economics", "BA Political Science", "BS Biology", "BS Psychology", "BS Public Administration"] },
+  { name: "College of Business Administration", programs: ["BS Business Administration Major in Financial Management", "BS Business Administration Major in Human Resource Development Management", "BS Business Administration Major in Legal Management", "BS Business Administration Major in Marketing Management", "BS Entrepreneurship", "BS Real Estate Management"] },
+  { name: "College of Communication", programs: ["BA Broadcasting", "BA Communication", "BA Journalism"] },
+  { name: "College of Informatics and Computing Studies", programs: ["BS Library and Information Science", "BS Computer Science", "BS Entertainment and Multimedia Computing (Digital Animation Technology)", "BS Entertainment and Multimedia Computing (Game Development)", "BS Information Technology", "BS Information System"] },
+  { name: "College of Criminology", programs: ["BS Criminology"] },
+  { name: "College of Education", programs: ["BS Elementary Education", "BS Elementary Education (Preschool Education)", "BS Elementary Education (Special Education)", "BS Secondary Education Major in Music Arts and Physical Education", "BS Secondary Education Major in English", "BS Secondary Education Major in Filipino", "BS Secondary Education Major in Mathematics", "BS Secondary Education Major in Science", "BS Secondary Education Major in Social Studies", "BS Secondary Education Major in Technology and Livelihood Education"] },
+  { name: "College of Engineering and Architecture", programs: ["BS Architecture", "BS Astronomy", "BS Civil Engineering", "BS Electrical Engineering", "BS Electronics Engineering", "BS Industrial Engineering", "BS Mechanical Engineering"] },
+  { name: "College of Medical Technology", programs: ["BS Medical Technology"] },
+  { name: "College of Midwifery", programs: ["Diploma in Midwifery"] },
+  { name: "College of Music", programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"] },
+  { name: "College of Nursing", programs: ["BS Nursing"] },
+  { name: "College of Physical Therapy", programs: ["BS Physical Therapy"] },
+  { name: "College of Respiratory Therapy", programs: ["BS Respiratory Therapy"] },
+  { name: "School of International Relations", programs: ["BA Foreign Service"] }
 ];
 
 const NON_STUDENT_OPTIONS = ["Faculty", "Administrative Staff", "Library Staff", "Guest / Visitor"];
@@ -124,38 +45,35 @@ function RegisterForm() {
   const [search, setSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
     const results: { type: 'header' | 'item' | 'non-student'; label: string; college?: string }[] = [];
-    
-    // Non-student options first
-    NON_STUDENT_OPTIONS.forEach(opt => {
-      if (opt.toLowerCase().includes(term)) {
-        results.push({ type: 'non-student', label: opt });
-      }
-    });
-
-    // Colleges and Programs
+    NON_STUDENT_OPTIONS.forEach(opt => { if (opt.toLowerCase().includes(term)) results.push({ type: 'non-student', label: opt }); });
     COLLEGES.forEach(college => {
-      const matchedPrograms = college.programs.filter(p => 
-        p.toLowerCase().includes(term) || college.name.toLowerCase().includes(term)
-      );
-      
+      const matchedPrograms = college.programs.filter(p => p.toLowerCase().includes(term) || college.name.toLowerCase().includes(term));
       if (matchedPrograms.length > 0) {
         results.push({ type: 'header', label: college.name });
-        matchedPrograms.forEach(p => {
-          results.push({ type: 'item', label: p, college: college.name });
-        });
+        matchedPrograms.forEach(p => { results.push({ type: 'item', label: p, college: college.name }); });
       }
     });
-
     return results;
   }, [search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !selectedCollege) return;
+    setFormError(null);
+
+    if (!validateFullName(fullName)) {
+      setFormError("Please enter your full name (letters only, minimum 3 characters).");
+      return;
+    }
+
+    if (!selectedCollege) {
+      setFormError("Please select your college and program.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -180,11 +98,8 @@ function RegisterForm() {
       }));
       router.push('/kiosk/purpose');
     } catch (err: any) {
-      toast({
-        title: "Registration Failed",
-        description: err.message || "Could not save profile.",
-        variant: "destructive",
-      });
+      logAppError('Registration', 'SaveUser', err);
+      setFormError("Registration failed. Please try again or ask library staff for help.");
       setLoading(false);
     }
   };
@@ -192,11 +107,7 @@ function RegisterForm() {
   return (
     <div className="min-h-screen neu-dark-bg flex flex-col items-center pt-12 pb-24 px-8 relative overflow-y-auto">
       <div className="absolute top-8 left-8">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.push('/')}
-          className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-12 rounded-full border border-[#c9a227]/20"
-        >
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-12 rounded-full border border-[#c9a227]/20">
           <ArrowLeft className="h-5 w-5" /> Back
         </Button>
       </div>
@@ -211,6 +122,17 @@ function RegisterForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="glass-neu rounded-[2.5rem] p-10 space-y-6 shadow-2xl border-none">
+          {formError && (
+            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-300">
+              <p className="text-red-200 text-xs font-black uppercase tracking-widest">{formError}</p>
+              {formError.includes("Registration failed") && (
+                <Button size="sm" variant="outline" className="h-8 text-[9px] border-red-500/30 text-white" onClick={handleSubmit}>
+                  <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-6">
              <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Assigned ID</Label>
@@ -221,9 +143,12 @@ function RegisterForm() {
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
               <Input 
                 placeholder="Enter your full name" 
-                className="h-14 text-lg font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-6 focus:border-[#c9a227] focus:ring-[#c9a227]/20"
+                className={`h-14 text-lg font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-6 focus:border-[#c9a227] ${formError?.includes("full name") ? 'border-red-500' : ''}`}
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(e) => {
+                  setFullName(e.target.value);
+                  setFormError(null);
+                }}
                 required
               />
             </div>
@@ -231,7 +156,7 @@ function RegisterForm() {
             <div className="space-y-2 relative">
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program / Affiliation</Label>
               <div 
-                className="h-14 flex items-center justify-between px-6 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all"
+                className={`h-14 flex items-center justify-between px-6 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] ${formError?.includes("college") ? 'border-red-500' : ''}`}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 <span className={`font-bold text-sm ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
@@ -256,36 +181,22 @@ function RegisterForm() {
                   <div className="overflow-y-auto space-y-1 flex-1 pr-2">
                     {filteredOptions.map((opt, i) => (
                       <div key={i}>
-                        {opt.type === 'header' && (
-                          <div className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-[#c9a227] opacity-60 mt-2">
-                            {opt.label}
-                          </div>
-                        )}
+                        {opt.type === 'header' && <div className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-[#c9a227] opacity-60 mt-2">{opt.label}</div>}
                         {(opt.type === 'item' || opt.type === 'non-student') && (
-                          <div 
-                            className="px-4 py-3 rounded-xl hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
+                          <div className="px-4 py-3 rounded-xl hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (opt.type === 'non-student') {
-                                setSelectedCollege(opt.label);
-                                setSelectedProgram('');
-                              } else {
-                                setSelectedCollege(opt.college!);
-                                setSelectedProgram(opt.label);
-                              }
-                              setIsDropdownOpen(false);
-                              setSearch('');
-                            }}
-                          >
+                              if (opt.type === 'non-student') { setSelectedCollege(opt.label); setSelectedProgram(''); }
+                              else { setSelectedCollege(opt.college!); setSelectedProgram(opt.label); }
+                              setIsDropdownOpen(false); setSearch(''); setFormError(null);
+                            }}>
                             <span className="text-sm font-bold text-white group-hover:translate-x-1 transition-transform">{opt.label}</span>
                             {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-[#c9a227]" />}
                           </div>
                         )}
                       </div>
                     ))}
-                    {filteredOptions.length === 0 && (
-                      <div className="p-8 text-center text-white/20 font-bold">No results found</div>
-                    )}
+                    {filteredOptions.length === 0 && <div className="p-8 text-center text-white/20 font-bold">No results found</div>}
                   </div>
                 </div>
               )}
@@ -294,10 +205,10 @@ function RegisterForm() {
 
           <Button 
             className="w-full h-16 text-xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98]"
-            disabled={loading || !fullName || !selectedCollege}
+            disabled={loading}
             type="submit"
           >
-            {loading ? <Loader2 className="animate-spin mr-3 h-6 w-6" /> : "Complete Registration"}
+            {loading ? <><Loader2 className="animate-spin mr-3 h-6 w-6" /> Saving Profile...</> : "Complete Registration"}
           </Button>
         </form>
       </div>

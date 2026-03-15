@@ -1,17 +1,17 @@
-
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, ShieldCheck, AlertCircle, Lock, Mail } from 'lucide-react';
+import { Loader2, ShieldCheck, AlertCircle, Lock, Mail, X } from 'lucide-react';
 import { auth, db } from '@/firebase/config';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -19,10 +19,24 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  const [attempts, setAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState(0);
+
+  useEffect(() => {
+    if (lockoutTime > 0) {
+      const timer = setInterval(() => setLockoutTime(t => t - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [lockoutTime]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (lockoutTime > 0) return;
+
+    if (!email) { setError('Please enter your email address.'); return; }
+    if (!password) { setError('Please enter your password.'); return; }
+    if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
 
     try {
       setLoading(true);
@@ -30,13 +44,6 @@ export default function AdminLogin() {
       
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
-
-      if (!user.email?.endsWith('@neu.edu.ph')) {
-        await signOut(auth);
-        setError('Unauthorized: Institutional account required.');
-        setLoading(false);
-        return;
-      }
 
       const q = query(collection(db, 'users'), where('email', '==', user.email));
       const snap = await getDocs(q);
@@ -49,27 +56,35 @@ export default function AdminLogin() {
         hasAdminAccess = userData.role === 'admin' || userData.studentId === '25-14294-549';
       }
 
-      const isWhitelisted = user.email.startsWith('25-14294-549');
+      const isWhitelisted = user.email?.startsWith('25-14294-549');
 
       if (hasAdminAccess || isWhitelisted) {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
-          displayName: user.displayName || user.email.split('@')[0],
+          displayName: user.displayName || user.email?.split('@')[0],
           role: 'admin',
           studentId: userData?.studentId || '25-14294-549'
         }, { merge: true });
 
+        setAttempts(0);
         window.location.href = '/admin';
       } else {
         await signOut(auth);
-        setError('Security Access Denied.');
+        setError('This account does not have administrator privileges. Contact the system administrator.');
         setLoading(false);
       }
     } catch (err: any) {
-      let message = 'Failed to sign in. Please check credentials.';
-      if (err.code === 'auth/invalid-credential') message = 'Invalid email or password.';
-      setError(message);
+      logAppError('AdminLogin', 'SignIn', err);
+      const msg = getErrorMessage(err);
+      setError(msg);
+      
+      setAttempts(prev => {
+        const next = prev + 1;
+        if (next >= 5) setLockoutTime(60);
+        return next;
+      });
+      
       setLoading(false);
     }
   };
@@ -103,9 +118,12 @@ export default function AdminLogin() {
           </CardHeader>
           <CardContent className="pb-12 space-y-6 px-10">
             {error && (
-              <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-200 rounded-xl py-3">
+              <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-200 rounded-xl py-3 relative pr-10">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-[10px] font-black">{error}</AlertDescription>
+                <button onClick={() => setError('')} className="absolute right-3 top-3 hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
               </Alert>
             )}
 
@@ -145,9 +163,11 @@ export default function AdminLogin() {
               <Button 
                 type="submit"
                 className="w-full h-16 mt-4 text-xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-2xl transition-all active:scale-[0.98]"
-                disabled={loading}
+                disabled={loading || lockoutTime > 0}
               >
-                {loading ? (
+                {lockoutTime > 0 ? (
+                  `Try again in ${lockoutTime}s`
+                ) : loading ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
                 ) : (
                   "Log In to Dashboard"
