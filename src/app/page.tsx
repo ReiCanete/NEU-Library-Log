@@ -162,11 +162,11 @@ export default function KioskEntry() {
           <CardContent className="p-6 space-y-4">
             <form onSubmit={handleIdSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                 <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Scan or Enter School ID (e.g. 25-12946-343)</Label>
+                 <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Scan or Enter School ID</Label>
                  <Input
                     ref={inputRef}
                     placeholder="25-12946-343"
-                    className="h-14 text-2xl text-center font-mono bg-black/20 border-[#c9a227]/20 text-white rounded-xl focus:ring-4 focus:ring-[#c9a227]/20 focus:border-[#c9a227] transition-all duration-300 placeholder:text-white/5"
+                    className="h-14 text-2xl text-center font-mono bg-black/20 border-[#c9a227]/20 text-white rounded-xl focus:ring-4 focus:ring-[#c9a227]/20 focus:border-[#c9a227] transition-all duration-300 placeholder:text-white/10"
                     value={studentId}
                     onChange={(e) => setStudentId(e.target.value)}
                     disabled={loading}

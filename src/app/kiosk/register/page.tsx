@@ -190,66 +190,64 @@ function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a1628] flex flex-col items-center justify-center p-8 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[150px] animate-orb" />
-      
+    <div className="min-h-screen neu-dark-bg flex flex-col items-center justify-center p-8 relative overflow-hidden">
       <div className="absolute top-8 left-8">
         <Button 
           variant="ghost" 
           onClick={() => router.push('/')}
-          className="text-white hover:bg-white/10 gap-2 font-bold"
+          className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-12 rounded-full border border-[#c9a227]/20"
         >
           <ArrowLeft className="h-5 w-5" /> Back
         </Button>
       </div>
 
-      <div className="max-w-2xl w-full space-y-10 z-10 animate-in fade-in zoom-in duration-700">
-        <div className="text-center space-y-4">
-          <div className="mx-auto bg-blue-500/10 h-20 w-20 rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
-            <UserPlus className="h-10 w-10 text-blue-400" />
+      <div className="max-w-2xl w-full space-y-8 z-10 animate-in fade-in zoom-in duration-700">
+        <div className="text-center space-y-3">
+          <div className="mx-auto bg-[#c9a227]/10 h-20 w-20 rounded-3xl flex items-center justify-center border border-[#c9a227]/20 shadow-2xl">
+            <UserPlus className="h-10 w-10 text-[#c9a227]" />
           </div>
-          <h2 className="text-5xl font-black text-white tracking-tight">New Profile</h2>
-          <p className="text-xl text-blue-200/50 font-medium">Please complete your registration details</p>
+          <h2 className="text-5xl font-black text-[#c9a227] tracking-tight">New Profile</h2>
+          <p className="text-xl text-white/40 font-bold uppercase tracking-widest text-sm">Please complete your registration</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-dark rounded-[2.5rem] p-12 space-y-8 shadow-2xl border-white/5">
-          <div className="grid grid-cols-1 gap-8">
-             <div className="space-y-3">
-              <Label className="text-xs font-black uppercase tracking-widest text-blue-300 ml-1">Assigned ID (e.g. 25-12946-343)</Label>
-              <Input value={studentId} readOnly className="h-16 text-2xl font-mono bg-black/40 border-white/5 text-white/50 rounded-2xl px-6" />
+        <form onSubmit={handleSubmit} className="glass-neu rounded-[2.5rem] p-10 space-y-6 shadow-2xl border-none">
+          <div className="grid grid-cols-1 gap-6">
+             <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Assigned ID</Label>
+              <Input value={studentId} readOnly className="h-14 text-2xl font-mono bg-black/40 border-[#c9a227]/20 text-white/50 rounded-xl px-6" />
             </div>
 
-            <div className="space-y-3">
-              <Label className="text-xs font-black uppercase tracking-widest text-blue-300 ml-1">Full Name</Label>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
               <Input 
                 placeholder="Enter your full name" 
-                className="h-16 text-xl font-bold bg-black/40 border-white/10 text-white rounded-2xl px-6 focus:border-blue-500 focus:ring-blue-500/20"
+                className="h-14 text-lg font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-6 focus:border-[#c9a227] focus:ring-[#c9a227]/20"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
 
-            <div className="space-y-3 relative">
-              <Label className="text-xs font-black uppercase tracking-widest text-blue-300 ml-1">College / Program / Affiliation</Label>
+            <div className="space-y-2 relative">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program / Affiliation</Label>
               <div 
-                className="h-16 flex items-center justify-between px-6 bg-black/40 border border-white/10 text-white rounded-2xl cursor-pointer hover:border-white/30 transition-all"
+                className="h-14 flex items-center justify-between px-6 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
-                <span className={`font-bold text-lg ${selectedProgram ? 'text-white' : 'text-white/20'}`}>
+                <span className={`font-bold text-sm ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
                   {selectedProgram || selectedCollege || "Search for your program..."}
                 </span>
-                <ChevronDown className={`h-5 w-5 text-blue-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
 
               {isDropdownOpen && (
-                <div className="absolute top-[calc(100%+12px)] left-0 w-full glass-dark rounded-[2rem] border-white/10 shadow-2xl p-4 z-50 animate-in slide-in-from-top-4 duration-300 max-h-[450px] flex flex-col">
+                <div className="absolute top-[calc(100%+12px)] left-0 w-full glass-neu rounded-[2rem] border-none shadow-2xl p-4 z-50 animate-in slide-in-from-top-4 duration-300 max-h-[400px] flex flex-col">
                   <div className="relative mb-4">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-400" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]" />
                     <Input 
                       autoFocus
                       placeholder="Type to filter..." 
-                      className="pl-11 h-12 bg-white/5 border-none rounded-xl text-white font-bold"
+                      className="pl-11 h-12 bg-black/20 border-none rounded-xl text-white font-bold"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -259,13 +257,13 @@ function RegisterForm() {
                     {filteredOptions.map((opt, i) => (
                       <div key={i}>
                         {opt.type === 'header' && (
-                          <div className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-400 opacity-60 mt-2">
+                          <div className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-[#c9a227] opacity-60 mt-2">
                             {opt.label}
                           </div>
                         )}
                         {(opt.type === 'item' || opt.type === 'non-student') && (
                           <div 
-                            className="px-4 py-4 rounded-xl hover:bg-blue-600/40 cursor-pointer flex items-center justify-between group transition-colors"
+                            className="px-4 py-3 rounded-xl hover:bg-[#c9a227]/20 cursor-pointer flex items-center justify-between group transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (opt.type === 'non-student') {
@@ -280,13 +278,13 @@ function RegisterForm() {
                             }}
                           >
                             <span className="text-sm font-bold text-white group-hover:translate-x-1 transition-transform">{opt.label}</span>
-                            {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-blue-400" />}
+                            {(selectedProgram === opt.label || selectedCollege === opt.label) && <Check className="h-4 w-4 text-[#c9a227]" />}
                           </div>
                         )}
                       </div>
                     ))}
                     {filteredOptions.length === 0 && (
-                      <div className="p-8 text-center text-blue-200/30 font-bold">No results found</div>
+                      <div className="p-8 text-center text-white/20 font-bold">No results found</div>
                     )}
                   </div>
                 </div>
@@ -295,10 +293,10 @@ function RegisterForm() {
           </div>
 
           <Button 
-            className="w-full h-20 text-2xl font-black rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all active:scale-[0.98]"
+            className="w-full h-16 text-xl font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98]"
             disabled={loading || !fullName || !selectedCollege}
           >
-            {loading ? <Loader2 className="animate-spin mr-3 h-7 w-7" /> : "Complete Registration"}
+            {loading ? <Loader2 className="animate-spin mr-3 h-6 w-6" /> : "Complete Registration"}
           </Button>
         </form>
       </div>
@@ -308,7 +306,7 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0a1628] flex items-center justify-center"><Loader2 className="animate-spin text-white h-12 w-12" /></div>}>
+    <Suspense fallback={<div className="min-h-screen neu-dark-bg flex items-center justify-center"><Loader2 className="animate-spin text-[#c9a227] h-12 w-12" /></div>}>
       <RegisterForm />
     </Suspense>
   );
