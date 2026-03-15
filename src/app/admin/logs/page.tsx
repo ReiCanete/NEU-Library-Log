@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Search, Filter, Download, UserX, UserCheck, Loader2, ArrowUpDown, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { Search, Filter, Download, UserX, UserCheck, Loader2, ArrowUpDown, ChevronLeft, ChevronRight, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection } from '@/firebase';
@@ -92,6 +92,20 @@ export default function VisitorLogs() {
       }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteVisit = async (visitId: string) => {
+    if (!confirm('Are you sure you want to delete this visit record? This action cannot be undone.')) return;
+    
+    setIsProcessing(true);
+    try {
+      await deleteDoc(doc(db, 'visits', visitId));
+      toast({ title: "Record Deleted", description: "The visit log has been permanently removed." });
+    } catch (e: any) {
+      toast({ title: "Delete Failed", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -244,58 +258,70 @@ export default function VisitorLogs() {
                         )}
                       </TableCell>
                       <TableCell className="px-8 text-right">
-                        {blocked ? (
+                        <div className="flex justify-end gap-2">
                           <Button 
-                            variant="outline" 
-                            size="sm" 
+                            variant="ghost" 
+                            size="icon" 
                             disabled={isProcessing}
-                            className="h-9 px-6 rounded-full font-black text-[9px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                            onClick={() => handleUnblockUser(v.studentId)}
+                            className="h-9 w-9 text-slate-300 hover:text-red-500 hover:bg-red-50"
+                            onClick={() => handleDeleteVisit(v.id)}
                           >
-                            Unblock Access
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        ) : (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                className="h-9 px-6 rounded-full font-black text-[9px] uppercase bg-red-500 hover:bg-red-600 shadow-md"
-                                onClick={() => setSelectedVisit(v)}
-                              >
-                                Block
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-lg">
-                              <DialogHeader className="space-y-4">
-                                <DialogTitle className="text-3xl font-black text-[#0a2a1a]">Restrict Access</DialogTitle>
-                                <DialogDescription className="text-slate-500 font-medium">
-                                  Are you sure you want to block <span className="text-red-600 font-black underline">{selectedVisit?.fullName}</span>? This student will be immediately denied entry.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="py-8 space-y-3">
-                                <Label className="font-black text-[#0a2a1a] text-[10px] uppercase tracking-widest ml-1">Reason for blocking</Label>
-                                <Textarea 
-                                  placeholder="Describe the violation..." 
-                                  className="rounded-2xl border-slate-100 bg-slate-50 focus:bg-white min-h-[140px] p-5 font-bold text-sm"
-                                  value={blockReason}
-                                  onChange={(e) => setBlockReason(e.target.value)}
-                                />
-                              </div>
-                              <DialogFooter className="gap-4">
-                                <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-slate-200" onClick={() => setSelectedVisit(null)}>Cancel</Button>
+
+                          {blocked ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              disabled={isProcessing}
+                              className="h-9 px-6 rounded-full font-black text-[9px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                              onClick={() => handleUnblockUser(v.studentId)}
+                            >
+                              Unblock Access
+                            </Button>
+                          ) : (
+                            <Dialog>
+                              <DialogTrigger asChild>
                                 <Button 
                                   variant="destructive" 
-                                  className="rounded-2xl h-14 px-10 font-black shadow-lg"
-                                  disabled={isProcessing || !blockReason}
-                                  onClick={handleBlockUser}
+                                  size="sm" 
+                                  className="h-9 px-6 rounded-full font-black text-[9px] uppercase bg-red-500 hover:bg-red-600 shadow-md"
+                                  onClick={() => setSelectedVisit(v)}
                                 >
-                                  {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm Block"}
+                                  Block
                                 </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        )}
+                              </DialogTrigger>
+                              <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-lg">
+                                <DialogHeader className="space-y-4">
+                                  <DialogTitle className="text-3xl font-black text-[#0a2a1a]">Restrict Access</DialogTitle>
+                                  <DialogDescription className="text-slate-500 font-medium">
+                                    Are you sure you want to block <span className="text-red-600 font-black underline">{selectedVisit?.fullName}</span>? This student will be immediately denied entry.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="py-8 space-y-3">
+                                  <Label className="font-black text-[#0a2a1a] text-[10px] uppercase tracking-widest ml-1">Reason for blocking</Label>
+                                  <Textarea 
+                                    placeholder="Describe the violation..." 
+                                    className="rounded-2xl border-slate-100 bg-slate-50 focus:bg-white min-h-[140px] p-5 font-bold text-sm"
+                                    value={blockReason}
+                                    onChange={(e) => setBlockReason(e.target.value)}
+                                  />
+                                </div>
+                                <DialogFooter className="gap-4">
+                                  <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-slate-200" onClick={() => setSelectedVisit(null)}>Cancel</Button>
+                                  <Button 
+                                    variant="destructive" 
+                                    className="rounded-2xl h-14 px-10 font-black shadow-lg"
+                                    disabled={isProcessing || !blockReason}
+                                    onClick={handleBlockUser}
+                                  >
+                                    {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm Block"}
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
