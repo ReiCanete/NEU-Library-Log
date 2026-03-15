@@ -33,13 +33,27 @@ function getFirebaseApp(): FirebaseApp {
   return app;
 }
 
-const app = getFirebaseApp();
-const auth = globalWithFirebase.__FIREBASE_AUTH__ || getAuth(app);
-const db = globalWithFirebase.__FIREBASE_DB__ || getFirestore(app);
-
-if (process.env.NODE_ENV !== 'production') {
-  globalWithFirebase.__FIREBASE_AUTH__ = auth;
-  globalWithFirebase.__FIREBASE_DB__ = db;
+function getFirebaseAuth(): Auth {
+  if (globalWithFirebase.__FIREBASE_AUTH__) return globalWithFirebase.__FIREBASE_AUTH__;
+  const app = getFirebaseApp();
+  const auth = getAuth(app);
+  if (process.env.NODE_ENV !== 'production') {
+    globalWithFirebase.__FIREBASE_AUTH__ = auth;
+  }
+  return auth;
 }
 
-export { app, auth, db };
+function getFirestoreDb(): Firestore {
+  if (globalWithFirebase.__FIREBASE_DB__) return globalWithFirebase.__FIREBASE_DB__;
+  const app = getFirebaseApp();
+  const db = getFirestore(app);
+  if (process.env.NODE_ENV !== 'production') {
+    globalWithFirebase.__FIREBASE_DB__ = db;
+  }
+  return db;
+}
+
+// Export singletons
+export const app = getFirebaseApp();
+export const auth = getFirebaseAuth();
+export const db = getFirestoreDb();

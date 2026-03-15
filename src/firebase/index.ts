@@ -1,10 +1,15 @@
 'use client';
 
 import { app, auth, db as firestore } from './config';
+
+/**
+ * Singleton exports for Firebase services
+ */
 export { app, auth, firestore };
 
 /**
  * Standard initialization function for the Firebase Provider.
+ * Returns the singleton instances.
  */
 export function initializeFirebase() {
   return { app, firestore, auth };
