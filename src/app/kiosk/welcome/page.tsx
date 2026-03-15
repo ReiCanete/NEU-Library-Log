@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -31,7 +32,6 @@ export default function WelcomePage() {
     };
   }, [router]);
 
-  // Handle navigation side effect separately from state updates
   useEffect(() => {
     if (countdown === 0) {
       sessionStorage.removeItem('kiosk_visitor');
@@ -48,7 +48,7 @@ export default function WelcomePage() {
   return (
     <div className="h-screen overflow-hidden flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] text-white text-center relative p-8">
       <div className="max-w-4xl w-full flex flex-col items-center gap-8 z-10 animate-in fade-in zoom-in duration-700">
-        <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="rounded-full shadow-2xl border-2 border-[#c9a227]/30 mb-4" />
+        <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="rounded-full shadow-2xl border-2 border-[#c9a227]/30 mb-2" />
         
         <div className="relative flex items-center justify-center w-[120px] h-[120px]">
           <svg className="w-full h-full -rotate-90">
@@ -61,30 +61,35 @@ export default function WelcomePage() {
         </div>
 
         <div className="space-y-4">
-          <p className="text-sm font-black text-[#c9a227] tracking-[0.4em] uppercase flex items-center justify-center gap-3"><Sparkles className="h-4 w-4" /> Entry Successful <Sparkles className="h-4 w-4" /></p>
+          <p className="text-xs font-black text-[#c9a227] tracking-[0.4em] uppercase flex items-center justify-center gap-3">
+            <Sparkles className="h-4 w-4" /> Entry Successful <Sparkles className="h-4 w-4" />
+          </p>
           <h1 className="text-6xl font-black text-white tracking-tight">{visitor.fullName}</h1>
-          <div className="inline-block px-8 py-2 rounded-full bg-[#c9a227] text-[#0a2a1a] text-lg font-black shadow-xl">{visitor.college}</div>
+          <p className="text-[#c9a227] text-lg font-black uppercase tracking-widest drop-shadow-lg">Welcome to NEU Library!</p>
+          <div className="inline-block px-10 py-3 rounded-[1.5rem] bg-[#c9a227] text-[#0a2a1a] text-xl font-black shadow-2xl">{visitor.college}</div>
         </div>
 
-        <div className="flex gap-6 w-full max-w-[500px] pt-10 border-t border-white/10">
-          <div className="bg-black/30 backdrop-blur-xl flex flex-1 items-center justify-center gap-4 p-6 rounded-3xl border border-white/5">
-            <Calendar className="h-8 w-8 text-[#c9a227]" />
+        <div className="flex gap-6 w-full max-w-[550px] pt-12 border-t border-white/10">
+          <div className="bg-black/30 backdrop-blur-xl flex flex-1 items-center justify-center gap-5 p-8 rounded-[2rem] border border-white/5 min-w-[240px]">
+            <Calendar className="h-10 w-10 text-[#c9a227]" />
             <div className="text-left">
               <p className="text-white/30 text-[9px] font-black uppercase tracking-widest">Date</p>
-              <p className="text-2xl font-black">{currentTime ? format(currentTime, 'MMM dd, yyyy') : '--'}</p>
+              <p className="text-xl font-bold whitespace-nowrap">{currentTime ? format(currentTime, 'MMMM dd, yyyy') : '--'}</p>
             </div>
           </div>
-          <div className="bg-black/30 backdrop-blur-xl flex flex-1 items-center justify-center gap-4 p-6 rounded-3xl border border-white/5">
-            <Clock className="h-8 w-8 text-[#c9a227]" />
+          <div className="bg-black/30 backdrop-blur-xl flex flex-1 items-center justify-center gap-5 p-8 rounded-[2rem] border border-white/5 min-w-[240px]">
+            <Clock className="h-10 w-10 text-[#c9a227]" />
             <div className="text-left">
               <p className="text-white/30 text-[9px] font-black uppercase tracking-widest">Time</p>
-              <p className="text-2xl font-black tabular-nums">{currentTime ? format(currentTime, 'hh:mm a') : '--:--'}</p>
+              <p className="text-xl font-bold tabular-nums whitespace-nowrap">{currentTime ? format(currentTime, 'hh:mm a') : '--:--'}</p>
             </div>
           </div>
         </div>
 
-        <div className="pt-6">
-          <p className="text-[#c9a227]/50 text-xs font-black uppercase tracking-[0.5em]">Resetting kiosk in <span className="text-white">{countdown}</span>...</p>
+        <div className="pt-8">
+          <p className="text-[#c9a227] text-sm font-black uppercase tracking-[0.6em]">
+            Resetting kiosk in <span className="text-white font-mono">{countdown}</span>...
+          </p>
         </div>
       </div>
       <div className="fixed bottom-0 left-0 w-full h-3 bg-black/40">

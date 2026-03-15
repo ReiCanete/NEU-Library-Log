@@ -3,11 +3,11 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { ShieldX, Search, Trash2, UserX, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { ShieldX, Search, Trash2, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection } from '@/firebase';
-import { db } from '@/firebase/config';
+import { db, auth } from '@/firebase/config';
 import { collection, query, orderBy, deleteDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -59,14 +59,14 @@ export default function BlocklistManagement() {
         studentId: newBlockId,
         fullName: newBlockName || 'Unregistered Account',
         reason: newBlockReason,
-        blockedBy: 'Admin Staff',
+        blockedBy: auth.currentUser?.email || 'Staff',
         blockedAt: Timestamp.now()
       });
-      toast({ title: "Success", description: "ID has been added to blocklist." });
+      toast({ title: "Success", description: "ID added to blocklist." });
       setNewBlockId(''); setNewBlockName(''); setNewBlockReason('');
       setShowAddModal(false);
     } catch (e: any) {
-      toast({ title: "Block Failed", description: e.message, variant: "destructive" });
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -82,11 +82,11 @@ export default function BlocklistManagement() {
           </div>
           <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
             <DialogTrigger asChild>
-              <Button className="h-14 px-8 rounded-2xl bg-red-600 text-white font-black hover:bg-red-700 shadow-xl shadow-red-200 flex gap-3">
-                <UserX className="h-5 w-5" /> Manually Block ID
+              <Button className="h-14 px-8 rounded-2xl bg-[#9b1c1c] text-white font-black hover:bg-red-900 shadow-xl shadow-red-200 flex gap-3 transition-all">
+                <ShieldAlert className="h-5 w-5" /> Manually Block ID
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[2.5rem] p-10 max-w-lg">
+            <DialogContent className="rounded-[2.5rem] p-10 max-w-lg border-none shadow-2xl">
               <DialogHeader className="space-y-2">
                 <DialogTitle className="text-3xl font-black text-[#1a3a2a]">Restrict New ID</DialogTitle>
                 <DialogDescription className="text-[#4a6741] font-bold">Immediately deny access to this ID at the kiosk.</DialogDescription>
@@ -102,12 +102,12 @@ export default function BlocklistManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Reason</Label>
-                  <Textarea placeholder="Describe violation..." className="rounded-2xl bg-[#f0f4f1] min-h-[100px] p-5 font-bold" value={newBlockReason} onChange={(e) => setNewBlockReason(e.target.value)} />
+                  <Textarea placeholder="Describe violation details..." className="rounded-2xl bg-[#f0f4f1] min-h-[100px] p-5 font-bold border-none" value={newBlockReason} onChange={(e) => setNewBlockReason(e.target.value)} />
                 </div>
               </div>
               <DialogFooter className="gap-4">
-                <Button variant="outline" className="rounded-2xl h-14 px-8 font-black" onClick={() => setShowAddModal(false)}>Cancel</Button>
-                <Button className="rounded-2xl h-14 px-10 font-black bg-red-600" disabled={isProcessing || !newBlockId || !newBlockReason} onClick={handleManualBlock}>
+                <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-[#d4e4d8]" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                <Button className="rounded-2xl h-14 px-10 font-black bg-[#9b1c1c] text-white" disabled={isProcessing || !newBlockId || !newBlockReason} onClick={handleManualBlock}>
                   {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm Block"}
                 </Button>
               </DialogFooter>
@@ -119,7 +119,7 @@ export default function BlocklistManagement() {
           <CardHeader className="p-10 border-b border-[#f0f4f1]">
             <div className="flex flex-col md:flex-row justify-between gap-6 items-end">
               <div className="flex-1 w-full space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Filter Blocklist</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Search Blocklist</Label>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                   <Input placeholder="Search name or ID..." className="h-14 pl-12 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a] w-full max-w-md" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -128,7 +128,7 @@ export default function BlocklistManagement() {
               <div className="text-right flex items-center gap-3">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
                 <span className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
-                  {filteredBlocklist.length} restricted records active
+                  {filteredBlocklist.length} restricted records
                 </span>
               </div>
             </div>
@@ -170,8 +170,8 @@ export default function BlocklistManagement() {
                       {format(b.blockedAt.toDate(), 'PPP')}
                     </TableCell>
                     <TableCell className="px-10 text-right">
-                      <Button variant="outline" size="sm" disabled={isProcessing} className="h-10 px-8 rounded-full font-black text-[9px] uppercase border-red-200 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" onClick={() => handleUnblockUser(b.id, b.fullName)}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Unblock
+                      <Button variant="outline" size="sm" disabled={isProcessing} className="h-10 px-8 rounded-full font-black text-[9px] uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm" onClick={() => handleUnblockUser(b.id, b.fullName)}>
+                        Restore Access
                       </Button>
                     </TableCell>
                   </TableRow>

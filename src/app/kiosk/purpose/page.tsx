@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -40,9 +41,9 @@ export default function PurposePage() {
     return () => clearInterval(timer);
   }, [router]);
 
-  // Handle inactivity timeout separately from progress updates
   useEffect(() => {
     if (progress === 0) {
+      sessionStorage.removeItem('kiosk_visitor');
       router.push('/');
     }
   }, [progress, router]);
@@ -71,30 +72,32 @@ export default function PurposePage() {
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col items-center justify-center p-8 relative overflow-hidden">
-      <div className="absolute top-8 left-8">
-        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-8 h-14 rounded-full border border-[#c9a227]/30">
-          <ArrowLeft className="h-5 w-5" /> Cancel Entry
+      <div className="absolute top-6 left-6">
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
+          <ArrowLeft className="h-4 w-4" /> Cancel Entry
         </Button>
       </div>
 
-      <div className="max-w-5xl w-full space-y-12 text-center z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <div className="space-y-3">
-          <h2 className="text-6xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight">Visit Purpose</h2>
-          <p className="text-xl text-white/50 font-bold uppercase tracking-widest">Select the reason for your visit, <span className="text-white">{visitor.fullName.split(' ')[0]}</span></p>
+      <div className="max-w-4xl w-full space-y-8 text-center z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="space-y-2">
+          <h2 className="text-3xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight uppercase">Visit Purpose</h2>
+          <p className="text-sm text-white/50 font-bold uppercase tracking-widest">Hi <span className="text-white">{visitor.fullName.split(' ')[0]}</span>, why are you visiting today?</p>
         </div>
 
         {isSubmitting ? (
-          <div className="py-24 flex flex-col items-center gap-8 bg-black/20 rounded-[3rem] backdrop-blur-xl border border-[#c9a227]/20">
-            <Loader2 className="h-20 w-20 animate-spin text-[#c9a227]" />
-            <p className="text-3xl font-black text-white uppercase tracking-widest">Logging Your Visit...</p>
+          <div className="py-20 flex flex-col items-center gap-6 bg-black/20 rounded-[3rem] backdrop-blur-xl border border-[#c9a227]/20">
+            <Loader2 className="h-16 w-16 animate-spin text-[#c9a227]" />
+            <p className="text-2xl font-black text-white uppercase tracking-widest">Logging Entry...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px]">
             {PURPOSES.map((item) => (
-              <Card key={item.id} className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] hover:scale-105 active:scale-95 transition-all duration-300 rounded-[2.5rem] shadow-2xl" onClick={() => handleSelect(item.label)}>
-                <CardContent className="flex flex-col items-center justify-center p-12 gap-8">
-                  <div className="p-8 rounded-3xl bg-[#c9a227]/10 group-hover:bg-[#c9a227] transition-all"><item.icon className="h-16 w-16 text-[#c9a227] group-hover:text-[#0a2a1a]" strokeWidth={2} /></div>
-                  <span className="text-2xl font-black text-white uppercase tracking-tight">{item.label}</span>
+              <Card key={item.id} className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] hover:scale-[1.03] transition-all duration-300 rounded-[2rem] shadow-xl overflow-hidden" onClick={() => handleSelect(item.label)}>
+                <CardContent className="flex flex-col items-center justify-center p-6 gap-4 min-h-[140px]">
+                  <div className="p-4 rounded-2xl bg-[#c9a227]/10 group-hover:bg-[#c9a227] transition-all">
+                    <item.icon className="h-10 w-10 text-[#c9a227] group-hover:text-[#0a2a1a]" />
+                  </div>
+                  <span className="text-sm font-black text-white uppercase tracking-tight">{item.label}</span>
                 </CardContent>
               </Card>
             ))}
@@ -102,8 +105,8 @@ export default function PurposePage() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full h-3 bg-black/40">
-        <div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_20px_#c9a227]" style={{ width: `${progress}%` }} />
+      <div className="fixed bottom-0 left-0 w-full h-2 bg-black/40">
+        <div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_15px_#c9a227]" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );
