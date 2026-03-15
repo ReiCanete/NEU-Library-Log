@@ -7,24 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, Megaphone, ShieldX } from 'lucide-react';
-import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
+import { useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { getRedirectResult, GoogleAuthProvider, signInWithRedirect, signOut } from 'firebase/auth';
 import { auth, db } from '@/firebase/config';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { startOfDay } from 'date-fns';
 import { validateStudentId } from '@/lib/validation';
-import { getErrorMessage, logAppError } from '@/lib/errorMessages';
-import { useToast } from '@/hooks/use-toast';
+import { logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 function KioskEntryContent() {
   const router = useRouter();
-  const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [redirectVerifying, setRedirectVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
@@ -42,7 +41,6 @@ function KioskEntryContent() {
   const currentCount = todayVisits?.length || 0;
   const isAtCapacity = currentCount >= dailyCapacity;
 
-  // Real-time Announcements Listener
   useEffect(() => {
     if (!db) return;
     const q = query(
@@ -66,7 +64,6 @@ function KioskEntryContent() {
     return () => unsubscribe();
   }, []);
 
-  // Cycle Announcements
   useEffect(() => {
     if (activeAnnouncements.length <= 1) return;
     const interval = setInterval(() => {
@@ -75,69 +72,52 @@ function KioskEntryContent() {
     return () => clearInterval(interval);
   }, [activeAnnouncements]);
 
-  // Handle Google Redirect Result on Mount
   useEffect(() => {
     const handleGoogleRedirect = async () => {
       try {
+        setRedirectVerifying(true);
         const result = await getRedirectResult(auth);
+        
         if (!result?.user) {
+          setRedirectVerifying(false);
           setLoading(false);
           return;
         }
         
         const user = result.user;
         
-        // 1. Check domain
         if (!user.email?.endsWith('@neu.edu.ph')) {
           await signOut(auth);
           setError('Only @neu.edu.ph Google accounts are allowed.');
+          setRedirectVerifying(false);
           setLoading(false);
           return;
         }
         
-        // 2. Check blocklist
         const blockSnap = await getDocs(
           query(collection(db, 'blocklist'), where('studentId', '==', user.email))
         );
         if (!blockSnap.empty) {
           await signOut(auth);
           setError('Your account has been restricted. Please contact library staff.');
+          setRedirectVerifying(false);
           setLoading(false);
           return;
         }
         
-        // 3. Check if user exists in users collection
-        const userSnap = await getDocs(
-          query(collection(db, 'users'), where('email', '==', user.email))
-        );
-        
-        if (userSnap.empty) {
-          // First time — go to registration
-          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-            studentId: user.email,
-            fullName: user.displayName || '',
-            email: user.email,
-            loginMethod: 'google',
-            isNew: true
-          }));
-          router.push('/kiosk/register?id=' + encodeURIComponent(user.email));
-        } else {
-          // Existing user — go to purpose selection
-          const userData = userSnap.docs[0].data();
-          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-            studentId: userData.studentId || user.email,
-            fullName: userData.fullName || userData.displayName,
-            college: userData.college || userData.College || '',
-            email: user.email,
-            loginMethod: 'google'
-          }));
-          router.push('/kiosk/purpose');
-        }
+        sessionStorage.setItem('kiosk_google_user', JSON.stringify({
+          email: user.email,
+          fullName: user.displayName || '',
+          loginMethod: 'google'
+        }));
+
+        router.push('/kiosk/register?method=google');
       } catch (err: any) {
         if (err.code !== 'auth/popup-closed-by-user') {
           console.error('[NEU Library Log] Google redirect error:', err);
           setError('Sign-in failed. Please try again.');
         }
+        setRedirectVerifying(false);
         setLoading(false);
       }
     };
@@ -251,6 +231,13 @@ function KioskEntryContent() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-4">
+        {redirectVerifying && (
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center gap-4 text-white">
+            <Loader2 className="h-12 w-12 animate-spin text-[#c9a227]" />
+            <p className="font-black uppercase tracking-[0.2em] text-sm animate-pulse">Verifying Google account...</p>
+          </div>
+        )}
+
         <div className="w-full max-w-md mx-auto flex flex-col items-center gap-4">
           <div className="flex flex-col items-center gap-2 text-center">
             <img src="/neu-logo.png" alt="NEU Logo" width={80} height={80} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
@@ -264,7 +251,7 @@ function KioskEntryContent() {
             <Card className="bg-[#0a2a1a]/60 backdrop-blur-2xl w-full border-2 border-red-500/50 rounded-[2rem] p-8 text-center space-y-4">
               <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Full Capacity</h2>
-              <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity}).</p>
+              <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity})..</p>
               <Button className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</Button>
             </Card>
           ) : (
@@ -288,7 +275,7 @@ function KioskEntryContent() {
                     />
                     {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
                   </div>
-                  <Button className="w-full h-14 text-xl font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90" disabled={loading} type="submit">
+                  <Button className="w-full h-14 text-xl font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={loading} type="submit">
                     {loading && studentId.trim() ? "Verifying..." : "Continue"}
                   </Button>
                 </form>

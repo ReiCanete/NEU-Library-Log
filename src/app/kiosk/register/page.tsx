@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft } from 'lucide-react';
-import { validateFullName } from '@/lib/validation';
+import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2 } from 'lucide-react';
+import { validateFullName, validateStudentId } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -44,37 +44,70 @@ function RegisterForm() {
   const [studentId, setStudentId] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
-  const [loginMethod, setLoginMethod] = useState<'id' | 'google'>('id');
   const [email, setEmail] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'id' | 'google'>('id');
   
   const [search, setSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [existingUser, setExistingUser] = useState<any>(null);
+
+  const method = searchParams.get('method');
+  const idFromUrl = searchParams.get('id');
 
   useEffect(() => {
-    // Check for visitor data from Google redirect
-    const visitorDataJson = sessionStorage.getItem('kiosk_visitor');
-    if (visitorDataJson) {
-      const visitor = JSON.parse(visitorDataJson);
-      if (visitor.isNew) {
-        setFullName(visitor.fullName || '');
-        setStudentId(visitor.studentId);
-        setEmail(visitor.email);
-        setLoginMethod('google');
-        return;
-      }
-    }
+    if (!db) return;
 
-    // Fallback to ID param from manual entry
-    const idParam = searchParams.get('id');
-    if (idParam) {
-      setStudentId(idParam);
-      setLoginMethod('id');
-    } else {
-      router.push('/');
-    }
-  }, [searchParams, router]);
+    const initialize = async () => {
+      setLoading(true);
+      
+      if (method === 'google') {
+        const googleDataJson = sessionStorage.getItem('kiosk_google_user');
+        if (!googleDataJson) {
+          router.push('/');
+          return;
+        }
+        
+        const googleUser = JSON.parse(googleDataJson);
+        setEmail(googleUser.email);
+        setFullName(googleUser.fullName);
+        setLoginMethod('google');
+        
+        // Check if email already registered
+        const userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', googleUser.email), limit(1)));
+        if (!userSnap.empty) {
+          const userData = userSnap.docs[0].data();
+          setExistingUser(userData);
+          setIsReturningUser(true);
+          
+          // Auto-redirect for returning users
+          setTimeout(() => {
+            sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+              studentId: userData.studentId || googleUser.email,
+              fullName: userData.displayName || userData.fullName,
+              college: userData.college,
+              program: userData.program,
+              loginMethod: 'google'
+            }));
+            router.push('/kiosk/purpose');
+          }, 2000);
+        }
+      } else if (idFromUrl) {
+        setStudentId(idFromUrl);
+        setLoginMethod('id');
+      } else {
+        router.push('/');
+      }
+      
+      setLoading(false);
+    };
+
+    initialize();
+  }, [db, method, idFromUrl, router]);
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
@@ -103,11 +136,16 @@ function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db) return;
+    if (!db || submitting) return;
     setFormError(null);
 
     if (!validateFullName(fullName)) {
       setFormError("Please enter your full name (letters only, minimum 3 characters).");
+      return;
+    }
+
+    if (!validateStudentId(studentId)) {
+      setFormError("Invalid Student ID format (XX-XXXXX-XXX).");
       return;
     }
 
@@ -116,24 +154,41 @@ function RegisterForm() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      const userId = loginMethod === 'google' ? studentId : `std_${studentId.replace(/[^a-zA-Z0-9]/g, '')}`;
+      // 1. Check if student ID already exists
+      const idSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', studentId), limit(1)));
+      
+      let userId = idSnap.empty ? doc(collection(db, 'users')).id : idSnap.docs[0].id;
+      const docRef = doc(db, 'users', userId);
+
       const userData = {
-        uid: userId,
         displayName: fullName,
+        fullName: fullName,
         college: selectedCollege,
         program: selectedProgram || 'N/A',
         studentId: studentId,
-        email: email || (loginMethod === 'id' ? `${studentId}@neu.edu.ph` : email),
+        email: email || `${studentId}@neu.edu.ph`,
         role: 'user',
         blocked: false,
-        createdAt: new Date()
+        updatedAt: new Date()
       };
 
-      await setDoc(doc(db, 'users', userId), userData, { merge: true });
+      if (idSnap.empty) {
+        await setDoc(docRef, { ...userData, createdAt: new Date(), uid: userId });
+      } else {
+        await updateDoc(docRef, userData);
+      }
 
-      // Update session storage for the purpose page
+      // 2. Check blocklist again with student ID
+      const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', studentId), limit(1)));
+      if (!blockSnap.empty) {
+        setFormError("This student ID is restricted. Please contact library staff.");
+        setSubmitting(false);
+        return;
+      }
+
+      // 3. Complete session
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
         studentId: studentId,
         fullName: fullName,
@@ -146,18 +201,51 @@ function RegisterForm() {
     } catch (err: any) {
       logAppError('Registration', 'SaveUser', err);
       setFormError("Registration failed. Please try again.");
-      setLoading(false);
+      setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 gap-4">
+        <Loader2 className="animate-spin text-[#c9a227] h-12 w-12" />
+        <p className="text-[#c9a227] font-black uppercase tracking-widest text-xs">Loading profile data...</p>
+      </div>
+    );
+  }
+
+  if (isReturningUser && existingUser) {
+    return (
+      <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
+        <div className="bg-black/40 backdrop-blur-2xl p-12 rounded-[3rem] border-2 border-[#c9a227]/30 flex flex-col items-center gap-6 shadow-2xl">
+          <div className="h-20 w-20 rounded-full bg-[#c9a227]/20 flex items-center justify-center border-2 border-[#c9a227]/50 shadow-[0_0_30px_rgba(201,162,39,0.2)]">
+            <CheckCircle2 className="h-10 w-10 text-[#c9a227]" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Welcome back!</h2>
+            <p className="text-[#c9a227] font-black text-lg uppercase tracking-widest">{existingUser.fullName || existingUser.displayName}</p>
+          </div>
+          <div className="flex items-center gap-2 text-white/40 font-bold uppercase tracking-[0.2em] text-[10px]">
+            <Sparkles className="h-3 w-3 animate-pulse text-[#c9a227]" />
+            Redirecting to entry selection...
+            <Sparkles className="h-3 w-3 animate-pulse text-[#c9a227]" />
+          </div>
+          <Button 
+            onClick={() => router.push('/kiosk/purpose')}
+            className="mt-4 h-14 px-12 rounded-2xl bg-white text-[#0a2a1a] font-black uppercase tracking-widest hover:bg-[#c9a227] transition-all"
+          >
+            Continue Now
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen neu-dark-bg flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <title>NEU Library Log — Registration</title>
       <div className="absolute top-6 left-6">
-        <Button variant="ghost" onClick={() => {
-          sessionStorage.removeItem('kiosk_visitor');
-          router.push('/');
-        }} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
       </div>
@@ -167,11 +255,11 @@ function RegisterForm() {
           <div className="mx-auto bg-[#c9a227]/10 h-14 w-14 rounded-2xl flex items-center justify-center border border-[#c9a227]/20 shadow-xl mb-2">
             <UserPlus className="h-7 w-7 text-[#c9a227]" />
           </div>
-          <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">New Profile</h2>
-          <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Please complete your registration</p>
+          <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">Complete Profile</h2>
+          <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Please verify your details</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-neu rounded-[2rem] p-8 space-y-4 shadow-2xl border-none">
+        <form onSubmit={handleSubmit} className="glass-neu rounded-[2rem] p-8 space-y-5 shadow-2xl border-none">
           {formError && (
             <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
               <p className="text-red-200 text-[9px] font-black uppercase text-center tracking-widest">{formError}</p>
@@ -179,21 +267,43 @@ function RegisterForm() {
           )}
 
           <div className="space-y-4">
+            {email && (
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1 flex items-center gap-1.5">
+                  Institutional Email <Lock className="h-2.5 w-2.5 opacity-50" />
+                </Label>
+                <div className="relative group">
+                  <Input 
+                    value={email} 
+                    readOnly 
+                    className="h-12 text-xs font-bold bg-black/40 border-[#c9a227]/10 text-white/40 rounded-xl px-4 cursor-not-allowed group-hover:bg-black/50 transition-all" 
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <Check className="h-4 w-4 text-emerald-500/50" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Assigned ID</Label>
-              <Input value={studentId} readOnly className="h-12 text-sm font-mono bg-black/40 border-[#c9a227]/20 text-white/50 rounded-xl px-4" />
+              <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Student ID</Label>
+              <Input 
+                autoFocus
+                placeholder="XX-XXXXX-XXX"
+                className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20 transition-all ${studentId ? 'font-bold' : ''}`}
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                required
+              />
             </div>
 
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
               <Input 
                 placeholder="Enter your full name" 
-                className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:border-[#c9a227]"
+                className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20"
                 value={fullName}
-                onChange={(e) => {
-                  setFullName(e.target.value);
-                  setFormError(null);
-                }}
+                onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
@@ -268,10 +378,10 @@ function RegisterForm() {
 
           <Button 
             className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg transition-all active:scale-[0.98] mt-2"
-            disabled={loading}
+            disabled={submitting}
             type="submit"
           >
-            {loading ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Registration"}
+            {submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Entry Registration"}
           </Button>
         </form>
       </div>
