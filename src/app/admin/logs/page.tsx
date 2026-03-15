@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Search, Filter, Download, UserX, UserCheck, Loader2, ArrowUpDown, ChevronLeft, ChevronRight, FileText, Trash2 } from 'lucide-react';
+import { Search, Filter, Download, UserX, UserCheck, Loader2, ArrowUpDown, ChevronLeft, ChevronRight, FileText, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection } from '@/firebase';
@@ -17,9 +17,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { AdminLayout } from '@/components/admin/admin-layout';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function VisitorLogs() {
   const { toast } = useToast();
@@ -39,6 +42,7 @@ export default function VisitorLogs() {
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Filtered visits
   const filteredVisits = useMemo(() => {
@@ -46,7 +50,7 @@ export default function VisitorLogs() {
     return allVisits.filter(v => {
       const matchesSearch = v.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            v.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           v.college.toLowerCase().includes(searchTerm.toLowerCase());
+                           (v.college && v.college.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
       return matchesSearch && matchesPurpose;
     });
@@ -97,18 +101,31 @@ export default function VisitorLogs() {
     }
   };
 
-  const handleDeleteVisit = async (visitId: string) => {
-    if (!confirm('Are you sure you want to delete this visit record? This action cannot be undone.')) return;
-    
+  const handleDeleteVisit = (visitId: string) => {
+    const docRef = doc(db, 'visits', visitId);
     setIsProcessing(true);
-    try {
-      await deleteDoc(doc(db, 'visits', visitId));
-      toast({ title: "Record Deleted", description: "The visit log has been permanently removed." });
-    } catch (e: any) {
-      toast({ title: "Delete Failed", description: e.message, variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
+    
+    deleteDoc(docRef)
+      .then(() => {
+        toast({ title: "Record Deleted", description: "The visit log has been permanently removed." });
+        setDeleteId(null);
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'delete',
+        } satisfies SecurityRuleContext);
+
+        errorEmitter.emit('permission-error', permissionError);
+        toast({ 
+          title: "Delete Failed", 
+          description: "Permission denied. Please ensure you are logged in as admin.", 
+          variant: "destructive" 
+        });
+      })
+      .finally(() => {
+        setIsProcessing(false);
+      });
   };
 
   const isBlocked = (studentId: string) => {
@@ -117,17 +134,17 @@ export default function VisitorLogs() {
 
   const exportFilteredData = () => {
     if (filteredVisits.length === 0) return;
-    const doc = new jsPDF('l', 'mm', 'a4');
-    doc.setFontSize(22);
-    doc.setTextColor(10, 42, 26);
-    doc.text("NEU Library — Visitor Activity Log", 14, 20);
+    const pdfDoc = new jsPDF('l', 'mm', 'a4');
+    pdfDoc.setFontSize(22);
+    pdfDoc.setTextColor(10, 42, 26);
+    pdfDoc.text("NEU Library — Visitor Activity Log", 14, 20);
     
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generated: ${format(new Date(), 'PPP p')}`, 14, 28);
-    doc.text(`Filter: ${purposeFilter} | Search: ${searchTerm || 'None'}`, 14, 33);
+    pdfDoc.setFontSize(10);
+    pdfDoc.setTextColor(100);
+    pdfDoc.text(`Generated: ${format(new Date(), 'PPP p')}`, 14, 28);
+    pdfDoc.text(`Filter: ${purposeFilter} | Search: ${searchTerm || 'None'}`, 14, 33);
 
-    autoTable(doc, {
+    autoTable(pdfDoc, {
       startY: 40,
       head: [['ID', 'Full Name', 'College/Program', 'Purpose', 'Method', 'Date & Time']],
       body: filteredVisits.map(v => [
@@ -135,7 +152,7 @@ export default function VisitorLogs() {
         v.fullName,
         `${v.college}\n${v.program}`,
         v.purpose,
-        v.loginMethod.toUpperCase(),
+        (v.loginMethod || 'id').toUpperCase(),
         format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')
       ]),
       headStyles: { fillColor: [26, 92, 46], fontSize: 10 },
@@ -143,21 +160,21 @@ export default function VisitorLogs() {
       alternateRowStyles: { fillColor: [245, 245, 240] }
     });
 
-    doc.save(`NEU-Library-Logs-${format(new Date(), 'yyyyMMdd-HHmm')}.pdf`);
+    pdfDoc.save(`NEU-Library-Logs-${format(new Date(), 'yyyyMMdd-HHmm')}.pdf`);
     toast({ title: "Log Exported", description: "Current view has been saved to PDF." });
   };
 
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div className="flex justify-between items-end">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
             <h2 className="text-4xl font-black text-[#0a2a1a] tracking-tight">Visitor Activity Logs</h2>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Detailed history of all library entries</p>
           </div>
           <Button 
             onClick={exportFilteredData}
-            className="h-14 px-8 rounded-2xl bg-[#c9a227] text-[#0a2a1a] font-black flex gap-2 hover:bg-[#b08d20] shadow-lg shadow-[#c9a227]/20"
+            className="h-14 px-8 rounded-2xl bg-[#c9a227] text-[#0a2a1a] font-black flex gap-2 hover:bg-[#b08d20] shadow-lg shadow-[#c9a227]/20 w-full md:w-auto"
           >
             <FileText className="h-5 w-5" /> Export View to PDF
           </Button>
@@ -239,7 +256,7 @@ export default function VisitorLogs() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-black text-[#0a2a1a]">{v.fullName}</span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate max-w-[150px]">{v.program}</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate max-w-[150px]">{v.program || 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -248,7 +265,7 @@ export default function VisitorLogs() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-slate-400 font-bold text-[10px] tabular-nums">
-                        {format(v.timestamp.toDate(), 'MMM dd, hh:mm a')}
+                        {v.timestamp ? format(v.timestamp.toDate(), 'MMM dd, hh:mm a') : '---'}
                       </TableCell>
                       <TableCell>
                         {blocked ? (
@@ -259,15 +276,35 @@ export default function VisitorLogs() {
                       </TableCell>
                       <TableCell className="px-8 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            disabled={isProcessing}
-                            className="h-9 w-9 text-slate-300 hover:text-red-500 hover:bg-red-50"
-                            onClick={() => handleDeleteVisit(v.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                disabled={isProcessing}
+                                className="h-9 w-9 text-slate-300 hover:text-red-500 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl p-10 max-w-md">
+                              <AlertDialogHeader className="space-y-4">
+                                <AlertDialogTitle className="text-2xl font-black text-[#0a2a1a]">Delete Record?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-slate-500 font-medium">
+                                  This will permanently remove the visit log for <span className="font-black">{v.fullName}</span>. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="mt-8 gap-4">
+                                <AlertDialogCancel className="rounded-xl h-12 font-black">Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  className="rounded-xl h-12 font-black bg-red-600 hover:bg-red-700"
+                                  onClick={() => handleDeleteVisit(v.id)}
+                                >
+                                  Delete Log
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
 
                           {blocked ? (
                             <Button 
@@ -277,7 +314,7 @@ export default function VisitorLogs() {
                               className="h-9 px-6 rounded-full font-black text-[9px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                               onClick={() => handleUnblockUser(v.studentId)}
                             >
-                              Unblock Access
+                              Unblock
                             </Button>
                           ) : (
                             <Dialog>

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Loader2, ShieldCheck, AlertCircle, Lock, Mail } from 'lucide-react';
 import { auth, db } from '@/firebase/config';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function AdminLogin() {
@@ -45,9 +45,10 @@ export default function AdminLogin() {
 
       let role = '';
       let isStaffId = false;
+      let userData = null;
       
       if (!snap.empty) {
-        const userData = snap.docs[0].data();
+        userData = snap.docs[0].data();
         role = userData.role;
         isStaffId = userData.studentId === '25-14294-549';
       }
@@ -56,8 +57,18 @@ export default function AdminLogin() {
       const isWhitelisted = user.email.startsWith('25-14294-549');
 
       if (role === 'admin' || isWhitelisted || isStaffId) {
+        // CRITICAL: Sync user document to Auth UID for Security Rules to work
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || user.email.split('@')[0],
+          role: 'admin',
+          studentId: userData?.studentId || '25-14294-549'
+        }, { merge: true });
+
         sessionStorage.setItem('adminEmail', user.email);
         sessionStorage.setItem('adminName', user.displayName || user.email.split('@')[0]);
+        
         // Clean navigation to admin
         window.location.href = '/admin';
       } else {
@@ -84,8 +95,8 @@ export default function AdminLogin() {
         <img 
           src="/neu-logo.png" 
           alt="NEU Logo" 
-          width={100} 
-          height={100} 
+          width={80} 
+          height={80} 
           className="rounded-full shadow-2xl" 
         />
         
