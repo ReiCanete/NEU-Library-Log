@@ -14,18 +14,30 @@ export const firebaseConfig = {
 };
 
 // Singleton pattern for HMR stability in Next.js
+// Attaching to globalThis ensures the same instance is reused across HMR cycles
 const globalWithFirebase = globalThis as unknown as {
   __FIREBASE_APP__?: FirebaseApp;
   __FIREBASE_AUTH__?: Auth;
   __FIREBASE_DB__?: Firestore;
 };
 
-const app = globalWithFirebase.__FIREBASE_APP__ || (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp());
+function getFirebaseApp(): FirebaseApp {
+  if (globalWithFirebase.__FIREBASE_APP__) return globalWithFirebase.__FIREBASE_APP__;
+  
+  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  
+  if (process.env.NODE_ENV !== 'production') {
+    globalWithFirebase.__FIREBASE_APP__ = app;
+  }
+  
+  return app;
+}
+
+const app = getFirebaseApp();
 const auth = globalWithFirebase.__FIREBASE_AUTH__ || getAuth(app);
 const db = globalWithFirebase.__FIREBASE_DB__ || getFirestore(app);
 
 if (process.env.NODE_ENV !== 'production') {
-  globalWithFirebase.__FIREBASE_APP__ = app;
   globalWithFirebase.__FIREBASE_AUTH__ = auth;
   globalWithFirebase.__FIREBASE_DB__ = db;
 }

@@ -31,5 +31,17 @@ service cloud.firestore {
       allow read: if true; // Kiosk needs to check this (or check user doc)
       allow write: if isAdmin();
     }
+
+    // Announcements collection
+    match /announcements/{announcementId} {
+      allow read: if true; // Publicly readable on kiosk
+      allow write: if isAdmin();
+    }
+
+    // Settings collection
+    match /settings/{settingId} {
+      allow read: if true; // Publicly readable for capacity check
+      allow write: if isAdmin();
+    }
   }
 }

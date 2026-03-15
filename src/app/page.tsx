@@ -12,7 +12,7 @@ import { collection, query, where, limit, getDocs, doc, orderBy } from 'firebase
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, startOfDay } from 'date-fns';
+import { startOfDay } from 'date-fns';
 import { validateStudentId, validateNEUEmail } from '@/lib/validation';
 import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 import { useToast } from '@/hooks/use-toast';
@@ -38,16 +38,16 @@ function KioskEntryContent() {
   }, []);
 
   const visitsQuery = useMemo(() => {
-    if (!todayDate || !db) return null;
+    if (typeof window === 'undefined' || !todayDate || !db) return null;
     return query(collection(db, 'visits'), where('timestamp', '>=', todayDate));
   }, [todayDate, db]);
 
   const { data: todayVisits } = useCollection(visitsQuery);
-  const settingsRef = useMemo(() => db ? doc(db, 'settings', 'library') : null, [db]);
+  const settingsRef = useMemo(() => (typeof window !== 'undefined' && db) ? doc(db, 'settings', 'library') : null, [db]);
   const { data: settings } = useDoc(settingsRef);
   
   const announcementsQuery = useMemo(() => {
-    if (!db) return null;
+    if (typeof window === 'undefined' || !db) return null;
     return query(
       collection(db, 'announcements'), 
       where('isActive', '==', true),
@@ -69,6 +69,12 @@ function KioskEntryContent() {
   }, [activeAnnouncements]);
 
   useEffect(() => {
+    if (loginMode === 'admin') {
+      router.push('/admin/login');
+    }
+  }, [loginMode, router]);
+
+  useEffect(() => {
     const handleRedirect = async () => {
       if (!auth) return;
       try {
@@ -78,13 +84,16 @@ function KioskEntryContent() {
           if (!validateNEUEmail(user.email || '')) {
             setError("Only NEU institutional email accounts (@neu.edu.ph) are allowed.");
             await signOut(auth);
-            setLoading(false); return;
+            setLoading(false); 
+            return;
           }
           const cleanId = user.email!.split('@')[0];
           const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
           if (!blockSnap.empty) {
             setBlockedData(blockSnap.docs[0].data());
-            await signOut(auth); setLoading(false); return;
+            await signOut(auth); 
+            setLoading(false); 
+            return;
           }
           sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
             studentId: cleanId, 
@@ -92,7 +101,8 @@ function KioskEntryContent() {
             college: 'Institutional Google Account', 
             loginMethod: 'google' 
           }));
-          router.push('/kiosk/purpose'); return;
+          router.push('/kiosk/purpose'); 
+          return;
         }
         setLoading(false);
       } catch (err: any) { 
@@ -105,12 +115,6 @@ function KioskEntryContent() {
     };
     handleRedirect();
   }, [router, toast, auth, db]);
-
-  useEffect(() => {
-    if (loginMode === 'admin') {
-      router.push('/admin/login');
-    }
-  }, [loginMode, router]);
 
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();

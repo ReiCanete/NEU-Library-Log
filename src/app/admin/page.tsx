@@ -81,14 +81,14 @@ export default function AdminDashboard() {
   const [isEditingCapacity, setIsEditingCapacity] = useState(false);
   const [newCapacity, setNewCapacity] = useState('');
 
-  const todayDate = useMemo(() => startOfDay(new Date()), []);
+  const todayDate = useMemo(() => typeof window !== 'undefined' ? startOfDay(new Date()) : null, []);
   const visitsQuery = useMemo(() => {
-    if (!db) return null;
+    if (typeof window === 'undefined' || !db) return null;
     return query(collection(db, 'visits'), orderBy('timestamp', 'desc'));
   }, [db]);
   const { data: allVisits, loading: visitsLoading, error: visitsError } = useCollection(visitsQuery);
   
-  const settingsRef = useMemo(() => db ? doc(db, 'settings', 'library') : null, [db]);
+  const settingsRef = useMemo(() => (typeof window !== 'undefined' && db) ? doc(db, 'settings', 'library') : null, [db]);
   const { data: settings, error: settingsError } = useDoc(settingsRef);
 
   const dailyCapacity = settings?.dailyCapacity || 200;
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
   };
 
   const stats = useMemo(() => {
-    if (!allVisits) return { today: 0, yesterday: 0, week: 0, month: 0 };
+    if (!allVisits || !todayDate) return { today: 0, yesterday: 0, week: 0, month: 0 };
     const yesterdayDate = subDays(todayDate, 1);
     const weekDate = subDays(todayDate, 7);
     const monthDate = subDays(todayDate, 30);
