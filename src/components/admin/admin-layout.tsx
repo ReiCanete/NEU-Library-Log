@@ -1,9 +1,8 @@
-
-"use client";
+'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, ChevronRight, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { auth, db } from '@/firebase/config';
@@ -22,20 +21,27 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [checkingRole, setCheckingRole] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [todayDate, setTodayDate] = useState<Date | null>(null);
+
+  // Initialize browser-specific values after hydration
+  useEffect(() => {
+    setCurrentTime(new Date());
+    setTodayDate(startOfDay(new Date()));
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Real-time counts for badges
-  const today = startOfDay(new Date());
-  const visitsQuery = useMemo(() => query(collection(db, 'visits'), where('timestamp', '>=', today)), [today]);
+  const visitsQuery = useMemo(() => {
+    if (!todayDate) return null;
+    return query(collection(db, 'visits'), where('timestamp', '>=', todayDate));
+  }, [todayDate]);
+
   const blocklistQuery = useMemo(() => query(collection(db, 'blocklist')), []);
   
   const { data: todayVisits } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(blocklistQuery);
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -60,7 +66,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             setIsAdmin(true);
           } else {
             setIsAdmin(false);
-            signOut(auth).then(() => router.push('/admin/login?error=Unauthorized'));
+            signOut(auth).then(() => router.push('/admin/login'));
           }
           setCheckingRole(false);
         });
@@ -79,7 +85,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     router.push('/admin/login');
   };
 
-  if (authLoading || checkingRole || isAdmin === null) {
+  if (authLoading || checkingRole || isAdmin === null || !currentTime) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a2a1a]">
         <Loader2 className="h-12 w-12 animate-spin text-[#c9a227]" />

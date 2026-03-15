@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +20,7 @@ function CountUp({ value }: { value: number }) {
     const end = value;
     if (start === end) return;
     let totalDuration = 1000;
-    let incrementTime = Math.abs(Math.floor(totalDuration / end));
+    let incrementTime = Math.abs(Math.floor(totalDuration / (end || 1)));
     let timer = setInterval(() => {
       start += 1;
       setCount(start);
@@ -36,6 +35,22 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateMarkers, setDateMarkers] = useState<{
+    today: Date;
+    yesterday: Date;
+    week: Date;
+    month: Date;
+  } | null>(null);
+
+  useEffect(() => {
+    const now = new Date();
+    setDateMarkers({
+      today: startOfDay(now),
+      yesterday: startOfDay(subDays(now, 1)),
+      week: startOfWeek(now, { weekStartsOn: 1 }),
+      month: startOfMonth(now)
+    });
+  }, []);
 
   const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
@@ -49,23 +64,18 @@ export default function AdminDashboard() {
     }, 800);
   };
 
-  const todayStart = startOfDay(new Date());
-  const yesterdayStart = startOfDay(subDays(new Date(), 1));
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const monthStart = startOfMonth(new Date());
-
   const stats = useMemo(() => {
-    if (!allVisits) return { today: 0, yesterday: 0, week: 0, month: 0 };
+    if (!allVisits || !dateMarkers) return { today: 0, yesterday: 0, week: 0, month: 0 };
     return {
-      today: allVisits.filter(v => v.timestamp.toDate() >= todayStart).length,
+      today: allVisits.filter(v => v.timestamp.toDate() >= dateMarkers.today).length,
       yesterday: allVisits.filter(v => {
         const d = v.timestamp.toDate();
-        return d >= yesterdayStart && d < todayStart;
+        return d >= dateMarkers.yesterday && d < dateMarkers.today;
       }).length,
-      week: allVisits.filter(v => v.timestamp.toDate() >= weekStart).length,
-      month: allVisits.filter(v => v.timestamp.toDate() >= monthStart).length
+      week: allVisits.filter(v => v.timestamp.toDate() >= dateMarkers.week).length,
+      month: allVisits.filter(v => v.timestamp.toDate() >= dateMarkers.month).length
     };
-  }, [allVisits, todayStart, yesterdayStart, weekStart, monthStart]);
+  }, [allVisits, dateMarkers]);
 
   const purposeData = useMemo(() => {
     if (!allVisits) return [];
@@ -77,7 +87,10 @@ export default function AdminDashboard() {
   const collegeData = useMemo(() => {
     if (!allVisits) return [];
     const counts: Record<string, number> = {};
-    allVisits.forEach(v => { counts[v.college] = (counts[v.college] || 0) + 1; });
+    allVisits.forEach(v => { 
+      const college = v.college || 'Other';
+      counts[college] = (counts[college] || 0) + 1; 
+    });
     return Object.entries(counts).map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count).slice(0, 5);
   }, [allVisits]);
