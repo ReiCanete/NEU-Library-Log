@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { db as firestore } from '@/firebase/config';
+import { useFirestore } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, RefreshCw } from 'lucide-react';
@@ -37,6 +37,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const db = useFirestore();
   const studentId = searchParams.get('id') || '';
   
   const [fullName, setFullName] = useState('');
@@ -63,6 +64,7 @@ function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!db) return;
     setFormError(null);
 
     if (!validateFullName(fullName)) {
@@ -78,7 +80,7 @@ function RegisterForm() {
     setLoading(true);
     try {
       const userId = `std_${studentId.replace(/[^a-zA-Z0-9]/g, '')}`;
-      await setDoc(doc(firestore, 'users', userId), {
+      await setDoc(doc(db, 'users', userId), {
         uid: userId,
         displayName: fullName,
         college: selectedCollege,

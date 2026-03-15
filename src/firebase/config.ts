@@ -1,8 +1,8 @@
 'use client';
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyAhYX4rOSAwQx-ZQJvK9nDH7dFE8--wvK4",
@@ -13,9 +13,21 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Initialize Firebase once and export for provider usage
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Singleton pattern for HMR stability in Next.js
+const globalWithFirebase = globalThis as unknown as {
+  __FIREBASE_APP__?: FirebaseApp;
+  __FIREBASE_AUTH__?: Auth;
+  __FIREBASE_DB__?: Firestore;
+};
+
+const app = globalWithFirebase.__FIREBASE_APP__ || (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp());
+const auth = globalWithFirebase.__FIREBASE_AUTH__ || getAuth(app);
+const db = globalWithFirebase.__FIREBASE_DB__ || getFirestore(app);
+
+if (process.env.NODE_ENV !== 'production') {
+  globalWithFirebase.__FIREBASE_APP__ = app;
+  globalWithFirebase.__FIREBASE_AUTH__ = auth;
+  globalWithFirebase.__FIREBASE_DB__ = db;
+}
 
 export { app, auth, db };

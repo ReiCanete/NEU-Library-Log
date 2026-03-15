@@ -1,13 +1,11 @@
-
 "use client";
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Megaphone, Plus, Calendar, AlertCircle, Trash2, CheckCircle2, XCircle, Clock, Send } from 'lucide-react';
+import { Megaphone, Plus, Calendar, AlertCircle, Trash2, CheckCircle2, XCircle, Clock, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCollection } from '@/firebase';
-import { db, auth } from '@/firebase/config';
+import { useCollection, useFirestore, useAuth } from '@/firebase';
 import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -23,6 +21,8 @@ import { Switch } from '@/components/ui/switch';
 
 export default function AnnouncementsPage() {
   const { toast } = useToast();
+  const db = useFirestore();
+  const auth = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   
@@ -31,11 +31,14 @@ export default function AnnouncementsPage() {
   const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
   const [endDate, setEndDate] = useState(format(new Date(Date.now() + 86400000), "yyyy-MM-dd'T'HH:mm"));
 
-  const announcementsQuery = useMemo(() => query(collection(db, 'announcements'), orderBy('startDate', 'desc')), []);
+  const announcementsQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'announcements'), orderBy('startDate', 'desc'));
+  }, [db]);
   const { data: announcements, loading } = useCollection(announcementsQuery);
 
   const handleAdd = async () => {
-    if (!msg || !startDate || !endDate) return;
+    if (!msg || !startDate || !endDate || !db) return;
     setIsProcessing(true);
     try {
       await addDoc(collection(db, 'announcements'), {
@@ -57,6 +60,7 @@ export default function AnnouncementsPage() {
   };
 
   const toggleStatus = async (id: string, current: boolean) => {
+    if (!db) return;
     try {
       await updateDoc(doc(db, 'announcements', id), { isActive: !current });
       toast({ title: "Status Updated", description: `Announcement ${!current ? 'enabled' : 'disabled'}.` });
@@ -66,6 +70,7 @@ export default function AnnouncementsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!db) return;
     try {
       await deleteDoc(doc(db, 'announcements', id));
       toast({ title: "Broadcast Ended", description: "Announcement removed." });

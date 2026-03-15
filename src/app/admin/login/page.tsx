@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, ShieldCheck, AlertCircle, Lock, Mail, X } from 'lucide-react';
-import { auth, db } from '@/firebase/config';
+import { useAuth, useFirestore } from '@/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,6 +15,8 @@ import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 
 export default function AdminLogin() {
   const router = useRouter();
+  const auth = useAuth();
+  const db = useFirestore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
@@ -32,7 +34,7 @@ export default function AdminLogin() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (lockoutTime > 0) return;
+    if (lockoutTime > 0 || !auth || !db) return;
 
     if (!email) { setError('Please enter your email address.'); return; }
     if (!password) { setError('Please enter your password.'); return; }

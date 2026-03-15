@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -6,10 +5,9 @@ import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, S
 import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, ChevronRight, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { auth, db } from '@/firebase/config';
-import { signOut } from 'firebase/auth';
+import { useUser, useCollection, useFirestore, useAuth } from '@/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { useUser, useCollection } from '@/firebase';
+import { signOut } from 'firebase/auth';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { format, startOfDay } from 'date-fns';
@@ -18,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const db = useFirestore();
+  const auth = useAuth();
   const { user, loading: authLoading } = useUser();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [checkingRole, setCheckingRole] = useState(true);
@@ -30,15 +30,27 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(timer);
   }, []);
 
-  const todayDate = useMemo(() => startOfDay(new Date()), []);
-  const visitsQuery = useMemo(() => query(collection(db, 'visits'), where('timestamp', '>=', todayDate)), [todayDate]);
-  const blocklistQuery = useMemo(() => query(collection(db, 'blocklist')), []);
+  const todayDate = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const visitsQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'visits'), where('timestamp', '>=', todayDate));
+  }, [db, todayDate]);
+
+  const blocklistQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'blocklist'));
+  }, [db]);
   
   const { data: todayVisits } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(blocklistQuery);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || !db) return;
     if (!user) {
       router.push('/admin/login');
       return;
@@ -60,9 +72,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       setCheckingRole(false);
     });
     return () => unsubscribe();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, db, auth]);
 
   const handleLogout = async () => {
+    if (!auth) return;
     await signOut(auth);
     router.push('/admin/login');
   };

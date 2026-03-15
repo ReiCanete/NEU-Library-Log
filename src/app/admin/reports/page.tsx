@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Download, Calendar, FileText, Loader2, TrendingUp, Users, Share2, Info, LayoutList, ShieldAlert, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCollection } from '@/firebase';
-import { db, auth } from '@/firebase/config';
+import { useCollection, useFirestore, useAuth } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, isWithinInterval, subDays, differenceInDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -21,15 +20,23 @@ import { logAppError } from '@/lib/errorMessages';
 
 export default function ReportsPage() {
   const { toast } = useToast();
+  const db = useFirestore();
+  const auth = useAuth();
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExportingCSV, setIsExportingCSV] = useState(false);
 
-  const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
+  const visitsQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'visits'), orderBy('timestamp', 'desc'));
+  }, [db]);
   const { data: allVisits, loading: visitsLoading, error: visitsError } = useCollection(visitsQuery);
 
-  const blocklistQuery = useMemo(() => query(collection(db, 'blocklist')), []);
+  const blocklistQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'blocklist'));
+  }, [db]);
   const { data: allBlocked } = useCollection(blocklistQuery);
 
   const dateError = useMemo(() => {

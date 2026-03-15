@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from 'react';
@@ -6,8 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ShieldX, Search, Trash2, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCollection } from '@/firebase';
-import { db, auth } from '@/firebase/config';
+import { useCollection, useFirestore, useAuth } from '@/firebase';
 import { collection, query, orderBy, deleteDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -21,6 +19,8 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 
 export default function BlocklistManagement() {
   const { toast } = useToast();
+  const db = useFirestore();
+  const auth = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -28,7 +28,10 @@ export default function BlocklistManagement() {
   const [newBlockName, setNewBlockName] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
 
-  const blocklistQuery = useMemo(() => query(collection(db, 'blocklist'), orderBy('blockedAt', 'desc')), []);
+  const blocklistQuery = useMemo(() => {
+    if (!db) return null;
+    return query(collection(db, 'blocklist'), orderBy('blockedAt', 'desc'));
+  }, [db]);
   const { data: blocklist, loading: blocklistLoading } = useCollection(blocklistQuery);
 
   const filteredBlocklist = useMemo(() => {
@@ -40,6 +43,7 @@ export default function BlocklistManagement() {
   }, [blocklist, searchTerm]);
 
   const handleUnblockUser = async (docId: string, studentName: string) => {
+    if (!db) return;
     setIsProcessing(true);
     try {
       await deleteDoc(doc(db, 'blocklist', docId));
@@ -52,7 +56,7 @@ export default function BlocklistManagement() {
   };
 
   const handleManualBlock = async () => {
-    if (!newBlockId || !newBlockReason) return;
+    if (!newBlockId || !newBlockReason || !db) return;
     setIsProcessing(true);
     try {
       await addDoc(collection(db, 'blocklist'), {
