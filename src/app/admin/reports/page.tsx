@@ -172,7 +172,9 @@ export default function ReportsPage() {
     } catch (e: any) {
       logAppError('Reports', 'GeneratePDF', e);
       toast({ title: "PDF Generation Failed", description: "Please try again. If problem persists, try a smaller date range.", variant: "destructive" });
-    } finally { setIsGenerating(true); setIsGenerating(false); }
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -42,7 +41,7 @@ export default function PurposePage() {
   }, [router]);
 
   useEffect(() => {
-    if (progress === 0) {
+    if (progress <= 0) {
       sessionStorage.removeItem('kiosk_visitor');
       router.push('/');
     }

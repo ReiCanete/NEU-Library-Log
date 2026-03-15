@@ -16,13 +16,7 @@ export function KioskLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener('touchstart', handleActivity);
 
     const timer = setInterval(() => {
-      setInactivityTimer((prev) => {
-        if (prev <= 1) {
-          router.push('/');
-          return 30;
-        }
-        return prev - 1;
-      });
+      setInactivityTimer((prev) => Math.max(0, prev - 1));
     }, 1000);
 
     return () => {
@@ -31,7 +25,13 @@ export function KioskLayout({ children }: { children: React.ReactNode }) {
       window.removeEventListener('touchstart', handleActivity);
       clearInterval(timer);
     };
-  }, [router]);
+  }, []);
+
+  useEffect(() => {
+    if (inactivityTimer === 0) {
+      router.push('/');
+    }
+  }, [inactivityTimer, router]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
