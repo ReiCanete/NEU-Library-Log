@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Megaphone, Plus, Trash2, Edit2, Send, Loader2, Info } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Edit2, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTrigger, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function AnnouncementsPage() {
   const { toast } = useToast();
@@ -49,50 +49,55 @@ export default function AnnouncementsPage() {
 
   const handleSave = () => {
     if (!msg.trim() || !startDate || !endDate || !db) return;
+    
+    const sDate = new Date(startDate);
+    const eDate = new Date(endDate);
+
+    if (!isValid(sDate) || !isValid(eDate)) {
+      toast({ title: "Invalid Dates", description: "Please ensure the dates are formatted correctly.", variant: "destructive" });
+      return;
+    }
+
     setIsProcessing(true);
 
     const announcementData = {
       message: msg.trim(),
       priority,
-      startDate: Timestamp.fromDate(new Date(startDate)),
-      endDate: Timestamp.fromDate(new Date(endDate)),
+      startDate: Timestamp.fromDate(sDate),
+      endDate: Timestamp.fromDate(eDate),
       isActive: true,
-      createdBy: auth.currentUser?.email || 'Admin',
+      createdBy: auth?.currentUser?.email || 'Admin',
       updatedAt: Timestamp.now()
+    };
+
+    const handleSuccess = (title: string, desc: string) => {
+      toast({ title, description: desc });
+      setShowModal(false);
+      resetForm();
+      setIsProcessing(false);
+    };
+
+    const handleError = (serverError: any, operation: 'create' | 'update', path: string, data: any) => {
+      setIsProcessing(false);
+      const permissionError = new FirestorePermissionError({
+        path,
+        operation,
+        requestResourceData: data
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      toast({ title: "Action Failed", description: "You might not have permission or there was a network error.", variant: "destructive" });
     };
 
     if (editingId) {
       const docRef = doc(db, 'announcements', editingId);
       updateDoc(docRef, announcementData)
-        .then(() => {
-          toast({ title: "Broadcast Updated", description: "Changes saved successfully." });
-          setShowModal(false);
-          resetForm();
-        })
-        .catch(async () => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'update',
-            requestResourceData: announcementData
-          }));
-        })
-        .finally(() => setIsProcessing(false));
+        .then(() => handleSuccess("Broadcast Updated", "Changes saved successfully."))
+        .catch((e) => handleError(e, 'update', docRef.path, announcementData));
     } else {
       const newData = { ...announcementData, createdAt: Timestamp.now() };
       addDoc(collection(db, 'announcements'), newData)
-        .then(() => {
-          toast({ title: "Broadcast Live", description: "Message is now active on the kiosk." });
-          setShowModal(false);
-          resetForm();
-        })
-        .catch(async () => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: '/announcements',
-            operation: 'create',
-            requestResourceData: newData
-          }));
-        })
-        .finally(() => setIsProcessing(false));
+        .then(() => handleSuccess("Broadcast Live", "Message is now active on the kiosk."))
+        .catch((e) => handleError(e, 'create', '/announcements', newData));
     }
   };
 
@@ -175,7 +180,7 @@ export default function AnnouncementsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Status</Label>
+                    <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Visibility</Label>
                     <div className="h-10 bg-[#f0f4f1] rounded-xl px-4 flex items-center justify-between">
                       <span className="font-bold text-[10px] text-[#1a3a2a]">LIVE</span>
                       <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
@@ -195,7 +200,7 @@ export default function AnnouncementsPage() {
               </div>
               <DialogFooter className="gap-2">
                 <Button variant="ghost" className="h-10 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button className="h-10 px-6 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing || !msg} onClick={handleSave}>
+                <Button className="h-10 px-6 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing || !msg.trim()} onClick={handleSave}>
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {editingId ? "Update" : "Broadcast"}
                 </Button>

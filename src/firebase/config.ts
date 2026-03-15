@@ -15,20 +15,19 @@ export const firebaseConfig = {
 
 const G = (typeof window !== 'undefined' ? window : globalThis) as any;
 
-function getFirebaseInstance(): { app: FirebaseApp; auth: Auth; db: Firestore } {
+/**
+ * Returns a robust, HMR-safe Firebase instance.
+ * Attaches instances to globalThis to prevent multiple initializations during Next.js development reloads.
+ */
+function getFirebaseInstance() {
   if (typeof window === 'undefined') {
     return { app: null as any, auth: null as any, db: null as any };
   }
 
   if (!G._firebaseApp) {
-    G._firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  }
-  
-  if (!G._firebaseAuth) {
+    const apps = getApps();
+    G._firebaseApp = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
     G._firebaseAuth = getAuth(G._firebaseApp);
-  }
-  
-  if (!G._firebaseDb) {
     G._firebaseDb = getFirestore(G._firebaseApp);
   }
 
