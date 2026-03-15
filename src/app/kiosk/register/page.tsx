@@ -215,7 +215,7 @@ function RegisterForm() {
         <form onSubmit={handleSubmit} className="glass-dark rounded-[2.5rem] p-12 space-y-8 shadow-2xl border-white/5">
           <div className="grid grid-cols-1 gap-8">
              <div className="space-y-3">
-              <Label className="text-xs font-black uppercase tracking-widest text-blue-300 ml-1">Assigned ID</Label>
+              <Label className="text-xs font-black uppercase tracking-widest text-blue-300 ml-1">Assigned ID (e.g. 25-12946-343)</Label>
               <Input value={studentId} readOnly className="h-16 text-2xl font-mono bg-black/40 border-white/5 text-white/50 rounded-2xl px-6" />
             </div>
 
