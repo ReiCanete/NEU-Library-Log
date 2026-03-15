@@ -47,9 +47,9 @@ export default function AnnouncementsPage() {
     setEditingId(null);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!db) {
-      toast({ title: "System Offline", description: "Database is not available. Please refresh.", variant: "destructive" });
+      toast({ title: "System Offline", description: "Database is not available.", variant: "destructive" });
       return;
     }
 
@@ -62,12 +62,7 @@ export default function AnnouncementsPage() {
     const eDate = new Date(endDate);
 
     if (!isValid(sDate) || !isValid(eDate)) {
-      toast({ title: "Invalid Dates", description: "Please ensure the start and end dates are correctly set.", variant: "destructive" });
-      return;
-    }
-
-    if (eDate <= sDate) {
-      toast({ title: "Timeline Error", description: "End date must be after the start date.", variant: "destructive" });
+      toast({ title: "Invalid Dates", description: "Please ensure the dates are correct.", variant: "destructive" });
       return;
     }
 
@@ -83,37 +78,38 @@ export default function AnnouncementsPage() {
       updatedAt: Timestamp.now()
     };
 
-    try {
-      if (editingId) {
-        const docRef = doc(db, 'announcements', editingId);
-        await updateDoc(docRef, announcementData);
-        toast({ title: "Broadcast Updated", description: "Changes have been published successfully." });
-      } else {
-        const newData = { ...announcementData, createdAt: Timestamp.now() };
-        await addDoc(collection(db, 'announcements'), newData);
-        toast({ title: "Broadcast Live", description: "Your message is now visible on the kiosk." });
-      }
-      
-      setShowModal(false);
-      resetForm();
-    } catch (err: any) {
-      const operation = editingId ? 'update' : 'create';
-      const path = editingId ? `announcements/${editingId}` : 'announcements';
-      
-      const permissionError = new FirestorePermissionError({
-        path,
-        operation,
-        requestResourceData: announcementData
-      });
-      
-      errorEmitter.emit('permission-error', permissionError);
-      toast({ 
-        title: "Action Denied", 
-        description: "You do not have permission to post broadcasts or a network error occurred.", 
-        variant: "destructive" 
-      });
-    } finally {
-      setIsProcessing(false);
+    if (editingId) {
+      const docRef = doc(db, 'announcements', editingId);
+      updateDoc(docRef, announcementData)
+        .then(() => {
+          toast({ title: "Broadcast Updated", description: "Changes have been published." });
+          setShowModal(false);
+          resetForm();
+        })
+        .catch(async (err) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: announcementData
+          }));
+        })
+        .finally(() => setIsProcessing(false));
+    } else {
+      const newData = { ...announcementData, createdAt: Timestamp.now() };
+      addDoc(collection(db, 'announcements'), newData)
+        .then(() => {
+          toast({ title: "Broadcast Live", description: "Your message is now visible." });
+          setShowModal(false);
+          resetForm();
+        })
+        .catch(async (err) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: 'announcements',
+            operation: 'create',
+            requestResourceData: newData
+          }));
+        })
+        .finally(() => setIsProcessing(false));
     }
   };
 

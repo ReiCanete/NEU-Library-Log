@@ -2,8 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Absolute authorization for designated institutional staff
-    // Explicitly whitelisting the user's email with case-insensitive check
+    // Whitelist specific institutional admin email and NEU staff/student patterns
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.email.lower() == 'reiangelo.canete@neu.edu.ph' ||
@@ -13,33 +12,33 @@ service cloud.firestore {
       );
     }
 
-    // Visitors collection - Public entry (create), Public monitoring (read), Admin management
+    // Visits collection
     match /visits/{visitId} {
       allow create: if true;
       allow read: if true; 
       allow update, delete: if isAdmin();
     }
 
-    // Users collection - Registration and Admin lookup
+    // Users collection
     match /users/{userId} {
       allow read: if true;
       allow create: if true; 
       allow update: if isAdmin() || request.auth.uid == userId; 
     }
 
-    // Blocklist - Restricted list management
+    // Blocklist
     match /blocklist/{blockId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
 
-    // Announcements - Public display, Admin management
+    // Announcements
     match /announcements/{announcementId} {
       allow read: if true; 
       allow write: if isAdmin();
     }
 
-    // Settings - System configuration
+    // Settings
     match /settings/{settingId} {
       allow read: if true; 
       allow write: if isAdmin();
