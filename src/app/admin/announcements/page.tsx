@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState } from 'react';
@@ -51,13 +52,8 @@ export default function AnnouncementsPage() {
       createdAt: Timestamp.now()
     };
 
-    // Right Pattern: Non-blocking mutation with .catch emitting specialized error
+    // Right Pattern: Non-blocking mutation with optimistic closure
     addDoc(collection(db, 'announcements'), announcementData)
-      .then(() => {
-        toast({ title: "Broadcast Live", description: "Announcement sent to kiosk." });
-        setMsg(''); setPriority('normal'); setShowAddModal(false);
-        setIsProcessing(false);
-      })
       .catch(async (error) => {
         const permissionError = new FirestorePermissionError({
           path: '/announcements',
@@ -65,8 +61,14 @@ export default function AnnouncementsPage() {
           requestResourceData: announcementData
         });
         errorEmitter.emit('permission-error', permissionError);
-        setIsProcessing(false);
       });
+
+    // Optimistic UI updates
+    toast({ title: "Broadcast Live", description: "Announcement sent to kiosk." });
+    setMsg(''); 
+    setPriority('normal'); 
+    setShowAddModal(false);
+    setIsProcessing(false);
   };
 
   const toggleStatus = (id: string, current: boolean) => {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -164,20 +165,6 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="space-y-4 pb-4">
-        {visitsError && (
-          <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-xl mb-3 py-2">
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-3 w-3" />
-                <AlertDescription className="font-bold text-[8px] uppercase tracking-widest leading-none">
-                  Syncing transient data... Metrics may be delayed.
-                </AlertDescription>
-              </div>
-              <Button size="sm" variant="outline" className="h-5 text-[7px] font-black px-2" onClick={() => window.location.reload()}>Retry</Button>
-            </div>
-          </Alert>
-        )}
-
         <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-xl p-4 text-white shadow-md relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-3 border-b-2 border-[#c9a227]">
           <div className="z-10 text-center sm:text-left space-y-0.5">
             <div className="flex items-center gap-2 justify-center sm:justify-start">
@@ -186,14 +173,14 @@ export default function AdminDashboard() {
                 Staff Dashboard <Sparkles className="h-2.5 w-2.5 text-[#c9a227]" />
               </h2>
             </div>
-            <p className="text-white/60 font-medium text-[9px] uppercase tracking-widest">
+            <p className="text-white/60 font-medium text-[10px] uppercase tracking-widest">
               Live Monitor: <span className="text-[#c9a227] font-black">{stats.today}</span> Visitors Recorded
             </p>
           </div>
           <div className="flex items-center gap-2 z-10">
             <Dialog open={isEditingCapacity} onOpenChange={setIsEditingCapacity}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-lg h-8 px-3 font-black flex gap-1.5 text-[8px]">
+                <Button variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-lg h-8 px-3 font-black flex gap-1.5 text-[9px]">
                   <Settings2 className="h-3 w-3 text-[#c9a227]" />
                   CAPACITY: {dailyCapacity}
                 </Button>
@@ -201,13 +188,13 @@ export default function AdminDashboard() {
               <DialogContent className="rounded-xl p-5 max-w-xs">
                 <DialogHeader>
                   <DialogTitle className="text-base font-black text-[#1a3a2a]">Daily Threshold</DialogTitle>
-                  <DialogDescription className="font-medium text-[9px] text-[#4a6741] uppercase">Set the maximum visitors for the kiosk.</DialogDescription>
+                  <DialogDescription className="font-medium text-[10px] text-[#4a6741] uppercase">Set the maximum visitors for the kiosk.</DialogDescription>
                 </DialogHeader>
                 <div className="py-2">
                   <Input type="number" className="h-10 rounded-lg bg-[#f0f4f1] border-none font-black text-lg text-center" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} />
                 </div>
                 <DialogFooter>
-                  <Button className="w-full h-9 rounded-lg bg-[#1a3a2a] font-black text-[9px]" onClick={updateCapacity}>Update Settings</Button>
+                  <Button className="w-full h-9 rounded-lg bg-[#1a3a2a] font-black text-[10px]" onClick={updateCapacity}>Update Settings</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -229,13 +216,13 @@ export default function AdminDashboard() {
                   <s.icon className={`h-3 w-3 ${s.iconColor}`} />
                 </div>
                 <div className="text-right">
-                  <CardTitle className="text-[7px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
+                  <CardTitle className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
                   <div className="text-xl font-black text-[#1a3a2a] mt-0.5 tabular-nums">
                     {visitsLoading ? <Skeleton className="h-5 w-10 ml-auto" /> : <CountUp value={s.value} error={!!visitsError} />}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="px-4 pb-3 pt-0 flex justify-between items-center text-[6px] font-bold text-[#4a6741]/40 uppercase tracking-widest">
+              <CardContent className="px-4 pb-3 pt-0 flex justify-between items-center text-[9px] font-bold text-[#4a6741]/40 uppercase tracking-widest">
                 <span>Database Sync</span>
                 {s.prev !== undefined && s.value >= s.prev ? <ArrowUpRight className="h-2 w-2 text-emerald-500" /> : <ArrowDownRight className="h-2 w-2 text-red-400" />}
               </CardContent>
@@ -248,19 +235,19 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-sm font-black text-[#1a3a2a] tracking-tight uppercase">Visit Statistics</h3>
-                <p className="text-[7px] text-[#4a6741] font-bold uppercase tracking-widest">By Activity Purpose</p>
+                <p className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">By Activity Purpose</p>
               </div>
               <BookOpen className="h-3 w-3 text-[#c9a227]" />
             </div>
-            <div className="h-[200px] w-full">
+            <div className="h-[250px] w-full">
               {visitsLoading ? <Skeleton className="h-full w-full rounded-lg" /> : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={purposeData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value" stroke="none">
+                    <Pie data={purposeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
                       {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#ccc'} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '8px', fontWeight: 'bold' }} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '7px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                    <Tooltip contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 'bold' }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -271,18 +258,18 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-sm font-black text-[#1a3a2a] tracking-tight uppercase">College Distribution</h3>
-                <p className="text-[7px] text-[#4a6741] font-bold uppercase tracking-widest">Top 5 Visitor Groups</p>
+                <p className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">Top 5 Visitor Groups</p>
               </div>
               <GraduationCap className="h-3 w-3 text-[#1a3a2a]" />
             </div>
-            <div className="h-[200px] w-full">
+            <div className="h-[250px] w-full">
               {visitsLoading ? <div className="space-y-1.5">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-5 w-full rounded-md" />)}</div> : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={collegeData} layout="vertical" margin={{ left: 0, right: 20 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={50} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 8, fontWeight: 'bold' }} />
-                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '8px' }} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={14}>
+                    <YAxis dataKey="name" type="category" width={60} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 10, fontWeight: 'bold' }} />
+                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '0.5rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '10px' }} />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={18}>
                       {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />)}
                     </Bar>
                   </BarChart>
