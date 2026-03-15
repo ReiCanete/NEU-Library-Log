@@ -1,28 +1,41 @@
 
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Calendar, TrendingUp, Loader2, RefreshCcw, Sparkles, BookOpen, GraduationCap, Clock } from 'lucide-react';
+import { Users, Calendar, TrendingUp, Loader2, RefreshCcw, Sparkles, BookOpen, GraduationCap, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCollection } from '@/firebase';
 import { db } from '@/firebase/config';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { format, startOfDay, startOfWeek, startOfMonth, getHours } from 'date-fns';
+import { format, startOfDay, startOfWeek, startOfMonth, getHours, subDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { AdminLayout } from '@/components/admin/admin-layout';
+
+function CountUp({ value }: { value: number }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const end = value;
+    if (start === end) return;
+    let totalDuration = 1000;
+    let incrementTime = Math.abs(Math.floor(totalDuration / end));
+    let timer = setInterval(() => {
+      start += 1;
+      setCount(start);
+      if (start === end) clearInterval(timer);
+    }, incrementTime);
+    return () => clearInterval(timer);
+  }, [value]);
+  return <>{count}</>;
+}
 
 export default function AdminDashboard() {
   const { toast } = useToast();
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Firestore Queries
-  const todayStart = startOfDay(new Date());
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const monthStart = startOfMonth(new Date());
 
   const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
@@ -36,47 +49,44 @@ export default function AdminDashboard() {
     }, 800);
   };
 
-  // Stats derivation
+  const todayStart = startOfDay(new Date());
+  const yesterdayStart = startOfDay(subDays(new Date(), 1));
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const monthStart = startOfMonth(new Date());
+
   const stats = useMemo(() => {
-    if (!allVisits) return { today: 0, week: 0, month: 0 };
+    if (!allVisits) return { today: 0, yesterday: 0, week: 0, month: 0 };
     return {
       today: allVisits.filter(v => v.timestamp.toDate() >= todayStart).length,
+      yesterday: allVisits.filter(v => {
+        const d = v.timestamp.toDate();
+        return d >= yesterdayStart && d < todayStart;
+      }).length,
       week: allVisits.filter(v => v.timestamp.toDate() >= weekStart).length,
       month: allVisits.filter(v => v.timestamp.toDate() >= monthStart).length
     };
-  }, [allVisits, todayStart, weekStart, monthStart]);
+  }, [allVisits, todayStart, yesterdayStart, weekStart, monthStart]);
 
-  // Purpose breakdown for Donut Chart
   const purposeData = useMemo(() => {
     if (!allVisits) return [];
     const counts: Record<string, number> = {};
-    allVisits.forEach(v => {
-      counts[v.purpose] = (counts[v.purpose] || 0) + 1;
-    });
+    allVisits.forEach(v => { counts[v.purpose] = (counts[v.purpose] || 0) + 1; });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [allVisits]);
 
-  // Top Colleges for Bar Chart
   const collegeData = useMemo(() => {
     if (!allVisits) return [];
     const counts: Record<string, number> = {};
-    allVisits.forEach(v => {
-      counts[v.college] = (counts[v.college] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    allVisits.forEach(v => { counts[v.college] = (counts[v.college] || 0) + 1; });
+    return Object.entries(counts).map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count).slice(0, 5);
   }, [allVisits]);
 
-  // Peak Hour and Most Active Day
   const insights = useMemo(() => {
     if (!allVisits || allVisits.length === 0) return { peakHour: '--', activeDay: '--', topPurpose: '--' };
-    
     const hours: Record<number, number> = {};
     const days: Record<string, number> = {};
     const purposes: Record<string, number> = {};
-
     allVisits.forEach(v => {
       const date = v.timestamp.toDate();
       const h = getHours(date);
@@ -85,11 +95,9 @@ export default function AdminDashboard() {
       days[d] = (days[d] || 0) + 1;
       purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
     });
-
     const peakH = Object.entries(hours).sort((a, b) => b[1] - a[1])[0]?.[0];
     const activeD = Object.entries(days).sort((a, b) => b[1] - a[1])[0]?.[0];
     const topP = Object.entries(purposes).sort((a, b) => b[1] - a[1])[0]?.[0];
-
     return {
       peakHour: peakH !== undefined ? format(new Date().setHours(Number(peakH)), 'hh:00 a') : '--',
       activeDay: activeD || '--',
@@ -102,128 +110,98 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="space-y-12">
-        {/* Welcome Banner */}
-        <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8">
+        <div className="bg-gradient-to-br from-[#0a2a1a] to-[#1a5c2e] rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-8 border-b-4 border-[#c9a227]">
           <div className="z-10 text-center md:text-left space-y-3">
-            <div className="flex items-center gap-3 justify-center md:justify-start">
-              <Sparkles className="h-6 w-6 text-[#c9a227]" />
-              <h2 className="text-4xl font-black tracking-tight">Staff Overview</h2>
+            <div className="flex items-center gap-4 justify-center md:justify-start">
+              <img src="/neu-logo.png" alt="Logo" className="h-10 w-10 rounded-full" />
+              <h2 className="text-4xl font-black tracking-tight flex items-center gap-3">
+                Staff Overview <Sparkles className="h-6 w-6 text-[#c9a227]" />
+              </h2>
             </div>
             <p className="text-white/60 font-bold max-w-lg text-lg leading-tight">
-              The NEU Library Log system is active. We have recorded <span className="text-[#c9a227]">{stats.today}</span> visits today so far.
+              Good day, Staff! Library log is active. We have recorded <span className="text-[#c9a227]">{stats.today}</span> entries today.
             </p>
           </div>
-          <div className="flex gap-4 z-10">
-            <Button 
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-2xl h-14 px-8 font-black transition-all"
-            >
-              {isRefreshing ? <Loader2 className="animate-spin h-5 w-5" /> : <RefreshCcw className="h-5 w-5 mr-2" />}
-              Sync Data
-            </Button>
-          </div>
+          <Button onClick={handleRefresh} disabled={isRefreshing} className="z-10 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-2xl h-14 px-8 font-black">
+            {isRefreshing ? <Loader2 className="animate-spin h-5 w-5" /> : <RefreshCcw className="h-5 w-5 mr-2" />}
+            Refresh Stats
+          </Button>
           <div className="absolute top-[-50%] right-[-10%] w-[400px] h-[400px] bg-[#c9a227]/10 rounded-full blur-[100px]" />
         </div>
 
-        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { label: 'Today\'s Visitors', value: stats.today, icon: Users, circle: 'bg-[#1a5c2e]/10', iconColor: 'text-[#1a5c2e]', sub: 'Live active entries' },
-            { label: 'Weekly Total', value: stats.week, icon: Calendar, circle: 'bg-[#c9a227]/10', iconColor: 'text-[#c9a227]', sub: 'Past 7 days performance' },
-            { label: 'Monthly Traffic', value: stats.month, icon: TrendingUp, circle: 'bg-[#0a2a1a]/10', iconColor: 'text-[#0a2a1a]', sub: 'Aggregated monthly log' }
-          ].map((s, i) => (
-            <Card key={i} className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] bg-white overflow-hidden group hover:scale-[1.02] transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-8">
-                <div className={`p-4 rounded-2xl ${s.circle} transition-transform group-hover:scale-110`}>
-                  <s.icon className={`h-6 w-6 ${s.iconColor}`} />
-                </div>
-                <div className="text-right">
-                  <CardTitle className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</CardTitle>
-                  <div className="text-5xl font-black text-[#0a2a1a] mt-1 tabular-nums">
-                    {visitsLoading ? <Skeleton className="h-12 w-20 ml-auto" /> : s.value}
+            { label: 'Today\'s Visitors', value: stats.today, prev: stats.yesterday, icon: Users, circle: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
+            { label: 'Weekly Total', value: stats.week, icon: Calendar, circle: 'bg-[#c9a227]/10', iconColor: 'text-[#c9a227]' },
+            { label: 'Monthly Traffic', value: stats.month, icon: TrendingUp, circle: 'bg-[#0a2a1a]/10', iconColor: 'text-[#0a2a1a]' }
+          ].map((s, i) => {
+            const isUp = s.prev !== undefined ? s.value >= s.prev : true;
+            return (
+              <Card key={i} className="border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden group hover:scale-[1.02] transition-all duration-300 border-t-4 border-[#c9a227]">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-8">
+                  <div className={`p-4 rounded-2xl ${s.circle}`}>
+                    <s.icon className={`h-6 w-6 ${s.iconColor}`} />
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="px-8 pb-8 pt-2 border-t border-slate-50 mt-2 flex justify-between items-center">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.sub}</p>
-                <span className="text-[9px] text-slate-300 font-bold uppercase">Updated {format(lastUpdated, 'p')}</span>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="text-right">
+                    <CardTitle className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</CardTitle>
+                    <div className="text-5xl font-black text-[#1a3a2a] mt-1 tabular-nums">
+                      {visitsLoading ? <Skeleton className="h-12 w-20 ml-auto" /> : <CountUp value={s.value} />}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-8 pb-8 pt-2 border-t border-[#f0f4f1] mt-2 flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    {s.prev !== undefined && (
+                      <span className={`text-[9px] font-black uppercase flex items-center ${isUp ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {isUp ? 'Trending Up' : 'Trending Down'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[9px] text-[#4a6741]/50 font-black uppercase">Updated {format(lastUpdated, 'p')}</span>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
-        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <Card className="rounded-[3rem] shadow-xl border-none bg-white p-10 space-y-10">
+          <Card className="rounded-[3rem] shadow-xl border border-[#d4e4d8] bg-white p-10 space-y-10">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-2xl font-black text-[#0a2a1a] tracking-tight">Visit Purpose Breakdown</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Student distribution by activity</p>
+                <h3 className="text-2xl font-black text-[#1a3a2a] tracking-tight">Visit Purpose Breakdown</h3>
+                <p className="text-[10px] text-[#4a6741] font-black uppercase tracking-widest mt-1">Activity distribution</p>
               </div>
-              <div className="p-3 bg-slate-50 rounded-2xl"><BookOpen className="h-5 w-5 text-slate-400" /></div>
+              <div className="p-3 bg-[#f0f4f1] rounded-2xl"><BookOpen className="h-5 w-5 text-[#1a3a2a]" /></div>
             </div>
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={purposeData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={80}
-                    outerRadius={120}
-                    paddingAngle={8}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {purposeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                  <Pie data={purposeData} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={8} dataKey="value" stroke="none">
+                    {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }}
-                  />
+                  <Tooltip contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {purposeData.map((p, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                  <span className="text-xs font-bold text-slate-600 truncate">{p.name}</span>
-                </div>
-              ))}
-            </div>
           </Card>
 
-          <Card className="rounded-[3rem] shadow-xl border-none bg-white p-10 space-y-10">
+          <Card className="rounded-[3rem] shadow-xl border border-[#d4e4d8] bg-white p-10 space-y-10">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-2xl font-black text-[#0a2a1a] tracking-tight">Top Active Colleges</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Most frequent visitor groups</p>
+                <h3 className="text-2xl font-black text-[#1a3a2a] tracking-tight">Top Active Colleges</h3>
+                <p className="text-[10px] text-[#4a6741] font-black uppercase tracking-widest mt-1">Frequent visitor groups</p>
               </div>
-              <div className="p-3 bg-slate-50 rounded-2xl"><GraduationCap className="h-5 w-5 text-slate-400" /></div>
+              <div className="p-3 bg-[#f0f4f1] rounded-2xl"><GraduationCap className="h-5 w-5 text-[#1a3a2a]" /></div>
             </div>
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={collegeData} layout="vertical">
                   <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    width={140} 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }}
-                  />
-                  <Tooltip 
-                    cursor={{ fill: 'transparent' }}
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }}
-                  />
+                  <YAxis dataKey="name" type="category" width={140} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 10, fontWeight: 900 }} />
+                  <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }} />
                   <Bar dataKey="count" radius={[0, 10, 10, 0]}>
-                    {collegeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                    {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -231,20 +209,19 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Analytics Insights */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { label: 'Peak Hour', value: insights.peakHour, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Most Active Day', value: insights.activeDay, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-50' },
-            { label: 'Popular Purpose', value: insights.topPurpose, icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+            { label: 'Peak Visit Hour', value: insights.peakHour, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Most Active Day', value: insights.activeDay, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
+            { label: 'Top Visit Purpose', value: insights.topPurpose, icon: BookOpen, color: 'text-[#0a2a1a]', bg: 'bg-slate-100' }
           ].map((item, i) => (
-            <div key={i} className="flex items-center gap-6 p-8 bg-white rounded-[2rem] shadow-lg border border-slate-50 group hover:border-[#c9a227]/20 transition-all">
+            <div key={i} className="flex items-center gap-6 p-8 bg-white rounded-[2rem] shadow-lg border-l-8 border-[#c9a227] group hover:border-[#1a3a2a] transition-all">
               <div className={`p-4 rounded-2xl ${item.bg} group-hover:scale-110 transition-transform`}>
                 <item.icon className={`h-6 w-6 ${item.color}`} />
               </div>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</p>
-                <p className="text-xl font-black text-[#0a2a1a] tracking-tight">{item.value}</p>
+                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{item.label}</p>
+                <p className="text-xl font-black text-[#1a3a2a] tracking-tight">{item.value}</p>
               </div>
             </div>
           ))}

@@ -2,14 +2,14 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Search, Filter, Download, UserX, UserCheck, Loader2, ArrowUpDown, ChevronLeft, ChevronRight, FileText, Trash2, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Search, Filter, Trash2, Loader2, ChevronLeft, ChevronRight, FileText, UserX, Calendar, Table as TableIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection } from '@/firebase';
 import { db, auth } from '@/firebase/config';
 import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, where, getDocs } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,35 +28,31 @@ export default function VisitorLogs() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Firestore Queries
   const visitsQuery = useMemo(() => query(collection(db, 'visits'), orderBy('timestamp', 'desc')), []);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
 
   const blocklistQuery = useMemo(() => query(collection(db, 'blocklist')), []);
   const { data: blocklist, loading: blocklistLoading } = useCollection(blocklistQuery);
 
-  // Blocking/Unblocking Logic
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Filtered visits
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
     return allVisits.filter(v => {
       const matchesSearch = v.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           v.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (v.college && v.college.toLowerCase().includes(searchTerm.toLowerCase()));
+                           v.studentId.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
-      return matchesSearch && matchesPurpose;
+      const matchesDate = !dateFilter || isSameDay(v.timestamp.toDate(), new Date(dateFilter));
+      return matchesSearch && matchesPurpose && matchesDate;
     });
-  }, [allVisits, searchTerm, purposeFilter]);
+  }, [allVisits, searchTerm, purposeFilter, dateFilter]);
 
-  // Pagination
   const paginatedVisits = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredVisits.slice(start, start + itemsPerPage);
@@ -72,14 +68,14 @@ export default function VisitorLogs() {
         studentId: selectedVisit.studentId,
         fullName: selectedVisit.fullName,
         reason: blockReason,
-        blockedBy: auth.currentUser?.email || 'System',
+        blockedBy: auth.currentUser?.email || 'Staff',
         blockedAt: Timestamp.now()
       });
-      toast({ title: "User Blocked", description: `${selectedVisit.fullName} has been restricted.` });
+      toast({ title: "Access Restricted", description: `${selectedVisit.fullName} is now blocked.` });
       setSelectedVisit(null);
       setBlockReason('');
     } catch (e: any) {
-      toast({ title: "Action Failed", description: e.message, variant: "destructive" });
+      toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -92,10 +88,10 @@ export default function VisitorLogs() {
       const snap = await getDocs(q);
       if (!snap.empty) {
         await deleteDoc(doc(db, 'blocklist', snap.docs[0].id));
-        toast({ title: "Access Restored", description: "Student can now enter the library again." });
+        toast({ title: "Access Restored", description: "Restriction removed." });
       }
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "Action Failed", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -104,292 +100,191 @@ export default function VisitorLogs() {
   const handleDeleteVisit = (visitId: string) => {
     const docRef = doc(db, 'visits', visitId);
     setIsProcessing(true);
-    
     deleteDoc(docRef)
       .then(() => {
-        toast({ title: "Record Deleted", description: "The visit log has been permanently removed." });
-        setDeleteId(null);
+        toast({ title: "Log Deleted", description: "Record removed from archives." });
       })
-      .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'delete',
-        } satisfies SecurityRuleContext);
-
-        errorEmitter.emit('permission-error', permissionError);
-        toast({ 
-          title: "Delete Failed", 
-          description: "Permission denied. Please ensure you are logged in as admin.", 
-          variant: "destructive" 
-        });
+      .catch(async (e) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' }));
       })
-      .finally(() => {
-        setIsProcessing(false);
-      });
+      .finally(() => setIsProcessing(false));
   };
 
-  const isBlocked = (studentId: string) => {
-    return blocklist?.some(b => b.studentId === studentId);
-  };
+  const isBlocked = (studentId: string) => blocklist?.some(b => b.studentId === studentId);
 
-  const exportFilteredData = () => {
-    if (filteredVisits.length === 0) return;
-    const pdfDoc = new jsPDF('l', 'mm', 'a4');
-    pdfDoc.setFontSize(22);
-    pdfDoc.setTextColor(10, 42, 26);
-    pdfDoc.text("NEU Library — Visitor Activity Log", 14, 20);
-    
-    pdfDoc.setFontSize(10);
-    pdfDoc.setTextColor(100);
-    pdfDoc.text(`Generated: ${format(new Date(), 'PPP p')}`, 14, 28);
-    pdfDoc.text(`Filter: ${purposeFilter} | Search: ${searchTerm || 'None'}`, 14, 33);
+  const exportPDF = () => {
+    const pdf = new jsPDF('l', 'mm', 'a4');
+    pdf.setFontSize(22);
+    pdf.setTextColor(26, 92, 46);
+    pdf.text("NEU Library — Visitor Activity Archives", 14, 20);
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(`Generated: ${format(new Date(), 'PPP p')} | Filtered Results: ${filteredVisits.length}`, 14, 28);
 
-    autoTable(pdfDoc, {
+    autoTable(pdf, {
       startY: 40,
-      head: [['ID', 'Full Name', 'College/Program', 'Purpose', 'Method', 'Date & Time']],
-      body: filteredVisits.map(v => [
-        v.studentId,
-        v.fullName,
-        `${v.college}\n${v.program}`,
-        v.purpose,
-        (v.loginMethod || 'id').toUpperCase(),
-        format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')
-      ]),
-      headStyles: { fillColor: [26, 92, 46], fontSize: 10 },
-      styles: { fontSize: 8 },
-      alternateRowStyles: { fillColor: [245, 245, 240] }
+      head: [['ID', 'Full Name', 'College', 'Purpose', 'Date & Time']],
+      body: filteredVisits.map(v => [v.studentId, v.fullName, v.college || '—', v.purpose, format(v.timestamp.toDate(), 'yyyy-MM-dd HH:mm')]),
+      headStyles: { fillColor: [26, 92, 46] },
+      alternateRowStyles: { fillColor: [240, 244, 241] }
     });
-
-    pdfDoc.save(`NEU-Library-Logs-${format(new Date(), 'yyyyMMdd-HHmm')}.pdf`);
-    toast({ title: "Log Exported", description: "Current view has been saved to PDF." });
+    pdf.save(`NEU-Visitor-Log-${format(new Date(), 'yyyyMMdd')}.pdf`);
   };
 
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h2 className="text-4xl font-black text-[#0a2a1a] tracking-tight">Visitor Activity Logs</h2>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Detailed history of all library entries</p>
+            <h2 className="text-4xl font-black text-[#1a3a2a] tracking-tight">Visitor Activity Logs</h2>
+            <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Archive of all library entries</p>
           </div>
-          <Button 
-            onClick={exportFilteredData}
-            className="h-14 px-8 rounded-2xl bg-[#c9a227] text-[#0a2a1a] font-black flex gap-2 hover:bg-[#b08d20] shadow-lg shadow-[#c9a227]/20 w-full md:w-auto"
-          >
-            <FileText className="h-5 w-5" /> Export View to PDF
-          </Button>
+          <div className="flex gap-4 w-full md:w-auto">
+             <Badge className="bg-[#f0f4f1] text-[#1a3a2a] border-[#d4e4d8] px-6 h-14 flex items-center font-black text-xs rounded-2xl">
+              {filteredVisits.length} Records Found
+             </Badge>
+             <Button onClick={exportPDF} className="h-14 px-8 rounded-2xl bg-[#c9a227] text-[#0a2a1a] font-black flex gap-2 hover:bg-[#b08d20] shadow-lg">
+              <FileText className="h-5 w-5" /> Export PDF
+            </Button>
+          </div>
         </div>
 
-        {/* Search & Filters */}
-        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden">
+        <Card className="rounded-[2.5rem] border-[#d4e4d8] shadow-xl bg-white overflow-hidden">
           <CardContent className="p-8">
-            <div className="flex flex-col md:flex-row gap-6 items-end">
-              <div className="flex-1 w-full space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Search Records</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Search Name / ID</Label>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                  <Input 
-                    placeholder="Filter by name, ID, or college..." 
-                    className="h-14 pl-12 rounded-2xl bg-slate-50 border-none font-bold text-slate-700 w-full"
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                  />
+                  <Input placeholder="Search..." className="h-14 pl-12 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
               </div>
-              <div className="w-full md:w-64 space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Filter by Purpose</Label>
-                <select 
-                  className="w-full h-14 px-6 rounded-2xl bg-slate-50 border-none font-bold text-slate-700 appearance-none cursor-pointer"
-                  value={purposeFilter}
-                  onChange={(e) => { setPurposeFilter(e.target.value); setCurrentPage(1); }}
-                >
-                  <option value="all">All Purposes</option>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Filter Purpose</Label>
+                <select className="w-full h-14 px-6 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a] appearance-none" value={purposeFilter} onChange={(e) => setPurposeFilter(e.target.value)}>
+                  <option value="all">All Activities</option>
                   <option value="Reading Books">Reading Books</option>
                   <option value="Research / Study">Research / Study</option>
                   <option value="Computer / Internet">Computer / Internet</option>
                   <option value="Group Discussion">Group Discussion</option>
                   <option value="Thesis / Archival">Thesis / Archival</option>
-                  <option value="Other Purpose">Other Purpose</option>
                 </select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Filter Date</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                  <Input type="date" className="h-14 pl-12 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Main Logs Table */}
-        <Card className="rounded-[3rem] border-none shadow-2xl bg-white overflow-hidden">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-[#0a2a1a] hover:bg-[#0a2a1a]">
-                <TableRow className="border-none hover:bg-transparent">
-                  <TableHead className="px-8 h-16 font-black text-white uppercase tracking-widest text-[10px]">#</TableHead>
-                  <TableHead className="h-16 font-black text-white uppercase tracking-widest text-[10px]">Student ID</TableHead>
-                  <TableHead className="h-16 font-black text-white uppercase tracking-widest text-[10px]">Visitor Info</TableHead>
-                  <TableHead className="h-16 font-black text-white uppercase tracking-widest text-[10px]">Purpose</TableHead>
-                  <TableHead className="h-16 font-black text-white uppercase tracking-widest text-[10px]">Time</TableHead>
-                  <TableHead className="h-16 font-black text-white uppercase tracking-widest text-[10px]">Status</TableHead>
-                  <TableHead className="px-8 h-16 text-right font-black text-white uppercase tracking-widest text-[10px]">Actions</TableHead>
+        <Card className="rounded-[3rem] border-[#d4e4d8] shadow-2xl bg-white overflow-hidden">
+          <Table>
+            <TableHeader className="bg-[#f0f4f1]">
+              <TableRow className="border-none hover:bg-transparent">
+                <TableHead className="px-8 h-16 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">#</TableHead>
+                <TableHead className="h-16 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Student ID</TableHead>
+                <TableHead className="h-16 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Visitor Info</TableHead>
+                <TableHead className="h-16 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Activity</TableHead>
+                <TableHead className="h-16 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Timestamp</TableHead>
+                <TableHead className="h-16 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Status</TableHead>
+                <TableHead className="px-8 h-16 text-right font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visitsLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}><TableCell colSpan={7} className="px-8 py-6"><Skeleton className="h-14 w-full rounded-2xl" /></TableCell></TableRow>
+                ))
+              ) : paginatedVisits.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-96 text-center">
+                    <div className="flex flex-col items-center justify-center opacity-10 gap-4">
+                      <TableIcon className="h-24 w-24" />
+                      <p className="text-3xl font-black uppercase tracking-tighter">No Logs Found</p>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visitsLoading || blocklistLoading ? (
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={7} className="px-8"><Skeleton className="h-14 w-full rounded-2xl" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : paginatedVisits.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-96 text-center">
-                      <div className="flex flex-col items-center justify-center opacity-20 space-y-4">
-                        <Search className="h-24 w-24" />
-                        <p className="text-2xl font-black uppercase">No records found</p>
+              ) : paginatedVisits.map((v, i) => {
+                const blocked = isBlocked(v.studentId);
+                return (
+                  <TableRow key={v.id} className="group hover:bg-[#f0f4f1]/50 border-b-[#f0f4f1]">
+                    <TableCell className="px-8 text-[#4a6741]/40 font-black text-[10px]">{(currentPage - 1) * itemsPerPage + i + 1}</TableCell>
+                    <TableCell className="font-mono text-sm font-bold text-slate-500">{v.studentId}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-black text-[#1a3a2a]">{v.fullName}</span>
+                        <span className="text-[9px] font-black text-[#4a6741]/60 uppercase tracking-widest">{v.college || '—'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="bg-[#1a3a2a]/5 text-[#1a3a2a] border-none px-4 py-1 font-black rounded-full text-[9px] uppercase">
+                        {v.purpose}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-slate-400 font-bold text-[10px] tabular-nums">
+                      {format(v.timestamp.toDate(), 'MMM dd, hh:mm a')}
+                    </TableCell>
+                    <TableCell>
+                      {blocked ? (
+                        <Badge className="bg-red-50 text-red-600 border-none px-4 py-1 font-black rounded-full text-[9px] uppercase">Restricted</Badge>
+                      ) : (
+                        <Badge className="bg-emerald-50 text-emerald-600 border-none px-4 py-1 font-black rounded-full text-[9px] uppercase">Active</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-8 text-right space-x-2">
+                      <div className="flex justify-end gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-red-500 hover:bg-red-50">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="rounded-[2rem] p-10 max-w-md">
+                            <AlertDialogHeader><AlertDialogTitle className="text-2xl font-black text-[#1a3a2a]">Delete Log?</AlertDialogTitle></AlertDialogHeader>
+                            <AlertDialogDescription className="text-[#4a6741] font-bold">This permanent action removes the record for <span className="text-[#1a3a2a]">{v.fullName}</span>.</AlertDialogDescription>
+                            <AlertDialogFooter className="mt-8 gap-4">
+                              <AlertDialogCancel className="rounded-xl h-12 font-black">Cancel</AlertDialogCancel>
+                              <AlertDialogAction className="rounded-xl h-12 font-black bg-red-600 hover:bg-red-700" onClick={() => handleDeleteVisit(v.id)}>Delete Now</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        {blocked ? (
+                          <Button size="sm" className="h-9 px-6 rounded-full font-black text-[9px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50" variant="outline" onClick={() => handleUnblockUser(v.studentId)}>Unblock</Button>
+                        ) : (
+                          <Dialog>
+                            <DialogTrigger asChild><Button size="sm" className="h-9 px-6 rounded-full font-black text-[9px] uppercase bg-[#9b1c1c] hover:bg-red-900" onClick={() => setSelectedVisit(v)}>Block</Button></DialogTrigger>
+                            <DialogContent className="rounded-[2.5rem] p-10 max-w-lg">
+                              <DialogHeader><DialogTitle className="text-3xl font-black text-[#1a3a2a]">Restrict Student</DialogTitle></DialogHeader>
+                              <DialogDescription className="text-[#4a6741] font-bold">Block access for <span className="text-red-700 underline">{selectedVisit?.fullName}</span>?</DialogDescription>
+                              <div className="py-6 space-y-2">
+                                <Label className="font-black text-[9px] uppercase tracking-widest">Reason</Label>
+                                <Textarea className="rounded-2xl bg-[#f0f4f1] p-5 font-bold" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Describe violation..." />
+                              </div>
+                              <DialogFooter className="gap-4">
+                                <Button variant="outline" className="rounded-2xl h-14 px-8 font-black" onClick={() => setSelectedVisit(null)}>Cancel</Button>
+                                <Button className="rounded-2xl h-14 px-10 font-black bg-red-600" disabled={!blockReason || isProcessing} onClick={handleBlockUser}>Confirm Block</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : paginatedVisits.map((v, i) => {
-                  const blocked = isBlocked(v.studentId);
-                  return (
-                    <TableRow key={v.id} className="group hover:bg-slate-50 transition-colors border-b-slate-50">
-                      <TableCell className="px-8 text-slate-300 font-black text-xs">{(currentPage - 1) * itemsPerPage + i + 1}</TableCell>
-                      <TableCell className="font-mono text-sm font-bold text-slate-500">{v.studentId}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-black text-[#0a2a1a]">{v.fullName}</span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate max-w-[150px]">{v.program || 'N/A'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-[#1a5c2e]/5 text-[#1a5c2e] hover:bg-[#1a5c2e]/10 border-none px-4 py-1.5 font-black rounded-full text-[9px] uppercase">
-                          {v.purpose}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-slate-400 font-bold text-[10px] tabular-nums">
-                        {v.timestamp ? format(v.timestamp.toDate(), 'MMM dd, hh:mm a') : '---'}
-                      </TableCell>
-                      <TableCell>
-                        {blocked ? (
-                          <Badge className="bg-red-50 text-red-600 hover:bg-red-50 border-none px-4 py-1.5 font-black rounded-full text-[9px] uppercase">Blocked</Badge>
-                        ) : (
-                          <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-50 border-none px-4 py-1.5 font-black rounded-full text-[9px] uppercase">Active</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="px-8 text-right">
-                        <div className="flex justify-end gap-2">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                disabled={isProcessing}
-                                className="h-9 w-9 text-slate-300 hover:text-red-500 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl p-10 max-w-md">
-                              <AlertDialogHeader className="space-y-4">
-                                <AlertDialogTitle className="text-2xl font-black text-[#0a2a1a]">Delete Record?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-slate-500 font-medium">
-                                  This will permanently remove the visit log for <span className="font-black">{v.fullName}</span>. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter className="mt-8 gap-4">
-                                <AlertDialogCancel className="rounded-xl h-12 font-black">Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  className="rounded-xl h-12 font-black bg-red-600 hover:bg-red-700"
-                                  onClick={() => handleDeleteVisit(v.id)}
-                                >
-                                  Delete Log
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-
-                          {blocked ? (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              disabled={isProcessing}
-                              className="h-9 px-6 rounded-full font-black text-[9px] uppercase text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                              onClick={() => handleUnblockUser(v.studentId)}
-                            >
-                              Unblock
-                            </Button>
-                          ) : (
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  className="h-9 px-6 rounded-full font-black text-[9px] uppercase bg-red-500 hover:bg-red-600 shadow-md"
-                                  onClick={() => setSelectedVisit(v)}
-                                >
-                                  Block
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-10 max-w-lg">
-                                <DialogHeader className="space-y-4">
-                                  <DialogTitle className="text-3xl font-black text-[#0a2a1a]">Restrict Access</DialogTitle>
-                                  <DialogDescription className="text-slate-500 font-medium">
-                                    Are you sure you want to block <span className="text-red-600 font-black underline">{selectedVisit?.fullName}</span>? This student will be immediately denied entry.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="py-8 space-y-3">
-                                  <Label className="font-black text-[#0a2a1a] text-[10px] uppercase tracking-widest ml-1">Reason for blocking</Label>
-                                  <Textarea 
-                                    placeholder="Describe the violation..." 
-                                    className="rounded-2xl border-slate-100 bg-slate-50 focus:bg-white min-h-[140px] p-5 font-bold text-sm"
-                                    value={blockReason}
-                                    onChange={(e) => setBlockReason(e.target.value)}
-                                  />
-                                </div>
-                                <DialogFooter className="gap-4">
-                                  <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-slate-200" onClick={() => setSelectedVisit(null)}>Cancel</Button>
-                                  <Button 
-                                    variant="destructive" 
-                                    className="rounded-2xl h-14 px-10 font-black shadow-lg"
-                                    disabled={isProcessing || !blockReason}
-                                    onClick={handleBlockUser}
-                                  >
-                                    {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm Block"}
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            
-            <div className="p-8 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Showing <span className="text-[#0a2a1a] font-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-[#0a2a1a] font-black">{Math.min(currentPage * itemsPerPage, filteredVisits.length)}</span> of <span className="text-[#0a2a1a] font-black">{filteredVisits.length}</span> entries
-              </p>
-              <div className="flex gap-4">
-                <Button 
-                  variant="outline" 
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="rounded-xl h-12 px-6 font-black border-slate-200 text-slate-600 hover:bg-white transition-all"
-                >
-                  <ChevronLeft className="h-5 w-5 mr-2" /> Previous
-                </Button>
-                <Button 
-                  variant="outline" 
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="rounded-xl h-12 px-6 font-black border-slate-200 text-slate-600 hover:bg-white transition-all"
-                >
-                  Next <ChevronRight className="h-5 w-5 ml-2" />
-                </Button>
-              </div>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <div className="p-8 bg-[#f0f4f1]/50 flex justify-between items-center">
+            <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">Showing {Math.min((currentPage - 1) * itemsPerPage + 1, filteredVisits.length)} to {Math.min(currentPage * itemsPerPage, filteredVisits.length)} of {filteredVisits.length} entries</p>
+            <div className="flex gap-4">
+              <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="rounded-xl h-12 px-6 font-black border-[#d4e4d8] text-[#4a6741]">Previous</Button>
+              <Button variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="rounded-xl h-12 px-6 font-black border-[#d4e4d8] text-[#4a6741]">Next</Button>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
     </AdminLayout>
