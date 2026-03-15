@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, ChevronRight, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser, useCollection, useFirestore, useAuth } from '@/firebase';
@@ -98,30 +98,30 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
+    <SidebarProvider style={{ "--sidebar-width": "240px" } as React.CSSProperties}>
       <div className="flex min-h-screen bg-[#f0f4f1] w-full font-body">
         <Sidebar className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white">
-          <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
+          <SidebarHeader className="p-5 border-b border-[#c9a227]/10 flex flex-col items-center gap-3">
             <img 
               src="/neu-logo.png" 
               alt="NEU Logo" 
-              width={64} 
-              height={64} 
-              className="rounded-full shadow-xl border border-[#c9a227]/40" 
+              width={48} 
+              height={48} 
+              className="rounded-full shadow-lg border border-[#c9a227]/40" 
             />
             <div className="text-center pb-2 border-b border-[#c9a227]/40 w-full">
-              <h2 className="text-base font-black text-[#c9a227] tracking-tight uppercase leading-none">NEU Library</h2>
-              <p className="text-[8px] text-white/40 font-bold uppercase tracking-widest mt-1">Management Portal</p>
+              <h2 className="text-sm font-black text-[#c9a227] tracking-tight uppercase leading-none">NEU Library</h2>
+              <p className="text-[8px] text-white/40 font-bold uppercase tracking-widest mt-1">Management</p>
             </div>
           </SidebarHeader>
-          <SidebarContent className="p-3 mt-2 space-y-1">
+          <SidebarContent className="p-3 mt-1 space-y-1">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === item.path}
-                    className={`h-11 rounded-xl px-4 transition-all ${
+                    className={`h-10 rounded-xl px-4 transition-all ${
                       pathname === item.path 
                         ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-lg' 
                         : 'text-white/60 hover:bg-white/5 hover:text-white font-bold'
@@ -129,7 +129,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   >
                     <Link href={item.path} className="flex items-center gap-3">
                       <item.icon className={`h-4 w-4 ${pathname === item.path ? 'text-[#0a2a1a]' : 'text-[#c9a227]'}`} />
-                      <span className="text-xs">{item.label}</span>
+                      <span className="text-[11px]">{item.label}</span>
                       {item.badge !== undefined && item.badge > 0 && (
                         <Badge className={`ml-auto ${item.badgeColor} text-white border-none text-[8px] font-black px-2 py-0.5 rounded-full`}>
                           {item.badge}
@@ -145,43 +145,43 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <Button 
               variant="ghost" 
               onClick={() => setShowLogoutModal(true)}
-              className="w-full justify-start gap-3 h-11 rounded-xl text-red-400 hover:bg-red-400/10 hover:text-red-400 font-black transition-all"
+              className="w-full justify-start gap-3 h-10 rounded-xl text-red-400 hover:bg-red-400/10 hover:text-red-400 font-black transition-all"
             >
               <LogOut className="h-4 w-4" />
-              <span className="text-xs">Logout</span>
+              <span className="text-[11px]">Logout</span>
             </Button>
           </SidebarFooter>
         </Sidebar>
         
-        <SidebarInset className="flex flex-col flex-1">
-          <header className="h-16 bg-white border-b border-[#d4e4d8] flex items-center justify-between px-8 sticky top-0 z-50 shadow-sm">
+        <SidebarInset className="flex flex-col flex-1 overflow-y-auto">
+          <header className="h-14 bg-white border-b border-[#d4e4d8] flex items-center justify-between px-6 sticky top-0 z-50 shadow-sm">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="text-[#1a3a2a]" />
               <div className="h-6 w-px bg-[#d4e4d8]" />
               <div>
-                <h1 className="text-lg font-black text-[#1a3a2a] tracking-tight">
+                <h1 className="text-sm font-black text-[#1a3a2a] tracking-tight">
                   {navItems.find(i => i.path === pathname)?.label || 'Administration'}
                 </h1>
-                <p className="text-[9px] font-bold text-[#4a6741] uppercase tracking-widest">
+                <p className="text-[8px] font-bold text-[#4a6741] uppercase tracking-widest">
                   {format(currentTime, 'EEEE, MMMM do')}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-black text-[#1a3a2a]">{user?.displayName || 'Authorized Admin'}</p>
-                <p className="text-[9px] font-black text-[#c9a227] uppercase tracking-widest tabular-nums">
+                <p className="text-[10px] font-black text-[#1a3a2a]">{user?.displayName || 'Admin'}</p>
+                <p className="text-[8px] font-black text-[#c9a227] uppercase tracking-widest tabular-nums">
                   {format(currentTime, 'hh:mm:ss a')}
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-[#0a2a1a] border border-[#c9a227]/30 flex items-center justify-center text-[#c9a227] font-black shadow-sm text-xs">
+              <div className="h-9 w-9 rounded-xl bg-[#0a2a1a] border border-[#c9a227]/30 flex items-center justify-center text-[#c9a227] font-black shadow-sm text-[10px]">
                 {user?.displayName?.charAt(0) || 'A'}
               </div>
             </div>
           </header>
 
-          <main className="p-8 flex-1 bg-[#f0f4f1] animate-in fade-in duration-500 min-h-0">
+          <main className="p-6 flex-1 bg-[#f0f4f1] animate-in fade-in duration-500">
             {children}
           </main>
         </SidebarInset>
@@ -191,7 +191,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <AlertDialogHeader className="space-y-3">
               <AlertDialogTitle className="text-2xl font-black text-[#1a3a2a]">End Session?</AlertDialogTitle>
               <AlertDialogDescription className="text-[#4a6741] font-medium text-sm">
-                Are you sure you want to logout of the management portal?
+                Are you sure you want to logout?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-6 gap-3">

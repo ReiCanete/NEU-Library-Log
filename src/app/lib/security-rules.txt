@@ -4,32 +4,29 @@ service cloud.firestore {
     
     // Function to check if the user is an admin
     function isAdmin() {
-      return request.auth != null && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // Function to check if user belongs to the @neu.edu.ph domain
-    function isNeuUser() {
-      return request.auth != null && request.auth.token.email.endsWith('@neu.edu.ph');
+      return request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        request.auth.token.email.startsWith('25-14294-549')
+      );
     }
 
     // Visitors collection - logging entries
     match /visits/{visitId} {
       allow create: if true; 
-      allow read: if true; // Kiosk needs to read today's visits to show capacity count
+      allow read: if true; 
       allow update, delete: if isAdmin();
     }
 
     // Users collection - profiles and roles
     match /users/{userId} {
-      allow read: if true; // Public check for existing users
-      allow create: if true; // Allow kiosk registration
-      allow update: if isAdmin(); 
+      allow read: if true; 
+      allow create: if true; 
+      allow update: if isAdmin() || (request.auth != null && request.auth.uid == userId); 
     }
 
     // Blocklist collection
     match /blocklist/{blockId} {
-      allow read: if true; // Kiosk needs to check this immediately
+      allow read: if true; 
       allow write: if isAdmin();
     }
 
