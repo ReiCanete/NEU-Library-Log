@@ -48,6 +48,13 @@ export default function KioskEntry() {
     handleRedirect();
   }, [router]);
 
+  // Handle mode change via side effect to avoid rendering phase navigation
+  useEffect(() => {
+    if (loginMode === 'admin') {
+      router.push('/admin/login');
+    }
+  }, [loginMode, router]);
+
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!studentId.trim() || loading) return;
@@ -67,8 +74,6 @@ export default function KioskEntry() {
       } else { router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}`); }
     } catch (err: any) { setError(err.message); setLoading(false); }
   };
-
-  if (loginMode === 'admin') router.push('/admin/login');
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col items-center justify-center p-4 overflow-hidden relative">
