@@ -13,21 +13,23 @@ export const firebaseConfig = {
   appId: "1:225328847693:web:4cfc1ea413e17269cf3504"
 };
 
-// Singleton pattern to handle Next.js HMR reloads safely and prevent "ID: ca9" errors
+// Singleton pattern to handle Next.js HMR reloads safely
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
 if (typeof window !== 'undefined') {
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
+  const globalApp = (globalThis as any)._firebaseApp as FirebaseApp | undefined;
+  if (globalApp) {
+    app = globalApp;
   } else {
-    app = getApp();
+    app = initializeApp(firebaseConfig);
+    (globalThis as any)._firebaseApp = app;
   }
   auth = getAuth(app);
   db = getFirestore(app);
 } else {
-  // Server-side placeholder (needed for initial render in App Router)
+  // Server-side placeholder
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);

@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, Megaphone, ShieldX } from 'lucide-react';
 import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, onSnapshot } from 'firebase/firestore';
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { getRedirectResult, GoogleAuthProvider, signInWithRedirect, signOut } from 'firebase/auth';
+import { auth, db } from '@/firebase/config';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { startOfDay } from 'date-fns';
 import { validateStudentId } from '@/lib/validation';
@@ -20,8 +21,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 function KioskEntryContent() {
   const router = useRouter();
   const { toast } = useToast();
-  const auth = useAuth();
-  const db = useFirestore();
   const inputRef = useRef<HTMLInputElement>(null);
   
   const [studentId, setStudentId] = useState('');
@@ -55,13 +54,17 @@ function KioskEntryContent() {
       const now = new Date();
       const docs = snapshot.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter((a: any) => a.startDate.toDate() <= now && a.endDate.toDate() >= now);
+        .filter((a: any) => {
+          const start = (a.startDate as any)?.toDate ? a.startDate.toDate() : new Date(a.startDate);
+          const end = (a.endDate as any)?.toDate ? a.endDate.toDate() : new Date(a.endDate);
+          return start <= now && end >= now;
+        });
       setActiveAnnouncements(docs);
       setCurrentIndex(0);
     });
 
     return () => unsubscribe();
-  }, [db]);
+  }, []);
 
   // Cycle Announcements
   useEffect(() => {
@@ -74,76 +77,84 @@ function KioskEntryContent() {
 
   // Handle Google Redirect Result on Mount
   useEffect(() => {
-    const handleRedirect = async () => {
-      if (!auth || !db) return;
+    const handleGoogleRedirect = async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (result?.user) {
-          const user = result.user;
-          
-          // Institutional domain check
-          if (!user.email?.endsWith('@neu.edu.ph')) {
-            await signOut(auth);
-            setError('Only @neu.edu.ph Google accounts are allowed.');
-            setLoading(false);
-            return;
-          }
-
-          // Blocklist check
-          const blockSnap = await getDocs(query(
-            collection(db, 'blocklist'),
-            where('studentId', '==', user.email)
-          ));
-          if (!blockSnap.empty) {
-            await signOut(auth);
-            setError('Your account has been restricted. Contact library staff.');
-            setLoading(false);
-            return;
-          }
-
-          // User existence check
-          const userSnap = await getDocs(query(
-            collection(db, 'users'),
-            where('email', '==', user.email)
-          ));
-
-          if (userSnap.empty) {
-            sessionStorage.setItem('kiosk_google_user', JSON.stringify({
-              email: user.email,
-              fullName: user.displayName || '',
-              loginMethod: 'google'
-            }));
-            router.push('/kiosk/register');
-          } else {
-            const userData = userSnap.docs[0].data();
-            sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-              studentId: userData.studentId || user.email,
-              fullName: userData.displayName || userData.fullName,
-              college: userData.college || '',
-              loginMethod: 'google'
-            }));
-            router.push('/kiosk/purpose');
-          }
-        } else {
+        if (!result?.user) {
           setLoading(false);
+          return;
+        }
+        
+        const user = result.user;
+        
+        // 1. Check domain
+        if (!user.email?.endsWith('@neu.edu.ph')) {
+          await signOut(auth);
+          setError('Only @neu.edu.ph Google accounts are allowed.');
+          setLoading(false);
+          return;
+        }
+        
+        // 2. Check blocklist
+        const blockSnap = await getDocs(
+          query(collection(db, 'blocklist'), where('studentId', '==', user.email))
+        );
+        if (!blockSnap.empty) {
+          await signOut(auth);
+          setError('Your account has been restricted. Please contact library staff.');
+          setLoading(false);
+          return;
+        }
+        
+        // 3. Check if user exists in users collection
+        const userSnap = await getDocs(
+          query(collection(db, 'users'), where('email', '==', user.email))
+        );
+        
+        if (userSnap.empty) {
+          // First time — go to registration
+          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+            studentId: user.email,
+            fullName: user.displayName || '',
+            email: user.email,
+            loginMethod: 'google',
+            isNew: true
+          }));
+          router.push('/kiosk/register?id=' + encodeURIComponent(user.email));
+        } else {
+          // Existing user — go to purpose selection
+          const userData = userSnap.docs[0].data();
+          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+            studentId: userData.studentId || user.email,
+            fullName: userData.fullName || userData.displayName,
+            college: userData.college || userData.College || '',
+            email: user.email,
+            loginMethod: 'google'
+          }));
+          router.push('/kiosk/purpose');
         }
       } catch (err: any) {
         if (err.code !== 'auth/popup-closed-by-user') {
-          logAppError('KioskEntry', 'GoogleRedirect', err);
-          setError(getErrorMessage(err));
+          console.error('[NEU Library Log] Google redirect error:', err);
+          setError('Sign-in failed. Please try again.');
         }
         setLoading(false);
       }
     };
-    handleRedirect();
-  }, [auth, db, router]);
+    
+    handleGoogleRedirect();
+  }, [router]);
 
-  const handleGoogleSignIn = () => {
-    if (!auth) return;
-    setLoading(true);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ hd: 'neu.edu.ph' });
-    signInWithRedirect(auth, provider);
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ hd: 'neu.edu.ph' });
+      await signInWithRedirect(auth, provider);
+    } catch (err) {
+      console.error('Google sign-in error:', err);
+      setLoading(false);
+    }
   };
 
   const handleIdSubmit = async (e?: React.FormEvent) => {
@@ -178,7 +189,7 @@ function KioskEntryContent() {
         const d = userSnap.docs[0].data();
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
           studentId: d.studentId, 
-          fullName: d.displayName, 
+          fullName: d.displayName || d.fullName, 
           college: d.college, 
           program: d.program, 
           loginMethod: 'id' 

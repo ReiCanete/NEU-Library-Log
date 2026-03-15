@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, Suspense, useEffect, useMemo } from 'react';
@@ -54,20 +53,26 @@ function RegisterForm() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    const googleUserJson = sessionStorage.getItem('kiosk_google_user');
-    if (googleUserJson) {
-      const googleUser = JSON.parse(googleUserJson);
-      setFullName(googleUser.fullName || '');
-      setStudentId(googleUser.email.split('@')[0]);
-      setEmail(googleUser.email);
-      setLoginMethod('google');
-    } else {
-      const idParam = searchParams.get('id');
-      if (idParam) {
-        setStudentId(idParam);
-      } else {
-        router.push('/');
+    // Check for visitor data from Google redirect
+    const visitorDataJson = sessionStorage.getItem('kiosk_visitor');
+    if (visitorDataJson) {
+      const visitor = JSON.parse(visitorDataJson);
+      if (visitor.isNew) {
+        setFullName(visitor.fullName || '');
+        setStudentId(visitor.studentId);
+        setEmail(visitor.email);
+        setLoginMethod('google');
+        return;
       }
+    }
+
+    // Fallback to ID param from manual entry
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      setStudentId(idParam);
+      setLoginMethod('id');
+    } else {
+      router.push('/');
     }
   }, [searchParams, router]);
 
@@ -120,7 +125,7 @@ function RegisterForm() {
         college: selectedCollege,
         program: selectedProgram || 'N/A',
         studentId: studentId,
-        email: email || `${studentId}@neu.edu.ph`,
+        email: email || (loginMethod === 'id' ? `${studentId}@neu.edu.ph` : email),
         role: 'user',
         blocked: false,
         createdAt: new Date()
@@ -128,6 +133,7 @@ function RegisterForm() {
 
       await setDoc(doc(db, 'users', userId), userData, { merge: true });
 
+      // Update session storage for the purpose page
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
         studentId: studentId,
         fullName: fullName,
@@ -136,7 +142,6 @@ function RegisterForm() {
         loginMethod: loginMethod
       }));
       
-      sessionStorage.removeItem('kiosk_google_user');
       router.push('/kiosk/purpose');
     } catch (err: any) {
       logAppError('Registration', 'SaveUser', err);
@@ -150,7 +155,7 @@ function RegisterForm() {
       <title>NEU Library Log — Registration</title>
       <div className="absolute top-6 left-6">
         <Button variant="ghost" onClick={() => {
-          sessionStorage.removeItem('kiosk_google_user');
+          sessionStorage.removeItem('kiosk_visitor');
           router.push('/');
         }} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -176,7 +181,7 @@ function RegisterForm() {
           <div className="space-y-4">
             <div className="space-y-1">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Assigned ID</Label>
-              <Input value={studentId} readOnly className="h-12 text-xl font-mono bg-black/40 border-[#c9a227]/20 text-white/50 rounded-xl px-4" />
+              <Input value={studentId} readOnly className="h-12 text-sm font-mono bg-black/40 border-[#c9a227]/20 text-white/50 rounded-xl px-4" />
             </div>
 
             <div className="space-y-1">
