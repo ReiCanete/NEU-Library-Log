@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, Suspense, useEffect, useMemo, useRef } from 'react';
+import { useState, Suspense, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,9 @@ import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, Check, ChevronDown, UserPlus, ArrowLeft, Lock, Sparkles, CheckCircle2, Mail } from 'lucide-react';
+import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock } from 'lucide-react';
 import { validateFullName, validateStudentId } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const COLLEGES = [
   { name: "College of Accountancy", programs: ["BS Accountancy", "BS Accounting Information System"] },
@@ -218,7 +217,7 @@ function RegisterForm() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-neu rounded-[2rem] p-8 space-y-5 shadow-2xl border-none">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="glass-neu rounded-[2rem] p-8 space-y-5 shadow-2xl border-none">
           {formError && (
             <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
               <p className="text-red-200 text-[9px] font-black uppercase text-center tracking-widest">{formError}</p>
@@ -251,7 +250,7 @@ function RegisterForm() {
                 className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-[#c9a227]/20" 
                 value={studentId} 
                 onChange={(e) => setStudentId(e.target.value)} 
-                onKeyDown={handleStudentIdIdKeyDown}
+                onKeyDown={handleStudentIdKeyDown}
                 required 
               />
             </div>
@@ -283,7 +282,7 @@ function RegisterForm() {
 
               {isDropdownOpen && (
                 <div 
-                  className="absolute bottom-full mb-1 left-0 w-full z-50 rounded-xl overflow-hidden"
+                  className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden"
                   style={{
                     background: '#071a0f',
                     border: '1px solid #c9a227',
@@ -300,7 +299,7 @@ function RegisterForm() {
                         border: 'none',
                         borderBottom: '1px solid #c9a227',
                         color: 'white',
-                        padding: '12px 16px',
+                        padding: '10px 16px',
                         width: '100%',
                         outline: 'none',
                         fontSize: '14px'
@@ -316,11 +315,11 @@ function RegisterForm() {
                       <div key={i}>
                         {opt.type === 'header' && (
                           <div style={{
-                            padding: '10px 16px 4px',
+                            padding: '8px 16px 4px',
                             color: '#c9a227',
-                            fontSize: '10px',
-                            fontWeight: '700',
-                            letterSpacing: '0.15em',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            letterSpacing: '0.1em',
                             textTransform: 'uppercase',
                             background: '#071a0f',
                             borderTop: i > 0 ? '1px solid rgba(201, 162, 39, 0.1)' : 'none'
@@ -331,11 +330,10 @@ function RegisterForm() {
                         {(opt.type === 'item' || opt.type === 'non-student') && (
                           <div 
                             style={{
-                              padding: '12px 16px',
+                              padding: '10px 16px',
                               color: 'white',
                               cursor: 'pointer',
-                              fontSize: '13px',
-                              fontWeight: '600',
+                              fontSize: '14px',
                               transition: 'all 0.2s',
                               borderLeft: (selectedProgram === opt.label || selectedCollege === opt.label) ? '3px solid #c9a227' : '3px solid transparent',
                               background: hoveredOption === opt.label ? '#0d3d24' : 'transparent',
