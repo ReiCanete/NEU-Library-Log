@@ -93,8 +93,6 @@ export default function VisitorLogs() {
   
   const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [enrichedVisits, setEnrichedVisits] = useState<any[]>([]);
-  const [enriching, setEnriching] = useState(false);
 
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<any>(null);
@@ -105,38 +103,9 @@ export default function VisitorLogs() {
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
 
-  useEffect(() => {
-    if (!allVisits || !db) return;
-    
-    const enrich = async () => {
-      setEnriching(true);
-      const enriched = await Promise.all(allVisits.map(async (visit) => {
-        if (!visit.college && visit.studentId) {
-          try {
-            const userSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', visit.studentId)));
-            if (!userSnap.empty) {
-              const userData = userSnap.docs[0].data();
-              return {
-                ...visit,
-                college: userData.college || visit.college || '',
-                program: userData.program || visit.program || '',
-                visitorType: userData.visitorType || visit.visitorType || 'Student',
-                email: userData.email || visit.email || ''
-              };
-            }
-          } catch (e) {}
-        }
-        return visit;
-      }));
-      setEnrichedVisits(enriched);
-      setEnriching(false);
-    };
-
-    enrich();
-  }, [allVisits, db]);
-
   const filteredVisits = useMemo(() => {
-    return enrichedVisits.filter(v => {
+    if (!allVisits) return [];
+    return allVisits.filter(v => {
       const visitType = v.visitorType || 'Student';
       const matchesSearch = (v.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (v.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
@@ -145,7 +114,7 @@ export default function VisitorLogs() {
       let matchesType = typeFilter === 'all' ? true : (typeFilter === 'employee' ? ['Faculty', 'Administrative Staff', 'Library Staff'].includes(visitType) : visitType === typeFilter);
       return matchesSearch && matchesPurpose && matchesType && matchesDate;
     });
-  }, [enrichedVisits, searchTerm, purposeFilter, typeFilter, dateFilter]);
+  }, [allVisits, searchTerm, purposeFilter, typeFilter, dateFilter]);
 
   const isBlocked = (id: string) => blocklist?.some(b => b.studentId === id);
 
@@ -250,7 +219,7 @@ export default function VisitorLogs() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visitsLoading || enriching ? (
+              {visitsLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}><TableCell colSpan={7} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
                 ))
