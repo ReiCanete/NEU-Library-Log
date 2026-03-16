@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Card } from '@/components/ui/card';
-import { Search, Filter, Loader2, UserCircle, X, ShieldOff, Clock, ShieldAlert } from 'lucide-react';
+import { Search, Loader2, UserCircle, X, ShieldOff, Clock, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
@@ -17,7 +18,7 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
-import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 const TYPE_STYLES: Record<string, string> = {
   'Student': 'bg-blue-50 text-blue-700 border-blue-200',
@@ -67,17 +68,19 @@ const VisitHistory = ({ studentId }: { studentId: string }) => {
     };
   }, [studentId, db]);
 
-  if (loading) return <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Loading history...</p>;
-  if (history.length === 0) return <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 italic">No previous visits recorded.</p>;
+  if (loading) return <p style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '10px 0' }}>Loading history...</p>;
+  if (history.length === 0) return <p style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic', margin: '10px 0' }}>No previous visits recorded.</p>;
 
   return (
-    <div className="space-y-2">
-      <p className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">{history.length} recent activity logs</p>
-      <div className="space-y-2">
+    <div style={{ marginTop: '16px' }}>
+      <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600', marginBottom: '8px' }}>
+        {history.length} recent activity logs
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {history.map((visit: any) => (
-          <div key={visit.id} className="p-3 rounded-xl bg-white border border-[#f0f4f1] flex justify-between items-center group hover:border-[#c9a227] transition-all">
-            <span className="font-black text-[#1a3a2a] text-[11px] uppercase tracking-tight">{visit.purpose}</span>
-            <span className="text-[9px] font-bold text-slate-400 tabular-nums">
+          <div key={visit.id} style={{ padding: '12px', borderRadius: '12px', background: 'white', border: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: '700', color: '#1a3a2a', fontSize: '11px', textTransform: 'uppercase' }}>{visit.purpose}</span>
+            <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af' }}>
               {visit.timestamp?.toDate ? format(visit.timestamp.toDate(), 'MMM dd') : '--'}
             </span>
           </div>
@@ -91,7 +94,7 @@ export default function VisitorLogs() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
-  const pathname = usePathname();
+  const router = useRouter();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
@@ -104,26 +107,13 @@ export default function VisitorLogs() {
   const [enriching, setEnriching] = useState(false);
 
   const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [blockTarget, setBlockTarget] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
-  const closePanel = () => {
+  const closePanel = useCallback(() => {
     setSidePanelOpen(false);
-    // Small delay before clearing selected visit so animation completes
-    setTimeout(() => setSelectedVisit(null), 300);
-  };
-
-  // Force close on navigation or unmount
-  useEffect(() => {
-    setSidePanelOpen(false);
-    setSelectedVisit(null);
-  }, [pathname]);
-
-  // Global listener for nav changes
-  useEffect(() => {
-    const handler = () => closePanel();
-    window.addEventListener('closeSidePanel', handler);
-    return () => window.removeEventListener('closeSidePanel', handler);
+    setTimeout(() => setSelectedVisit(null), 350);
   }, []);
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
@@ -175,25 +165,155 @@ export default function VisitorLogs() {
   const isBlocked = (id: string) => blocklist?.some(b => b.studentId === id);
 
   const handleBlockUser = async () => {
-    if (!selectedVisit || !blockReason || !db) return;
+    if (!blockTarget || !blockReason || !db) return;
     setIsBlocking(true);
     try {
       await addDoc(collection(db, 'blocklist'), {
-        studentId: selectedVisit.studentId,
-        fullName: selectedVisit.fullName,
+        studentId: blockTarget.studentId,
+        fullName: blockTarget.fullName,
         reason: blockReason,
         blockedBy: auth?.currentUser?.email || 'Admin',
         blockedAt: Timestamp.now()
       });
-      toast({ title: "Visitor Blocked", description: `${selectedVisit.fullName} access restricted.` });
+      toast({ title: "Visitor Blocked", description: `${blockTarget.fullName} access restricted.` });
       setBlockModalOpen(false);
       setBlockReason('');
-      closePanel();
+      setBlockTarget(null);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
       setIsBlocking(false);
     }
+  };
+
+  const SidePanel = () => {
+    if (!selectedVisit) return null;
+    
+    return createPortal(
+      <>
+        {/* Overlay */}
+        <div
+          onClick={closePanel}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9998,
+            background: 'rgba(0,0,0,0.2)',
+            cursor: 'default',
+          }}
+        />
+        
+        {/* Panel */}
+        <div
+          style={{
+            position: 'fixed',
+            right: 0,
+            top: 0,
+            height: '100%',
+            width: '400px',
+            background: 'white',
+            zIndex: 9999,
+            boxShadow: '-4px 0 30px rgba(0,0,0,0.15)',
+            overflowY: 'auto',
+            transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease',
+          }}
+        >
+          {/* Header */}
+          <div style={{ background: '#1a3a2a', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+            <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '18px', margin: 0 }}>Visitor Details</h2>
+            <button
+              onClick={closePanel}
+              style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div style={{ padding: '24px' }}>
+            {/* Avatar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ color: '#c9a227', fontSize: '24px', fontWeight: 'bold' }}>
+                  {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+              </div>
+              <div>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a3a2a', margin: 0 }}>{selectedVisit.fullName}</h3>
+                <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0' }}>{selectedVisit.studentId}</p>
+              </div>
+            </div>
+
+            {/* Visit info */}
+            <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600', marginBottom: '8px' }}>This Visit</p>
+              <p style={{ fontWeight: '600', color: '#1a3a2a', margin: '0 0 4px' }}>{selectedVisit.purpose}</p>
+              <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
+                {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+              <p style={{ fontSize: '14px', color: '#6b7280', margin: '2px 0 0' }}>
+                {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+
+            {/* Profile info */}
+            <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600', marginBottom: '12px' }}>Profile</p>
+              {[
+                { label: 'Visitor Type', value: selectedVisit.visitorType || 'Student' },
+                { label: 'College', value: selectedVisit.college || '—' },
+                { label: 'Program', value: selectedVisit.program || '—' },
+                { label: 'Email', value: selectedVisit.email || '—' },
+                { label: 'Login Method', value: selectedVisit.loginMethod || '—' },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '16px' }}>
+                  <span style={{ fontSize: '14px', color: '#6b7280', flexShrink: 0 }}>{label}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right' }}>{value}</span>
+                </div>
+              ))}
+              
+              {/* Historical Activity */}
+              <VisitHistory studentId={selectedVisit.studentId} />
+            </div>
+
+            {/* Block button */}
+            {!isBlocked(selectedVisit.studentId) ? (
+              <button
+                onClick={() => {
+                  setBlockTarget(selectedVisit);
+                  setBlockModalOpen(true);
+                  closePanel();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#fef2f2',
+                  color: '#b91c1c',
+                  border: '1px solid #fecaca',
+                  borderRadius: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                }}
+              >
+                <ShieldAlert size={16} />
+                Block This Visitor
+              </button>
+            ) : (
+              <div style={{ padding: '12px', background: '#f3f4f6', borderRadius: '12px', textAlign: 'center', color: '#6b7280', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <ShieldOff size={16} />
+                Visitor is Blocked
+              </div>
+            )}
+          </div>
+        </div>
+      </>,
+      document.body
+    );
   };
 
   return (
@@ -304,105 +424,20 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Overlay - only exists in DOM when panel is open */}
-      {sidePanelOpen && (
-        <div 
-          className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity" 
-          onClick={closePanel} 
-        />
-      )}
-
-      {/* Side panel */}
-      <div 
-        className={`fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out ${
-          sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
-        } border-l border-[#d4e4d8] flex flex-col`}
-        style={{ pointerEvents: sidePanelOpen ? 'auto' : 'none' }}
-      >
-        {selectedVisit && (
-          <>
-            <div className="bg-[#1a3a2a] p-10 flex flex-col items-center justify-center text-center relative">
-              <button 
-                onClick={closePanel} 
-                className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              <div className="w-24 h-24 rounded-3xl bg-[#c9a227] flex items-center justify-center text-[#1a3a2a] text-4xl font-black shadow-2xl">
-                {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
-              </div>
-              <h3 className="mt-6 text-2xl font-black text-white uppercase tracking-tight leading-none">{selectedVisit.fullName}</h3>
-              <p className="mt-2 text-[#c9a227] font-mono text-sm font-bold">{selectedVisit.studentId}</p>
-            </div>
-
-            <div className="p-10 flex-1 overflow-y-auto space-y-8 custom-scrollbar">
-              <div className="bg-[#f8fafc] rounded-2xl p-6 border border-[#f0f4f1] space-y-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#c9a227]" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">Visit Record</span>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-lg font-black text-[#1a3a2a]">{selectedVisit.purpose}</p>
-                  <p className="text-xs font-bold text-slate-500">
-                    {selectedVisit.timestamp?.toDate ? format(selectedVisit.timestamp.toDate(), 'PPPP p') : '--'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <UserCircle className="w-4 h-4 text-[#c9a227]" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">Profile Details</span>
-                </div>
-                <div className="bg-white rounded-2xl border border-[#f0f4f1] overflow-hidden mb-6">
-                  {[
-                    { label: 'Visitor Type', value: selectedVisit.visitorType || 'Student' },
-                    { label: 'College', value: selectedVisit.college || '—' },
-                    { label: 'Program', value: selectedVisit.program || '—' },
-                    { label: 'Official Email', value: selectedVisit.email || '—' },
-                    { label: 'Login Method', value: selectedVisit.loginMethod || 'id' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex justify-between items-center px-6 py-4 border-b border-[#f0f4f1] last:border-none">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-                      <span className="text-xs font-bold text-[#1a3a2a] text-right max-w-[180px]">{value}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Historical Activity */}
-                <VisitHistory studentId={selectedVisit.studentId} />
-              </div>
-
-              <div className="pt-6">
-                {!isBlocked(selectedVisit.studentId) ? (
-                  <Button
-                    onClick={() => setBlockModalOpen(true)}
-                    className="w-full h-14 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <ShieldAlert className="w-5 h-5" />
-                    Block This Visitor
-                  </Button>
-                ) : (
-                  <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-center gap-3">
-                    <ShieldOff className="w-5 h-5 text-red-600" />
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Account Restricted</p>
-                      <p className="text-xs font-bold text-red-800/60">This visitor is currently on the blocklist.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      {/* Portal Panel */}
+      {typeof window !== 'undefined' && sidePanelOpen && <SidePanel />}
 
       {/* Block Modal */}
-      <Dialog open={blockModalOpen} onOpenChange={setBlockModalOpen}>
+      <Dialog open={blockModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          setBlockModalOpen(false);
+          setBlockTarget(null);
+        }
+      }}>
         <DialogContent className="rounded-[2.5rem] p-10 max-w-lg border-none shadow-2xl">
           <DialogHeader className="space-y-2">
             <DialogTitle className="text-3xl font-black text-[#1a3a2a]">Confirm Restriction</DialogTitle>
-            <DialogDescription className="text-[#4a6741] font-bold">You are about to block access for <span className="text-red-600">{selectedVisit?.fullName}</span>.</DialogDescription>
+            <DialogDescription className="text-[#4a6741] font-bold">You are about to block access for <span className="text-red-600">{blockTarget?.fullName}</span>.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
@@ -416,7 +451,7 @@ export default function VisitorLogs() {
             </div>
           </div>
           <DialogFooter className="gap-4">
-            <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-[#d4e4d8]" onClick={() => setBlockModalOpen(false)}>Cancel</Button>
+            <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-[#d4e4d8]" onClick={() => { setBlockModalOpen(false); setBlockTarget(null); }}>Cancel</Button>
             <Button 
               className="rounded-2xl h-14 px-10 font-black bg-red-600 text-white hover:bg-red-700" 
               disabled={isBlocking || !blockReason} 
