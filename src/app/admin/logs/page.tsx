@@ -147,7 +147,7 @@ export default function VisitorLogs() {
 
   const closePanel = useCallback(() => {
     setSidePanelOpen(false);
-    setSelectedVisit(null); // Instant clear to prevent batching issues in Next.js 15
+    setSelectedVisit(null);
   }, []);
 
   return (
@@ -199,10 +199,12 @@ export default function VisitorLogs() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Visit Date</Label>
-              <Input type="date" className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={dateFilter} onChange={(e) => setDateFilter(setSearchTerm)}>
-                {/* Fixed incorrect usage of date filter */}
-                <Input type="date" className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
-              </Input>
+              <Input 
+                type="date" 
+                className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
+                value={dateFilter} 
+                onChange={(e) => setDateFilter(e.target.value)} 
+              />
             </div>
           </div>
         </Card>
@@ -262,7 +264,7 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Side panel implementation - Clean stacking logic */}
+      {/* Side panel overlay - Clean stacking logic */}
       {sidePanelOpen && (
         <div
           className="fixed inset-0"
