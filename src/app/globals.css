@@ -67,7 +67,7 @@
 
 @keyframes marquee {
   0%   { transform: translateX(100vw) translateY(-50%); }
-  100% { transform: translateX(-100%) translateY(-50%); }
+  100% { transform: translateX(calc(-100% - 0px)) translateY(-50%); }
 }
 
 .ticker-track {
@@ -77,7 +77,7 @@
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  animation: marquee 18s linear infinite;
+  animation: marquee 20s linear infinite;
 }
 
 .ticker-track:hover {

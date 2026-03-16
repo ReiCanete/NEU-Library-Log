@@ -60,7 +60,9 @@ export default function AnnouncementTicker() {
       <span className={a.priority === 'urgent' ? 'font-bold' : 'font-medium'}>
         {a.message}
       </span>
-      <span className="mx-8 opacity-40">◆</span>
+      {i < announcements.length - 1 && (
+        <span className="mx-8 opacity-40">◆</span>
+      )}
     </span>
   ));
 
@@ -85,12 +87,19 @@ export default function AnnouncementTicker() {
         <div
           className="ticker-track text-sm"
           style={{
-            animationDuration: `${Math.max(12, announcements.reduce((acc, a) => acc + a.message.length * 0.12, 10))}s`
+            animationDuration: `${Math.max(20, announcements.reduce((acc, a) => acc + a.message.length * 0.15, 12))}s`
           }}
         >
-          {tickerContent}
-          {/* Duplicate for seamless loop */}
-          {tickerContent}
+          {/* First copy */}
+          <span className="inline-flex items-center">
+            {tickerContent}
+          </span>
+          {/* Large spacer between copies so they never overlap on screen */}
+          <span style={{ display: 'inline-block', width: '100vw' }} />
+          {/* Second copy for seamless loop */}
+          <span className="inline-flex items-center">
+            {tickerContent}
+          </span>
         </div>
       </div>
     </div>
