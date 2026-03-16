@@ -53,34 +53,46 @@ export default function AnnouncementTicker() {
   const bannerBg = allUrgent ? 'bg-red-600 text-white' : 'bg-[#c9a227] text-[#0a2a1a]';
   const labelBg = allUrgent ? 'bg-red-800 text-white border-red-500' : 'bg-[#a07d1a] text-[#0a2a1a] border-[#0a2a1a]/20';
 
-  const tickerDuration = Math.max(12, 
-    announcements.reduce((acc, a) => acc + a.message.length * 0.08, 10)
-  );
+  const totalChars = announcements.reduce((acc, a) => acc + a.message.length, 0);
+  const tickerDuration = Math.max(20, totalChars * 0.3 + announcements.length * 8);
 
-  const tickerSegment = announcements.map((a, i) => (
-    <span key={a.id} className="inline-flex items-center">
-      {a.priority === 'urgent' && (
-        <span className={`text-[10px] font-black px-2 py-0.5 rounded mr-2 uppercase tracking-tight flex items-center gap-1 ${
-          allUrgent ? 'bg-white text-red-700' : 'bg-red-600 text-white'
-        }`}>
-          ⚠ URGENT
+  const buildCopy = () => (
+    <span className="inline-flex items-center">
+      {announcements.map((a) => (
+        <span key={a.id} className="inline-flex items-center">
+          {/* Priority badge */}
+          {a.priority === 'urgent' && (
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded mr-3 uppercase tracking-tight ${
+              allUrgent 
+                ? 'bg-white text-red-700'
+                : 'bg-red-600 text-white'
+            }`}>
+              ⚠ URGENT
+            </span>
+          )}
+          {/* Message text */}
+          <span className={a.priority === 'urgent' ? 'font-bold' : 'font-medium'}>
+            {a.message}
+          </span>
+          {/* Spacing after each announcement - larger gap between multiple */}
+          <span style={{ 
+            display: 'inline-block', 
+            width: announcements.length > 1 
+              ? `${Math.floor(600 / announcements.length)}px`
+              : '200px'
+          }} />
+          {/* Diamond divider */}
+          <span className="opacity-40 mr-6">◆</span>
+          <span style={{ 
+            display: 'inline-block', 
+            width: announcements.length > 1 
+              ? `${Math.floor(600 / announcements.length)}px`
+              : '200px'
+          }} />
         </span>
-      )}
-      <span className={a.priority === 'urgent' ? 'font-bold' : 'font-medium'}>
-        {a.message}
-      </span>
-      {/* Dynamic spacing based on count */}
-      <span style={{ 
-        display: 'inline-block', 
-        width: `${Math.max(120, Math.floor(800 / announcements.length))}px` 
-      }} />
-      <span className="opacity-40 mr-4">◆</span>
-      <span style={{ 
-        display: 'inline-block', 
-        width: `${Math.max(120, Math.floor(800 / announcements.length))}px` 
-      }} />
+      ))}
     </span>
-  ));
+  );
 
   return (
     <div
@@ -101,14 +113,9 @@ export default function AnnouncementTicker() {
             animationDuration: `${tickerDuration}s`
           }}
         >
-          <span className="inline-flex items-center">
-            {tickerSegment}
-          </span>
-          {/* Spacer between copies for seamless loop */}
-          <span style={{ display: 'inline-block', width: '100vw' }} />
-          <span className="inline-flex items-center">
-            {tickerSegment}
-          </span>
+          {/* Content repeated twice for seamless loop using translateX(-50%) animation */}
+          {buildCopy()}
+          {buildCopy()}
         </div>
       </div>
     </div>
