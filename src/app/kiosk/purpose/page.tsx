@@ -8,7 +8,7 @@ import { useFirestore } from '@/firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
+import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
 
 const PURPOSES = [
   { id: 'reading', label: 'Reading Books', icon: BookOpen },
@@ -53,15 +53,14 @@ export default function PurposePage() {
     if (!visitor || isSubmitting || !db) return;
     setIsSubmitting(true);
     try {
-      // Save purpose to session for welcome page
       const updatedVisitor = { ...visitor, purpose };
       sessionStorage.setItem('kiosk_visitor', JSON.stringify(updatedVisitor));
 
       await addDoc(collection(db, 'visits'), {
         studentId: updatedVisitor.studentId,
         fullName: updatedVisitor.fullName,
-        college: updatedVisitor.college,
-        program: updatedVisitor.program,
+        college: updatedVisitor.college || '',
+        program: updatedVisitor.program || '',
         visitorType: updatedVisitor.visitorType || 'Student',
         email: updatedVisitor.email || '',
         purpose: purpose,
@@ -79,7 +78,7 @@ export default function PurposePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24]">
-      <AnnouncementTicker />
+      <AnnouncementToast />
       
       <div className="absolute top-16 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
@@ -91,7 +90,9 @@ export default function PurposePage() {
         <div className="max-w-4xl w-full flex flex-col gap-6">
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight uppercase">Visit Purpose</h2>
-            <p className="text-sm text-white/50 font-bold uppercase tracking-widest">Hi <span className="text-white">{visitor?.fullName?.split(' ')[0] || 'Visitor'}</span>, why are you visiting today?</p>
+            <p className="text-sm text-white/50 font-bold uppercase tracking-widest">
+              Hi <span className="text-[#c9a227] font-black">{visitor?.fullName?.split(' ')[0] || 'Visitor'}</span>, why are you visiting today?
+            </p>
           </div>
 
           {isSubmitting ? (
@@ -104,7 +105,7 @@ export default function PurposePage() {
               {PURPOSES.map((item) => (
                 <Card 
                   key={item.id} 
-                  className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden" 
+                  className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:border-[#c9a227] hover:scale-105 transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden active:bg-[#c9a227]/20" 
                   onClick={() => handleSelect(item.label)}
                 >
                   <CardContent className="flex flex-col items-center justify-center p-4 gap-3 h-[140px]">

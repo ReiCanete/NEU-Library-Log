@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock } from 'lucide-react';
 import { validateFullName } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
-import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
+import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
 
 const COLLEGES = [
   { name: "College of Accountancy", programs: ["BS Accountancy", "BS Accounting Information System"] },
@@ -88,23 +88,19 @@ function RegisterForm() {
     if (method === 'email' && emailFromUrl) setEmail(emailFromUrl);
     else if (idFromUrl) setStudentId(idFromUrl);
     
-    // For Guest, handle direct ID generation if not from Entry
     if (visitorType === 'Guest' && !idFromUrl) {
       setStudentId(`GUEST-${Date.now()}`);
     }
-    
     setLoading(false);
   }, [db, method, idFromUrl, emailFromUrl, visitorType]);
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
-    
     if (visitorType === 'Faculty') {
       return FACULTY_DEPARTMENTS
         .filter(d => d.toLowerCase().includes(term))
         .map(d => ({ type: 'item', label: d, college: d }));
     }
-
     const results: any[] = [];
     COLLEGES.forEach(college => {
       const matchedPrograms = college.programs.filter(p => 
@@ -123,37 +119,14 @@ function RegisterForm() {
   const handleSubmit = async () => {
     if (!db || submitting) return;
     setFormError(null);
-
     if (!validateFullName(fullName)) {
       setFormError("Please enter your full name.");
       return;
     }
-
-    if (visitorType !== 'Guest' && !studentId.trim()) {
-      setFormError(visitorType === 'Student' ? "Student ID is required." : "Employee ID is required.");
-      return;
-    }
-
-    if (visitorType === 'Student' && !selectedCollege) {
-      setFormError("Please select your college and program.");
-      return;
-    }
-
-    if (visitorType === 'Faculty' && !selectedCollege) {
-      setFormError("Please select your department.");
-      return;
-    }
-
-    if (['Administrative Staff', 'Library Staff'].includes(visitorType) && !department.trim()) {
-      setFormError("Please enter your office/department.");
-      return;
-    }
-
     setSubmitting(true);
     try {
       const finalStudentId = visitorType === 'Guest' && !idFromUrl ? `GUEST-${Date.now()}` : studentId;
       const docRef = doc(db, 'users', finalStudentId);
-      
       const userData = {
         studentId: finalStudentId,
         fullName,
@@ -175,23 +148,8 @@ function RegisterForm() {
         }
       }
 
-      const visitorSession = {
-        ...userData,
-        loginMethod: method === 'email' ? 'email' : 'id'
-      };
-      sessionStorage.setItem('kiosk_visitor', JSON.stringify(visitorSession));
-      
-      if (visitorType === 'Guest') {
-        await addDoc(collection(db, 'visits'), {
-          ...userData,
-          purpose: 'General Visit / Library Tour',
-          loginMethod: 'id',
-          timestamp: Timestamp.now(),
-        });
-        router.push('/kiosk/welcome');
-      } else {
-        router.push('/kiosk/purpose');
-      }
+      sessionStorage.setItem('kiosk_visitor', JSON.stringify({ ...userData, loginMethod: method === 'email' ? 'email' : 'id' }));
+      router.push(visitorType === 'Guest' ? '/kiosk/welcome' : '/kiosk/purpose');
     } catch (err) {
       logAppError('Registration', 'SaveUser', err);
       setFormError("Registration failed. Please try again.");
@@ -203,8 +161,7 @@ function RegisterForm() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] overflow-hidden">
-      <AnnouncementTicker />
-
+      <AnnouncementToast />
       <div className="absolute top-16 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -213,154 +170,61 @@ function RegisterForm() {
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 overflow-y-auto">
         <div className="max-w-[480px] w-full space-y-4">
-          <div className="text-center space-y-1">
-            <div className="mx-auto bg-[#c9a227]/10 h-14 w-14 rounded-2xl flex items-center justify-center border border-[#c9a227]/20 shadow-xl mb-2">
-              <UserPlus className="h-7 w-7 text-[#c9a227]" />
+          <div className="text-center space-y-3">
+            <div className="flex flex-col items-center gap-1 mb-2">
+              <span className="text-[10px] font-black text-[#c9a227] uppercase tracking-widest">Step 1 of 2</span>
+              <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden">
+                <div className="w-1/2 h-full bg-[#c9a227]" />
+              </div>
             </div>
-            <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">Complete Your Profile</h2>
-            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">
-              {visitorType} Registration
-            </p>
+            <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">Profile Setup</h2>
+            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{visitorType} Registration</p>
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="glass-neu rounded-[2rem] p-8 space-y-6 shadow-2xl border-none">
             {formError && (
-              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-center animate-in slide-in-from-top-1">
+              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-center">
                 <p className="text-red-200 text-[9px] font-black uppercase tracking-widest">{formError}</p>
               </div>
             )}
-
             <div className="space-y-4">
-              <div className="space-y-4 animate-in fade-in duration-500">
-                {email && (
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Institutional Email</Label>
-                    <div className="relative">
-                      <Input value={email} readOnly className="h-12 text-xs font-bold bg-black/40 border-2 border-[#c9a227] text-[#c9a227] rounded-xl px-4 cursor-not-allowed" />
-                      <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]/50" />
-                    </div>
-                  </div>
-                )}
-
-                {visitorType !== 'Guest' && (
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
-                      {visitorType === 'Student' ? 'Student ID' : 'Employee ID'}
-                    </Label>
-                    <div className="relative">
-                      <Input 
-                        placeholder={visitorType === 'Student' ? "XX-XXXXX-XXX" : "EMP-2024-XXX"} 
-                        className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : ''}`} 
-                        value={studentId} 
-                        onChange={(e) => !idFromUrl && setStudentId(e.target.value)} 
-                        readOnly={!!idFromUrl}
-                        required 
-                      />
-                      {idFromUrl && (
-                        <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#c9a227]/50" />
-                      )}
-                    </div>
-                  </div>
-                )}
-
+              {email && (
                 <div className="space-y-1">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
-                  <Input 
-                    placeholder="Enter your full name" 
-                    className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
-                    value={fullName} 
-                    onChange={(e) => setFullName(e.target.value)} 
-                    required 
-                  />
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Official Email</Label>
+                  <div className="relative"><Input value={email} readOnly className="h-12 text-xs font-bold bg-black/40 border-2 border-[#c9a227] text-[#c9a227] rounded-xl px-4 cursor-not-allowed" /><Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]/50" /></div>
                 </div>
-
-                {(visitorType === 'Student' || visitorType === 'Faculty') && (
-                  <div className="space-y-1 relative">
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
-                      {visitorType === 'Student' ? 'College / Program' : 'Department'}
-                    </Label>
-                    <div 
-                      className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all ${isDropdownOpen ? 'ring-2 ring-[#c9a227]/30' : ''}`}
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    >
-                      <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
-                        {selectedProgram || selectedCollege || (visitorType === 'Student' ? "Search for your program..." : "Select your department...")}
-                      </span>
-                      <ChevronDown className={`h-4 w-4 shrink-0 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                    </div>
-
-                    {isDropdownOpen && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-                        <div 
-                          className="absolute left-0 right-0 z-50 mt-1 rounded-xl overflow-hidden" 
-                          style={{ 
-                            background: '#071a0f', 
-                            border: '1px solid #c9a227', 
-                            boxShadow: '0 25px 50px rgba(0,0,0,0.9)', 
-                            maxHeight: '240px', 
-                            overflowY: 'auto',
-                            top: '100%'
-                          }}
-                        >
-                          <div className="sticky top-0 p-2" style={{ background: '#071a0f', borderBottom: '1px solid rgba(201,162,39,0.2)' }}>
-                            <input 
-                              autoFocus 
-                              style={{ background: '#0a2a1a', border: '1px solid rgba(201,162,39,0.3)', color: 'white', padding: '10px 14px', width: '100%', outline: 'none', fontSize: '14px', borderRadius: '8px' }}
-                              placeholder="Type to search..." 
-                              value={search} 
-                              onChange={(e) => setSearch(e.target.value)} 
-                              onClick={(e) => e.stopPropagation()} 
-                            />
-                          </div>
-                          <div className="py-2">
-                            {filteredOptions.map((opt: any, i: number) => (
-                              <div key={i}>
-                                {opt.type === 'header' ? (
-                                  <div style={{ padding: '8px 16px 4px', color: '#c9a227', fontSize: '11px', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase', background: '#071a0f' }}>{opt.label}</div>
-                                ) : (
-                                  <div 
-                                    style={{ padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '13px', background: 'transparent' }}
-                                    className="hover:bg-[#c9a227]/20 transition-colors flex items-center justify-between font-bold"
-                                    onClick={(e) => { 
-                                      e.stopPropagation(); 
-                                      setSelectedCollege(opt.college); 
-                                      if (visitorType === 'Student') setSelectedProgram(opt.label);
-                                      setIsDropdownOpen(false); 
-                                      setSearch(''); 
-                                    }}
-                                  >
-                                    <span className="truncate">{opt.label}</span>
-                                    {(selectedProgram === opt.label || (visitorType === 'Faculty' && selectedCollege === opt.label)) && <Check className="h-4 w-4 text-[#c9a227]" />}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
+              )}
+              {visitorType !== 'Guest' && (
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">{visitorType === 'Student' ? 'Student ID' : 'Employee ID'}</Label>
+                  <div className="relative">
+                    <Input placeholder={visitorType === 'Student' ? "XX-XXXXX-XXX" : "EMP-XXX"} className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : ''}`} value={studentId} onChange={(e) => !idFromUrl && setStudentId(e.target.value)} readOnly={!!idFromUrl} required />
+                    {idFromUrl && <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#c9a227]/50" />}
                   </div>
-                )}
-
-                {['Administrative Staff', 'Library Staff'].includes(visitorType) && (
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Office / Department</Label>
-                    <Input 
-                      placeholder="Enter your specific office" 
-                      className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
-                      value={department} 
-                      onChange={(e) => setDepartment(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                )}
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
+                <Input placeholder="Enter your full name" className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
               </div>
+              {(visitorType === 'Student' || visitorType === 'Faculty') && (
+                <div className="space-y-1 relative">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">{visitorType === 'Student' ? 'College / Program' : 'Department'}</Label>
+                  <div className="h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+                    <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>{selectedProgram || selectedCollege || "Select..."}</span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                  {isDropdownOpen && (
+                    <><div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                    <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl overflow-hidden" style={{ background: '#071a0f', border: '1px solid #c9a227', boxShadow: '0 25px 50px rgba(0,0,0,0.9)', maxHeight: '240px', overflowY: 'auto', top: '100%' }}>
+                      <div className="sticky top-0 p-2" style={{ background: '#071a0f', borderBottom: '1px solid rgba(201,162,39,0.2)' }}><input autoFocus style={{ background: '#0a2a1a', border: '1px solid rgba(201,162,39,0.3)', color: 'white', padding: '10px 14px', width: '100%', outline: 'none', fontSize: '14px', borderRadius: '8px' }} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} onClick={(e) => e.stopPropagation()} /></div>
+                      <div className="py-2">{filteredOptions.map((opt: any, i: number) => (<div key={i}>{opt.type === 'header' ? <div style={{ padding: '8px 16px 4px', color: '#c9a227', fontSize: '11px', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{opt.label}</div> : <div style={{ padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '13px' }} className="hover:bg-[#c9a227]/20 transition-colors flex items-center justify-between font-bold" onClick={(e) => { e.stopPropagation(); setSelectedCollege(opt.college); if (visitorType === 'Student') setSelectedProgram(opt.label); setIsDropdownOpen(false); setSearch(''); }}><span className="truncate">{opt.label}</span>{(selectedProgram === opt.label || (visitorType === 'Faculty' && selectedCollege === opt.label)) && <Check className="h-4 w-4 text-[#c9a227]" />}</div>}</div>))}</div>
+                    </div></>
+                  )}
+                </div>
+              )}
             </div>
-
-            <Button className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={submitting} type="submit">
-              {submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Register Profile"}
-            </Button>
+            <Button className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={submitting} type="submit">{submitting ? <Loader2 className="animate-spin h-6 w-6" /> : "Complete Setup"}</Button>
           </form>
         </div>
       </div>
@@ -369,9 +233,5 @@ function RegisterForm() {
 }
 
 export default function RegisterPage() {
-  return (
-    <Suspense fallback={null}>
-      <RegisterForm />
-    </Suspense>
-  );
+  return (<Suspense fallback={null}><RegisterForm /></Suspense>);
 }

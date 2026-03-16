@@ -11,10 +11,9 @@ import { validateStudentId, validateNEUEmail } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
-import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
+import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-// KioskIdForm - isolated component with its own state
 const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type: string) => Promise<void>, disabled: boolean }) => {
   const [schoolId, setSchoolId] = useState('');
   const [visitorType, setVisitorType] = useState('Student');
@@ -125,7 +124,6 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type:
   );
 });
 
-// KioskEmailForm - isolated component with its own state
 const KioskEmailForm = memo(({ onSubmit, disabled }: { onSubmit: (email: string) => Promise<void>, disabled: boolean }) => {
   const [emailInput, setEmailInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -182,7 +180,6 @@ const KioskEmailForm = memo(({ onSubmit, disabled }: { onSubmit: (email: string)
   );
 });
 
-// StaffLoginForm - isolated component with its own state
 const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: string) => Promise<void> }) => {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -300,19 +297,16 @@ function KioskEntryContent() {
   const handleIdSubmit = useCallback(async (cleanId: string, visitorType: string) => {
     if (!db) return;
     try {
-      // Guest flow — skip registration entirely
       if (visitorType === 'Guest') {
         const guestId = `GUEST-${Date.now()}`;
-        
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: guestId,
-          fullName: cleanId, // cleanId field holds full name for guests
+          fullName: cleanId,
           college: '',
           program: '',
           visitorType: 'Guest',
           loginMethod: 'id'
         }));
-        
         router.push('/kiosk/purpose');
         return;
       }
@@ -383,8 +377,6 @@ function KioskEntryContent() {
       const result = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
       const user = result.user;
       const userEmail = user.email?.toLowerCase();
-
-      // Case-insensitive whitelist check
       const isWhitelisted = userEmail === 'reiangelo.canete@neu.edu.ph' || userEmail?.includes('25-14294-549');
 
       const q = query(collection(db, 'users'), where('email', '==', user.email));
@@ -392,7 +384,6 @@ function KioskEntryContent() {
 
       let hasAdminAccess = false;
       let userData = null;
-      
       if (!snap.empty) {
         userData = snap.docs[0].data();
         hasAdminAccess = userData.role === 'admin' || userData.studentId === '25-14294-549';
@@ -406,7 +397,6 @@ function KioskEntryContent() {
           role: 'admin',
           studentId: userData?.studentId || 'ADMIN-ACCESS'
         }, { merge: true });
-
         router.push('/admin');
       } else {
         await signOut(auth);
@@ -438,36 +428,16 @@ function KioskEntryContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#0a2a1a] to-[#0d3d24]">
-      <AnnouncementTicker />
+      <AnnouncementToast />
       
       <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-full p-1 shadow-xl">
-        <button 
-          suppressHydrationWarning
-          onClick={() => setMode('kiosk')}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${
-            mode === 'kiosk' 
-              ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' 
-              : 'text-white/60 hover:text-white'
-          }`}
-        >
-          Kiosk
-        </button>
-        <button 
-          suppressHydrationWarning
-          onClick={() => setMode('staff')}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${
-            mode === 'staff' 
-              ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' 
-              : 'text-white/60 hover:text-white'
-          }`}
-        >
-          Staff
-        </button>
+        <button suppressHydrationWarning onClick={() => setMode('kiosk')} className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${mode === 'kiosk' ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' : 'text-white/60 hover:text-white'}`}>Kiosk</button>
+        <button suppressHydrationWarning onClick={() => setMode('staff')} className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${mode === 'staff' ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' : 'text-white/60 hover:text-white'}`}>Staff</button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 relative">
+        <div className="absolute w-40 h-40 rounded-full bg-[#c9a227]/5 blur-3xl -z-10" />
         <img src="/neu-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-3 shadow-2xl border-2 border-[#c9a227]/30" />
-        
         <h1 className="text-4xl font-black text-[#c9a227] text-center drop-shadow-2xl uppercase tracking-tight">NEU LIBRARY</h1>
         <p className="text-[10px] font-black tracking-widest text-white/50 uppercase mt-1 mb-8">Digital Visitor Log</p>
 
@@ -480,26 +450,30 @@ function KioskEntryContent() {
               <button suppressHydrationWarning className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</button>
             </div>
           ) : (
-            mode === 'kiosk' ? (
-              <div className="w-full bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-2xl p-8 shadow-2xl">
-                <div className="flex justify-between items-center mb-6 pb-3 border-b border-[#c9a227]/20">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#c9a227]">Entry Count</span>
+            <div className="w-full bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-2xl p-8 shadow-2xl">
+              {mode === 'kiosk' && (
+                <div className="flex justify-between items-center mb-6 pb-3 border-b border-[#c9a227]/20 border-l-2 border-l-[#c9a227] pl-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#c9a227]">Entry Count</span>
+                  </div>
                   <span className="text-[10px] font-black text-white uppercase tabular-nums">{currentCount} / {dailyCapacity}</span>
                 </div>
-                
-                <KioskIdForm onSubmit={handleIdSubmit} disabled={isAtCapacity} />
-                
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">or</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
-                
-                <KioskEmailForm onSubmit={handleEmailSubmit} disabled={isAtCapacity} />
-              </div>
-            ) : (
-              <StaffLoginForm onSubmit={handleStaffLogin} />
-            )
+              )}
+              {mode === 'kiosk' ? (
+                <>
+                  <KioskIdForm onSubmit={handleIdSubmit} disabled={isAtCapacity} />
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">or</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
+                  <KioskEmailForm onSubmit={handleEmailSubmit} disabled={isAtCapacity} />
+                </>
+              ) : (
+                <StaffLoginForm onSubmit={handleStaffLogin} />
+              )}
+            </div>
           )}
         </div>
       </div>
