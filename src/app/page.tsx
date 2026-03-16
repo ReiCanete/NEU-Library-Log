@@ -24,7 +24,7 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type:
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [visitorType]);
 
   const visitorTypes = [
     { value: 'Student', label: 'Student' },
@@ -67,7 +67,7 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type:
               key={type.value}
               type="button"
               suppressHydrationWarning
-              onClick={() => { setVisitorType(type.value); setError(null); }}
+              onClick={() => { setVisitorType(type.value); setSchoolId(''); setError(null); }}
               className={`px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
                 visitorType === type.value
                   ? 'bg-[#c9a227] text-[#0a2a1a] shadow-lg shadow-[#c9a227]/20'
@@ -99,6 +99,11 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type:
           suppressHydrationWarning
           className={`w-full h-14 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-base font-bold text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
         />
+        {visitorType === 'Guest' && (
+          <p className="text-[10px] text-white/40 font-black uppercase tracking-widest text-center mt-2">
+            No ID required for guest visitors
+          </p>
+        )}
       </div>
 
       {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
@@ -112,9 +117,9 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type:
         {loading ? (
           <span className="flex items-center justify-center gap-2">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Verifying...
+            {visitorType === 'Guest' ? 'Processing...' : 'Verifying...'}
           </span>
-        ) : 'Continue'}
+        ) : visitorType === 'Guest' ? 'Continue as Guest →' : 'Continue'}
       </button>
     </form>
   );
@@ -295,14 +300,26 @@ function KioskEntryContent() {
   const handleIdSubmit = useCallback(async (cleanId: string, visitorType: string) => {
     if (!db) return;
     try {
-      const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
-      if (!blockSnap.empty) {
-        setBlockedData(blockSnap.docs[0].data());
+      // Guest flow — skip registration entirely
+      if (visitorType === 'Guest') {
+        const guestId = `GUEST-${Date.now()}`;
+        
+        sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+          studentId: guestId,
+          fullName: cleanId, // cleanId field holds full name for guests
+          college: '',
+          program: '',
+          visitorType: 'Guest',
+          loginMethod: 'id'
+        }));
+        
+        router.push('/kiosk/purpose');
         return;
       }
 
-      if (visitorType === 'Guest') {
-        router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}&type=Guest`);
+      const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
+      if (!blockSnap.empty) {
+        setBlockedData(blockSnap.docs[0].data());
         return;
       }
 

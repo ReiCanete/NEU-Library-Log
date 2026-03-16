@@ -55,6 +55,8 @@ export default function WelcomePage() {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (countdown / 8) * circumference;
 
+  const isGuest = visitorData.visitorType === 'Guest';
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24]">
       <AnnouncementTicker />
@@ -86,11 +88,15 @@ export default function WelcomePage() {
               <Badge className="bg-[#c9a227] text-[#0a2a1a] text-sm font-black px-6 py-1.5 rounded-xl shadow-lg border-none uppercase">
                 {visitorData.visitorType}
               </Badge>
-              {visitorData.college && (
+              {isGuest ? (
+                <Badge variant="outline" className="border-[#c9a227] text-[#c9a227] text-sm font-black px-6 py-1.5 rounded-xl uppercase">
+                  Guest Visitor
+                </Badge>
+              ) : visitorData.college ? (
                 <Badge variant="outline" className="border-[#c9a227] text-[#c9a227] text-sm font-black px-6 py-1.5 rounded-xl uppercase">
                   {visitorData.college}
                 </Badge>
-              )}
+              ) : null}
             </div>
           </div>
 
