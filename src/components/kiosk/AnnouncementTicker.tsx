@@ -15,6 +15,7 @@ interface Announcement {
   isActive: boolean;
   startDate: any;
   endDate: any;
+  createdAt?: any;
 }
 
 export default function AnnouncementTicker() {
@@ -37,7 +38,7 @@ export default function AnnouncementTicker() {
           .sort((a, b) => {
             if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
             if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
-            return 0;
+            return (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0);
           })
           .slice(0, 5);
         setAnnouncements(active);
@@ -48,57 +49,65 @@ export default function AnnouncementTicker() {
 
   if (announcements.length === 0) return null;
 
-  const hasUrgent = announcements.some(a => a.priority === 'urgent');
+  const allUrgent = announcements.every(a => a.priority === 'urgent');
+  const bannerBg = allUrgent ? 'bg-red-600 text-white' : 'bg-[#c9a227] text-[#0a2a1a]';
+  const labelBg = allUrgent ? 'bg-red-800 text-white border-red-500' : 'bg-[#a07d1a] text-[#0a2a1a] border-[#0a2a1a]/20';
 
-  const tickerContent = announcements.map((a, i) => (
-    <span key={a.id} className="inline-flex items-center gap-3">
+  const tickerDuration = Math.max(12, 
+    announcements.reduce((acc, a) => acc + a.message.length * 0.08, 10)
+  );
+
+  const tickerSegment = announcements.map((a, i) => (
+    <span key={a.id} className="inline-flex items-center">
       {a.priority === 'urgent' && (
-        <span className="bg-white text-red-700 text-xs font-black px-2 py-0.5 rounded">
+        <span className={`text-[10px] font-black px-2 py-0.5 rounded mr-2 uppercase tracking-tight flex items-center gap-1 ${
+          allUrgent ? 'bg-white text-red-700' : 'bg-red-600 text-white'
+        }`}>
           ⚠ URGENT
         </span>
       )}
       <span className={a.priority === 'urgent' ? 'font-bold' : 'font-medium'}>
         {a.message}
       </span>
-      {i < announcements.length - 1 && (
-        <span className="mx-8 opacity-40">◆</span>
-      )}
+      {/* Dynamic spacing based on count */}
+      <span style={{ 
+        display: 'inline-block', 
+        width: `${Math.max(120, Math.floor(800 / announcements.length))}px` 
+      }} />
+      <span className="opacity-40 mr-4">◆</span>
+      <span style={{ 
+        display: 'inline-block', 
+        width: `${Math.max(120, Math.floor(800 / announcements.length))}px` 
+      }} />
     </span>
   ));
 
   return (
     <div
-      className={`w-full flex items-center shrink-0 ${
-        hasUrgent ? 'bg-red-600 text-white' : 'bg-[#c9a227] text-[#0a2a1a]'
-      }`}
+      className={`w-full flex items-center shrink-0 ${bannerBg}`}
       style={{ height: '36px', overflow: 'hidden', position: 'relative' }}
     >
-      {/* Megaphone icon label on left */}
-      <div className={`shrink-0 px-3 h-full flex items-center gap-1.5 border-r z-10 ${
-        hasUrgent
-          ? 'bg-red-800 text-white border-red-500'
-          : 'bg-[#a07d1a] text-[#0a2a1a] border-[#0a2a1a]/20'
-      }`}>
+      <div className={`shrink-0 px-3 h-full flex items-center gap-1.5 border-r z-10 ${labelBg}`}>
         <Megaphone className="w-4 h-4" />
+        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
+          {allUrgent ? 'ALERT' : 'NOTICE'}
+        </span>
       </div>
 
-      {/* Scrolling area */}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', height: '100%' }}>
         <div
           className="ticker-track text-sm"
           style={{
-            animationDuration: `${Math.max(20, announcements.reduce((acc, a) => acc + a.message.length * 0.15, 12))}s`
+            animationDuration: `${tickerDuration}s`
           }}
         >
-          {/* First copy */}
           <span className="inline-flex items-center">
-            {tickerContent}
+            {tickerSegment}
           </span>
-          {/* Large spacer between copies so they never overlap on screen */}
+          {/* Spacer between copies for seamless loop */}
           <span style={{ display: 'inline-block', width: '100vw' }} />
-          {/* Second copy for seamless loop */}
           <span className="inline-flex items-center">
-            {tickerContent}
+            {tickerSegment}
           </span>
         </div>
       </div>
