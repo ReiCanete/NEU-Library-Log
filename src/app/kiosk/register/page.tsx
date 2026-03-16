@@ -9,7 +9,6 @@ import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock } from 'lucide-react';
-import { validateFullName } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
 
@@ -74,7 +73,9 @@ function RegisterForm() {
   const isGoogleSignIn = method === 'google';
   
   const [visitorType, setVisitorType] = useState(searchParams.get('type') || 'Student');
-  const [fullName, setFullName] = useState(nameFromUrl);
+  const [firstName, setFirstName] = useState('');
+  const [middleInitial, setMiddleInitial] = useState('');
+  const [lastName, setLastName] = useState('');
   const [studentId, setStudentId] = useState(idFromUrl || '');
   const [selectedCollege, setSelectedCollege] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
@@ -90,6 +91,24 @@ function RegisterForm() {
     if (!db) return;
     setLoading(false);
   }, [db]);
+
+  // Handle name parsing for Google Sign-in
+  useEffect(() => {
+    if (nameFromUrl) {
+      const parts = nameFromUrl.trim().split(' ');
+      if (parts.length >= 2) {
+        setFirstName(parts[0]);
+        setLastName(parts[parts.length - 1]);
+      } else {
+        setFirstName(nameFromUrl);
+      }
+    }
+  }, [nameFromUrl]);
+
+  // Derived Full Name
+  const fullName = [firstName.trim(), middleInitial.trim() ? middleInitial.trim() + '.' : '', lastName.trim()]
+    .filter(Boolean)
+    .join(' ');
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
@@ -117,10 +136,13 @@ function RegisterForm() {
     if (!db || submitting) return;
     setFormError(null);
 
-    if (!validateFullName(fullName)) {
-      setFormError("Please enter your full name.");
-      return;
-    }
+    // Validation
+    if (!firstName.trim()) { setFormError('Please enter your first name.'); return; }
+    if (!lastName.trim()) { setFormError('Please enter your last name.'); return; }
+    
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'\-\.]+$/;
+    if (!nameRegex.test(firstName.trim())) { setFormError('First name contains invalid characters.'); return; }
+    if (!nameRegex.test(lastName.trim())) { setFormError('Last name contains invalid characters.'); return; }
 
     if (visitorType !== 'Guest' && !studentId.trim()) {
       setFormError(`Please enter your ${visitorType === 'Student' ? 'Student' : 'Employee'} ID.`);
@@ -139,8 +161,8 @@ function RegisterForm() {
       
       const userData = {
         studentId: finalStudentId,
-        fullName: fullName.trim(),
-        displayName: fullName.trim(),
+        fullName: fullName,
+        displayName: fullName,
         college: selectedCollege,
         program: visitorType === 'Student' ? (selectedProgram || 'N/A') : '',
         visitorType,
@@ -149,7 +171,7 @@ function RegisterForm() {
         updatedAt: Timestamp.now()
       };
 
-      // Save to Firestore users collection (skip for guests to avoid clutter, or save as transient)
+      // Save to Firestore users collection
       if (visitorType !== 'Guest') {
         const docRef = doc(db, 'users', finalStudentId);
         await setDoc(docRef, { ...userData, createdAt: Timestamp.now() }, { merge: true });
@@ -257,10 +279,47 @@ function RegisterForm() {
                 </div>
               )}
 
-              {/* Name Field */}
-              <div className="space-y-1">
+              {/* Name Fields */}
+              <div className="space-y-2">
                 <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
-                <Input placeholder="Enter your full name" className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-1">
+                    <Input 
+                      placeholder="First name" 
+                      className="h-12 text-sm font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-3" 
+                      value={firstName} 
+                      onChange={(e) => setFirstName(e.target.value)} 
+                    />
+                    <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">First</p>
+                  </div>
+                  <div className="w-[64px] space-y-1">
+                    <Input 
+                      placeholder="MI" 
+                      className="h-12 text-sm font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-3 text-center" 
+                      value={middleInitial} 
+                      maxLength={2}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+                        if (val.length <= 2) setMiddleInitial(val.toUpperCase());
+                      }}
+                    />
+                    <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">M.I.</p>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Input 
+                      placeholder="Last name" 
+                      className="h-12 text-sm font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-3" 
+                      value={lastName} 
+                      onChange={(e) => setLastName(e.target.value)} 
+                    />
+                    <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">Last</p>
+                  </div>
+                </div>
+                {(firstName || lastName) && (
+                  <p className="text-white/40 text-[9px] font-bold text-center italic">
+                    Full name: <span className="text-[#c9a227]/70 font-black">{fullName}</span>
+                  </p>
+                )}
               </div>
 
               {/* Dynamic Department/College Field */}
