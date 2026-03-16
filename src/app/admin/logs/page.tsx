@@ -1,13 +1,14 @@
+
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Search, Loader2, ShieldAlert } from 'lucide-react';
+import { Search, Loader2, ShieldAlert, X, User, Mail, Calendar, Clock, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, addDoc, Timestamp } from 'firebase/firestore';
-import { isSameDay } from 'date-fns';
+import { isSameDay, format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,8 +18,10 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { usePathname } from 'next/navigation';
 
 export default function VisitorLogs() {
+  const pathname = usePathname();
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
@@ -28,10 +31,17 @@ export default function VisitorLogs() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   
+  const [selectedVisit, setSelectedVisit] = useState<any>(null);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
+
+  // Auto-cleanup on navigation to prevent "stuck" UI
+  useEffect(() => {
+    setSelectedVisit(null);
+    setBlockModalOpen(false);
+  }, [pathname]);
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
@@ -67,6 +77,7 @@ export default function VisitorLogs() {
       setBlockModalOpen(false);
       setBlockReason('');
       setBlockTarget(null);
+      setSelectedVisit(null);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -88,7 +99,12 @@ export default function VisitorLogs() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
-              <Input placeholder="Search name/ID..." className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Input 
+                placeholder="Search name/ID..." 
+                className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Role Filter</Label>
@@ -133,7 +149,7 @@ export default function VisitorLogs() {
           </div>
         </Card>
 
-        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm">
+        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm relative">
           <Table>
             <TableHeader className="bg-[#1a3a2a]">
               <TableRow className="hover:bg-transparent border-none">
@@ -155,7 +171,11 @@ export default function VisitorLogs() {
                   <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
                 </TableRow>
               ) : filteredVisits.map(v => (
-                <TableRow key={v.id} className="border-b-[#f0f4f1]">
+                <TableRow 
+                  key={v.id} 
+                  className="border-b-[#f0f4f1] cursor-pointer hover:bg-[#f0f4f1]/40"
+                  onClick={() => setSelectedVisit(v)}
+                >
                   <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
                   <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
                   <TableCell className="text-xs font-bold text-slate-600">{v.college || '—'}</TableCell>
@@ -178,7 +198,8 @@ export default function VisitorLogs() {
                         variant="ghost" 
                         size="sm" 
                         className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setBlockTarget(v);
                           setBlockModalOpen(true);
                         }}
@@ -193,6 +214,88 @@ export default function VisitorLogs() {
           </Table>
         </Card>
       </div>
+
+      {/* VISITOR DETAILS PANEL - Simplified absolute overlay to prevent blocking sidebar */}
+      {selectedVisit && (
+        <div 
+          className="fixed inset-0 z-[998] flex justify-end pointer-events-none"
+        >
+          {/* Transparent click catcher only for the content area, NOT THE SIDEBAR */}
+          <div 
+            className="flex-1 pointer-events-auto"
+            onClick={() => setSelectedVisit(null)}
+          />
+          
+          {/* Sliding Panel */}
+          <div 
+            className="w-[380px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] border-l border-[#d4e4d8] pointer-events-auto overflow-y-auto animate-in slide-in-from-right duration-300"
+          >
+            <div className="sticky top-0 bg-[#1a3a2a] p-6 flex justify-between items-center z-10">
+              <h3 className="text-white font-black uppercase text-xs tracking-widest">Entry Details</h3>
+              <button onClick={() => setSelectedVisit(null)} className="text-white/50 hover:text-white transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-[#f0f4f1] flex items-center justify-center text-[#1a3a2a]">
+                  <User className="h-8 w-8" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-black text-[#1a3a2a]">{selectedVisit.fullName}</h4>
+                  <p className="text-xs font-mono font-bold text-slate-400">{selectedVisit.studentId}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 bg-[#f8fafc] rounded-2xl border border-[#d4e4d8]">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-2">Institutional Info</Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="h-4 w-4 text-[#c9a227]" />
+                      <span className="text-xs font-bold text-[#1a3a2a]">{selectedVisit.college || 'No College Specified'}</span>
+                    </div>
+                    {selectedVisit.email && (
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-[#c9a227]" />
+                        <span className="text-xs font-bold text-[#1a3a2a]">{selectedVisit.email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-[#f8fafc] rounded-2xl border border-[#d4e4d8]">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-2">Visit History</Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-[#1a3a2a]" />
+                      <span className="text-xs font-bold text-[#1a3a2a]">{format(selectedVisit.timestamp.toDate(), 'MMMM dd, yyyy')}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-4 w-4 text-[#1a3a2a]" />
+                      <span className="text-xs font-bold text-[#1a3a2a]">{format(selectedVisit.timestamp.toDate(), 'hh:mm a')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-[#f0f4f1]">
+                <Button 
+                  className="w-full h-12 bg-red-50 text-red-600 border border-red-100 font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all rounded-xl"
+                  onClick={() => {
+                    setBlockTarget(selectedVisit);
+                    setBlockModalOpen(true);
+                  }}
+                >
+                  <ShieldAlert className="h-4 w-4 mr-2" /> 
+                  Restrict Access
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Block Modal */}
       <Dialog open={blockModalOpen} onOpenChange={(open) => {

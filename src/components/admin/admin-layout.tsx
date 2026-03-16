@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, Megaphone, ShieldOff } from 'lucide-react';
+import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser, useFirestore, useAuth } from '@/firebase';
@@ -119,9 +119,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
+        {/* SIDEBAR - Explicitly layered at the top (z-1000) */}
         <Sidebar 
           className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white"
-          style={{ zIndex: 1000, pointerEvents: 'auto' }} // CRITICAL: Ensure sidebar is always above all page overlays for reliable navigation
+          style={{ zIndex: 1000, pointerEvents: 'auto' }}
         >
           <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
             <img 
@@ -204,7 +205,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto relative">
+          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto relative" style={{ zIndex: 1 }}>
             <div className="max-w-7xl mx-auto pb-12">
               {children}
             </div>
