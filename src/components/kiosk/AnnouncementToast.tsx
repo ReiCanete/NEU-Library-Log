@@ -1,6 +1,8 @@
 'use client';
 /**
- * @fileOverview A professional sequence of popup announcements for the kiosk, positioned in the bottom-right corner.
+ * @fileOverview A professional static sidebar for kiosk announcements.
+ * - Displays up to 2 active announcements in the bottom-right corner.
+ * - Announcements remain until manually dismissed by the visitor.
  */
 
 import { useEffect, useState, memo } from 'react';
@@ -19,7 +21,7 @@ interface Announcement {
 
 function AnnouncementToast() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -40,116 +42,82 @@ function AnnouncementToast() {
             if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
             return 0;
           })
-          .slice(0, 5);
+          .slice(0, 2); // Max 2 shown at once
         setAnnouncements(active);
-        setCurrentIndex(0);
+        // Show with slide animation when announcements arrive
+        if (active.length > 0) {
+          setTimeout(() => setVisible(true), 100);
+        }
       }
     );
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (announcements.length === 0) return;
+  const visibleAnnouncements = announcements.filter(a => !dismissed.has(a.id));
 
-    const current = announcements[currentIndex];
-    if (!current) return;
+  const toggleDismiss = (id: string) => {
+    setDismissed(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
 
-    const duration = Math.min(12000, Math.max(4000, current.message.length * 60));
-
-    // Small delay before showing so transition is visible
-    const showTimer = setTimeout(() => setVisible(true), 100);
-
-    const hideTimer = setTimeout(() => {
-      setVisible(false);
-      // Wait for hide animation then move to next
-      setTimeout(() => {
-        setCurrentIndex(i => 
-          i < announcements.length - 1 ? i + 1 : 0
-        );
-      }, 600);
-    }, duration + 100);
-
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  }, [currentIndex, announcements]);
-
-  const current = announcements[currentIndex];
-  if (!current || announcements.length === 0) return null;
-
-  const isUrgent = current.priority === 'urgent';
-  const displayDuration = Math.min(12000, Math.max(4000, current.message.length * 60));
+  if (visibleAnnouncements.length === 0) return null;
 
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 transition-all duration-500 ease-out ${
-        visible
-          ? 'opacity-100 translate-x-0'
-          : 'opacity-0 translate-x-full pointer-events-none'
+      className={`fixed bottom-6 right-6 z-50 flex flex-col gap-3 transition-all duration-500 ${
+        visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'
       }`}
-      style={{ width: '320px' }}
+      style={{ width: '300px' }}
     >
-      <div className={`w-full rounded-2xl shadow-2xl overflow-hidden ${
-        isUrgent
-          ? 'bg-red-600 border border-red-400'
-          : 'bg-[#0a2a1a] border border-[#c9a227]/30'
-      }`}>
-        {/* Header bar */}
-        <div className={`flex items-center justify-between px-4 py-2.5 ${
-          isUrgent ? 'bg-red-800' : 'bg-[#c9a227]'
-        }`}>
-          <div className="flex items-center gap-2">
-            {isUrgent ? (
-              <AlertTriangle className="w-4 h-4 text-white" />
-            ) : (
-              <Megaphone className="w-4 h-4 text-[#0a2a1a]" />
-            )}
-            <span className={`text-[10px] font-black uppercase tracking-widest ${
-              isUrgent ? 'text-white' : 'text-[#0a2a1a]'
+      {visibleAnnouncements.map((announcement) => {
+        const isUrgent = announcement.priority === 'urgent';
+        return (
+          <div
+            key={announcement.id}
+            className={`w-full rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-10 duration-500 ${
+              isUrgent
+                ? 'bg-red-600 border border-red-400'
+                : 'bg-[#0a2a1a] border border-[#c9a227]/30'
+            }`}
+          >
+            {/* Header */}
+            <div className={`flex items-center justify-between px-4 py-2.5 ${
+              isUrgent ? 'bg-red-800' : 'bg-[#c9a227]'
             }`}>
-              {isUrgent ? '⚠ Urgent Notice' : 'Announcement'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {announcements.length > 1 && (
-              <span className={`text-[9px] font-black tracking-widest ${
-                isUrgent ? 'text-white/70' : 'text-[#0a2a1a]/70'
-              }`}>
-                {currentIndex + 1}/{announcements.length}
-              </span>
-            )}
-            <button
-              onClick={() => setVisible(false)}
-              className={`p-1 rounded-full hover:bg-black/10 transition-colors ${
-                isUrgent ? 'text-white' : 'text-[#0a2a1a]'
-              }`}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+              <div className="flex items-center gap-2">
+                {isUrgent ? (
+                  <AlertTriangle className="w-4 h-4 text-white" />
+                ) : (
+                  <Megaphone className="w-4 h-4 text-[#0a2a1a]" />
+                )}
+                <span className={`text-[10px] font-black uppercase tracking-widest ${
+                  isUrgent ? 'text-white' : 'text-[#0a2a1a]'
+                }`}>
+                  {isUrgent ? '⚠ Urgent' : 'Announcement'}
+                </span>
+              </div>
+              <button
+                onClick={() => toggleDismiss(announcement.id)}
+                className={`p-1 rounded-full hover:bg-black/10 transition-colors ${
+                  isUrgent ? 'text-white' : 'text-[#0a2a1a]'
+                }`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-        {/* Message body */}
-        <div className="px-4 py-3">
-          <p className="text-sm font-medium leading-relaxed text-white">
-            {current.message}
-          </p>
-        </div>
-
-        {/* Progress bar showing remaining display time */}
-        <div className={`h-1 ${isUrgent ? 'bg-red-900' : 'bg-[#071a0f]'}`}>
-          {visible && (
-            <div
-              className={`h-full ${isUrgent ? 'bg-white' : 'bg-[#c9a227]'} transition-none`}
-              style={{
-                animation: `shrink ${displayDuration}ms linear forwards`,
-                width: '100%',
-              }}
-            />
-          )}
-        </div>
-      </div>
+            {/* Message */}
+            <div className="px-4 py-3">
+              <p className="text-sm font-medium leading-relaxed text-white">
+                {announcement.message}
+              </p>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

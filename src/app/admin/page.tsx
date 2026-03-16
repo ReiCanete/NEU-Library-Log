@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, TrendingUp, RefreshCcw, Sparkles, BookOpen, GraduationCap, ArrowUpRight, Clock, CalendarRange } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, Filter, X } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -11,12 +10,10 @@ import { format, startOfDay, subDays, isWithinInterval, endOfDay, isSameDay, sta
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { AdminLayout } from '@/components/admin/admin-layout';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const NEU_COLLEGES = [
-  'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences', 'College of Business Administration', 'College of Communication', 'College of Informatics and Computing Studies', 'College of Criminology', 'College of Education', 'College of Engineering and Architecture', 'College of Medical Technology', 'College of Midwifery', 'College of Music', 'College of Nursing', 'College of Physical Therapy', 'College of Respiratory Therapy', 'School of International Relations', 'Faculty', 'Administrative Staff', 'Library Staff', 'Guest / Visitor'
+  'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences', 'College of Business Administration', 'College of Communication', 'College of Informatics and Computing Studies', 'College of Criminology', 'College of Education', 'College of Engineering and Architecture', 'College of Medical Technology', 'College of Midwifery', 'College of Music', 'College of Nursing', 'College of Physical Therapy', 'College of Respiratory Therapy', 'School of International Relations'
 ];
 
 const PURPOSE_COLORS: Record<string, string> = {
@@ -29,12 +26,13 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const db = useFirestore();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Filters
   const [filterPurpose, setFilterPurpose] = useState('all');
   const [filterCollege, setFilterCollege] = useState('all');
   const [filterType, setFilterType] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [isRangeActive, setIsRangeActive] = useState(false);
+  const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
@@ -46,51 +44,46 @@ export default function AdminDashboard() {
       const purposeMatch = filterPurpose === 'all' || visit.purpose === filterPurpose;
       const collegeMatch = filterCollege === 'all' || visit.college === filterCollege;
       let typeMatch = filterType === 'all' ? true : (filterType === 'employee' ? ['Faculty', 'Administrative Staff', 'Library Staff'].includes(visitType) : visitType === filterType);
-      let dateMatch = isRangeActive && startDate && endDate ? isWithinInterval(visit.timestamp.toDate(), { start: startOfDay(new Date(startDate)), end: endOfDay(new Date(endDate)) }) : true;
+      
+      const visitDate = visit.timestamp?.toDate ? visit.timestamp.toDate() : new Date();
+      const dateMatch = isWithinInterval(visitDate, { 
+        start: startOfDay(new Date(startDate)), 
+        end: endOfDay(new Date(endDate)) 
+      });
+
       return purposeMatch && collegeMatch && typeMatch && dateMatch;
     });
-  }, [allVisits, filterPurpose, filterCollege, filterType, startDate, endDate, isRangeActive]);
+  }, [allVisits, filterPurpose, filterCollege, filterType, startDate, endDate]);
 
   const stats = useMemo(() => {
-    const today = isRangeActive && startDate ? startOfDay(new Date(startDate)) : startOfDay(new Date());
+    const today = startOfDay(new Date());
     return {
-      today: filteredVisits.filter(v => isSameDay(v.timestamp.toDate(), today)).length,
-      week: filteredVisits.filter(v => isRangeActive ? true : v.timestamp.toDate() >= subDays(new Date(), 7)).length,
-      month: filteredVisits.filter(v => isWithinInterval(v.timestamp.toDate(), { start: startOfMonth(today), end: endOfMonth(today) })).length
+      today: filteredVisits.filter(v => isSameDay(v.timestamp?.toDate?.() || new Date(), today)).length,
+      week: filteredVisits.filter(v => (v.timestamp?.toDate?.() || new Date()) >= subDays(new Date(), 7)).length,
+      month: filteredVisits.filter(v => isWithinInterval(v.timestamp?.toDate?.() || new Date(), { start: startOfMonth(today), end: endOfMonth(today) })).length
     };
-  }, [filteredVisits, isRangeActive, startDate, endDate]);
-
-  const typeOptions = useMemo(() => {
-    if (!allVisits) return [];
-    const counts: any = { all: allVisits.length, Student: 0, Faculty: 0, 'Administrative Staff': 0, 'Library Staff': 0, Guest: 0, employee: 0 };
-    allVisits.forEach(v => {
-      const t = v.visitorType || 'Student';
-      counts[t]++;
-      if (['Faculty', 'Administrative Staff', 'Library Staff'].includes(t)) counts.employee++;
-    });
-    return [
-      { value: 'all', label: `All Types (${counts.all})` },
-      { value: 'Student', label: `Student (${counts.Student})` },
-      { value: 'Faculty', label: `Faculty (${counts.Faculty})` },
-      { value: 'Administrative Staff', label: `Admin Staff (${counts['Administrative Staff']})` },
-      { value: 'Library Staff', label: `Library Staff (${counts['Library Staff']})` },
-      { value: 'Guest', label: `Guest (${counts.Guest})` },
-      { value: 'employee', label: `Staff Total (${counts.employee})` }
-    ];
-  }, [allVisits]);
+  }, [filteredVisits]);
 
   const chartData = useMemo(() => {
     const counts: Record<string, number> = {};
     filteredVisits.forEach(v => {
-      const key = filterType === 'all' ? (v.purpose || 'Other') : (v.purpose || 'Other');
+      const key = v.purpose || 'Other Purpose';
       counts[key] = (counts[key] || 0) + 1;
     });
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [filteredVisits, filterType]);
+  }, [filteredVisits]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setTimeout(() => { setIsRefreshing(false); toast({ title: "Live Sync", description: "Metrics are up to date." }); }, 800);
+    setTimeout(() => { setIsRefreshing(false); toast({ title: "Live Sync", description: "Metrics updated." }); }, 800);
+  };
+
+  const resetFilters = () => {
+    setFilterPurpose('all');
+    setFilterCollege('all');
+    setFilterType('all');
+    setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+    setEndDate(format(new Date(), 'yyyy-MM-dd'));
   };
 
   return (
@@ -110,26 +103,72 @@ export default function AdminDashboard() {
           <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm transition-all font-black uppercase tracking-widest"><RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync</button>
         </div>
 
-        <Card className="p-6 rounded-2xl border-[#d4e4d8] shadow-sm bg-white border-t-4 border-t-[#c9a227]">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">Purpose Filter</Label>
-              <Select value={filterPurpose} onValueChange={setFilterPurpose}><SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Purposes</SelectItem>{Object.keys(PURPOSE_COLORS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
+        {/* Global Filters Row */}
+        <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Purpose Filter</Label>
+              <select
+                value={filterPurpose}
+                onChange={e => setFilterPurpose(e.target.value)}
+                className="w-full h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+              >
+                <option value="all">All Purposes</option>
+                {Object.keys(PURPOSE_COLORS).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">College Filter</Label>
-              <Select value={filterCollege} onValueChange={setFilterCollege}><SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Colleges</SelectItem>{NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select>
+            <div>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">College Filter</Label>
+              <select
+                value={filterCollege}
+                onChange={e => setFilterCollege(e.target.value)}
+                className="w-full h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+              >
+                <option value="all">All Colleges</option>
+                {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">Visitor Role</Label>
-              <Select value={filterType} onValueChange={setFilterType}><SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold text-xs"><SelectValue /></SelectTrigger><SelectContent>{typeOptions.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent></Select>
+            <div>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Visitor Type</Label>
+              <select
+                value={filterType}
+                onChange={e => setFilterType(e.target.value)}
+                className="w-full h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+              >
+                <option value="all">All Types</option>
+                <option value="Student">Student</option>
+                <option value="Faculty">Faculty</option>
+                <option value="Administrative Staff">Admin Staff</option>
+                <option value="Library Staff">Library Staff</option>
+                <option value="Guest">Guest</option>
+                <option value="employee">All Staff Total</option>
+              </select>
             </div>
           </div>
-        </Card>
+
+          <div className="flex flex-col md:flex-row items-end gap-6 pt-4 border-t border-[#f0f4f1]">
+            <div className="flex-1 w-full">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Date Range</Label>
+              <div className="flex items-center gap-3">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                  className="flex-1 h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-[11px] font-bold text-[#1a3a2a]" />
+                <span className="text-slate-300">to</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                  className="flex-1 h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-[11px] font-bold text-[#1a3a2a]" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={resetFilters}
+                className="h-11 px-6 bg-slate-100 text-[#4a6741] text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2">
+                <X className="w-3.5 h-3.5" /> Reset
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { label: 'Visits Today', value: stats.today, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Visits (Filtered)', value: filteredVisits.length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
             { label: 'Monthly Volume', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100' }
           ].map((s, i) => (

@@ -1,13 +1,12 @@
-
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarInset, SidebarTrigger, SidebarFooter } from '@/components/ui/sidebar';
-import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, Megaphone, ShieldOff } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useUser, useCollection, useFirestore, useAuth } from '@/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { useUser, useFirestore, useAuth } from '@/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
@@ -109,11 +108,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   }
 
   const navItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
-    { label: 'Visitor Logs', icon: Users, path: '/admin/logs', badge: todayCount },
-    { label: 'Blocklist', icon: UserX, path: '/admin/blocklist', badge: blockedCount },
-    { label: 'Announcements', icon: Megaphone, path: '/admin/announcements' },
-    { label: 'Reports', icon: FileText, path: '/admin/reports' },
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/logs', label: 'Visitor Logs', icon: Users, badge: todayCount },
+    { href: '/admin/blocklist', label: 'Blocklist', icon: UserX, badge: blockedCount },
+    { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+    { href: '/admin/reports', label: 'Reports', icon: FileText },
   ];
 
   return (
@@ -136,29 +135,34 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </SidebarHeader>
           <SidebarContent className="p-4 space-y-1">
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === item.path}
-                    className={`h-11 rounded-xl px-4 transition-all ${
-                      pathname === item.path 
-                        ? 'bg-[#c9a227] text-[#0a2a1a] font-bold shadow-md' 
-                        : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <Link href={item.path} className="flex items-center gap-3">
-                      <item.icon className={`h-4 w-4 ${pathname === item.path ? 'text-[#0a2a1a]' : 'text-[#c9a227]'}`} />
-                      <span className="text-sm font-semibold">{item.label}</span>
-                      {item.badge !== undefined && item.badge > 0 && (
-                        <Badge className={`ml-auto bg-white/10 text-white border-none text-[10px] px-2 py-0.5 rounded-full min-w-[20px] h-[20px] flex items-center justify-center`}>
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={isActive}
+                      className={`h-11 rounded-xl px-4 transition-all ${
+                        isActive 
+                          ? 'bg-[#c9a227] text-[#0a2a1a] font-bold shadow-md' 
+                          : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <Link href={item.href} className="flex items-center gap-3">
+                        <item.icon className={`h-4 w-4 ${isActive ? 'text-[#0a2a1a]' : 'text-[#c9a227]'}`} />
+                        <span className="text-sm font-semibold">{item.label}</span>
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <Badge className={`ml-auto border-none text-[10px] px-2 py-0.5 rounded-full min-w-[20px] h-[20px] flex items-center justify-center ${
+                            item.href === '/admin/blocklist' ? 'bg-red-500 text-white' : 'bg-[#c9a227]/20 text-[#c9a227]'
+                          }`}>
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className="p-4 border-t border-[#c9a227]/10">
@@ -179,7 +183,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <SidebarTrigger className="text-[#1a3a2a]" />
               <div className="h-6 w-px bg-[#d4e4d8]" />
               <p className="text-xs font-bold text-[#4a6741] uppercase tracking-widest leading-none">
-                {format(currentTime, 'EEEE, MMMM do, yyyy')}
+                {currentTime ? format(currentTime, 'EEEE, MMMM do, yyyy') : '--'}
               </p>
             </div>
 
@@ -187,7 +191,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-[#1a3a2a] leading-none">{adminProfile?.fullName || adminProfile?.displayName || 'Library Admin'}</p>
                 <p className="text-[10px] font-black text-[#c9a227] uppercase tracking-widest tabular-nums mt-1">
-                  {format(currentTime, 'hh:mm:ss a')}
+                  {currentTime ? format(currentTime, 'hh:mm:ss a') : '--'}
                 </p>
               </div>
               <div className="h-10 w-10 rounded-xl bg-[#0a2a1a] border-2 border-[#c9a227]/30 flex items-center justify-center text-[#c9a227] font-black text-sm">
