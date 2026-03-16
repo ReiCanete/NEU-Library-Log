@@ -2,66 +2,42 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Calendar, TrendingUp, Loader2, RefreshCcw, Sparkles, BookOpen, GraduationCap, ArrowUpRight, ArrowDownRight, Settings2, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Users, Calendar, TrendingUp, RefreshCcw, Sparkles, BookOpen, GraduationCap, ArrowUpRight, ArrowDownRight, UserCheck, Clock, CalendarRange, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth, useFirestore, useCollection, useDoc } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { useFirestore, useCollection } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
-import { format, startOfDay, subDays } from 'date-fns';
+import { format, startOfDay, subDays, isWithinInterval, endOfDay, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { logAppError } from '@/lib/errorMessages';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-function CountUp({ value, error }: { value: number; error?: boolean }) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (error) return;
-    let start = 0;
-    const end = value;
-    if (start === end) {
-      setCount(end);
-      return;
-    }
-    const duration = 1000;
-    const increment = Math.ceil(end / (duration / 16)) || 1;
-    const timer = setInterval(() => {
-      start += increment;
-      if (start >= end) {
-        setCount(end);
-        clearInterval(timer);
-      } else {
-        setCount(start);
-      }
-    }, 16);
-    return () => clearInterval(timer);
-  }, [value, error]);
-
-  if (error) return <span className="flex items-center gap-2">— <AlertTriangle className="h-4 w-4 text-red-500" /></span>;
-  return <>{count}</>;
-}
-
-const ABBREVIATIONS: Record<string, string> = {
-  "College of Informatics and Computing Studies": "CICS",
-  "College of Engineering and Architecture": "CEA",
-  "College of Business Administration": "CBA",
-  "College of Arts and Sciences": "CAS",
-  "College of Accountancy": "COA",
-  "College of Education": "COE",
-  "College of Medical Technology": "CMT",
-  "College of Nursing": "CON",
-  "College of Agriculture": "CAG",
-  "College of Music": "CMU",
-  "College of Physical Therapy": "CPT",
-  "College of Respiratory Therapy": "CRT",
-  "College of Criminology": "CC",
-  "College of Midwifery": "CMID",
-  "College of Communication": "CCOM",
-  "School of International Relations": "SIR"
-};
+const NEU_COLLEGES = [
+  'College of Accountancy',
+  'College of Agriculture',
+  'College of Arts and Sciences',
+  'College of Business Administration',
+  'College of Communication',
+  'College of Informatics and Computing Studies',
+  'College of Criminology',
+  'College of Education',
+  'College of Engineering and Architecture',
+  'College of Medical Technology',
+  'College of Midwifery',
+  'College of Music',
+  'College of Nursing',
+  'College of Physical Therapy',
+  'College of Respiratory Therapy',
+  'School of International Relations',
+  'Faculty',
+  'Administrative Staff',
+  'Library Staff',
+  'Guest / Visitor',
+];
 
 const PURPOSE_COLORS: Record<string, string> = {
   "Reading Books": "#1a5c2e",
@@ -72,183 +48,257 @@ const PURPOSE_COLORS: Record<string, string> = {
   "Other Purpose": "#9ca3af"
 };
 
+const TYPE_OPTIONS = [
+  { value: 'all', label: 'All Types' },
+  { value: 'Student', label: 'Student' },
+  { value: 'Faculty', label: 'Faculty / Teacher' },
+  { value: 'Administrative Staff', label: 'Administrative Staff' },
+  { value: 'Library Staff', label: 'Library Staff' },
+  { value: 'Guest', label: 'Guest / Visitor' },
+  { value: 'employee', label: 'Employee (All Staff)' },
+];
+
 export default function AdminDashboard() {
   const { toast } = useToast();
   const db = useFirestore();
-  const auth = useAuth();
-  const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isEditingCapacity, setIsEditingCapacity] = useState(false);
-  const [newCapacity, setNewCapacity] = useState('');
-
-  const todayDate = useMemo(() => startOfDay(new Date()), []);
   
+  // Filters
+  const [filterPurpose, setFilterPurpose] = useState('all');
+  const [filterCollege, setFilterCollege] = useState('all');
+  const [filterType, setFilterType] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isRangeActive, setIsRangeActive] = useState(false);
+
   const visitsQuery = useMemo(() => {
     if (!db) return null;
     return query(collection(db, 'visits'), orderBy('timestamp', 'desc'));
   }, [db]);
   
-  const { data: allVisits, loading: visitsLoading, error: visitsError } = useCollection(visitsQuery);
-  
-  const settingsRef = useMemo(() => (db ? doc(db, 'settings', 'library') : null), [db]);
-  const { data: settings } = useDoc(settingsRef);
+  const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
 
-  const dailyCapacity = settings?.dailyCapacity || 200;
+  const filteredVisits = useMemo(() => {
+    if (!allVisits) return [];
+    return allVisits.filter(visit => {
+      const purposeMatch = filterPurpose === 'all' || visit.purpose === filterPurpose;
+      const collegeMatch = filterCollege === 'all' || visit.college === filterCollege;
+      
+      let typeMatch = filterType === 'all';
+      if (filterType === 'employee') {
+        typeMatch = ['Faculty', 'Administrative Staff', 'Library Staff'].includes(visit.visitorType);
+      } else if (filterType !== 'all') {
+        typeMatch = visit.visitorType === filterType;
+      }
+
+      let dateMatch = true;
+      if (isRangeActive && startDate && endDate) {
+        const d = visit.timestamp?.toDate();
+        dateMatch = isWithinInterval(d, { 
+          start: startOfDay(new Date(startDate)), 
+          end: endOfDay(new Date(endDate)) 
+        });
+      }
+
+      return purposeMatch && collegeMatch && typeMatch && dateMatch;
+    });
+  }, [allVisits, filterPurpose, filterCollege, filterType, startDate, endDate, isRangeActive]);
+
+  const stats = useMemo(() => {
+    if (!filteredVisits) return { today: 0, week: 0, month: 0 };
+    
+    const now = new Date();
+    const today = isRangeActive && startDate ? startOfDay(new Date(startDate)) : startOfDay(now);
+    const weekStart = isRangeActive && startDate && endDate ? startOfDay(new Date(startDate)) : subDays(today, 7);
+    const weekEnd = isRangeActive && endDate ? endOfDay(new Date(endDate)) : endOfDay(today);
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
+
+    return {
+      today: filteredVisits.filter(v => isSameDay(v.timestamp.toDate(), today)).length,
+      week: filteredVisits.filter(v => {
+        const d = v.timestamp.toDate();
+        return isRangeActive 
+          ? isWithinInterval(d, { start: weekStart, end: weekEnd })
+          : d >= subDays(now, 7);
+      }).length,
+      month: filteredVisits.filter(v => isWithinInterval(v.timestamp.toDate(), { start: monthStart, end: monthEnd })).length
+    };
+  }, [filteredVisits, isRangeActive, startDate, endDate]);
+
+  const purposeData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredVisits.forEach(v => { counts[v.purpose] = (counts[v.purpose] || 0) + 1; });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [filteredVisits]);
+
+  const collegeData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredVisits.forEach(v => { counts[v.college || 'Other'] = (counts[v.college || 'Other'] || 0) + 1; });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [filteredVisits]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      setLastUpdated(new Date());
       setIsRefreshing(false);
       toast({ title: "Metrics Updated", description: "Latest database snapshots loaded." });
     }, 800);
   };
 
-  const updateCapacity = async () => {
-    if (!db || !auth) return;
-    const val = parseInt(newCapacity);
-    if (isNaN(val) || val <= 0) {
-      toast({ title: "Invalid Input", description: "Capacity must be a positive number.", variant: "destructive" });
-      return;
-    }
-    try {
-      await setDoc(doc(db, 'settings', 'library'), {
-        dailyCapacity: val,
-        lastUpdatedBy: auth?.currentUser?.email || 'Admin',
-        updatedAt: Timestamp.now()
-      }, { merge: true });
-      toast({ title: "Threshold Updated", description: `Daily capacity set to ${val}.` });
-      setIsEditingCapacity(false);
-    } catch (e: any) {
-      logAppError('Dashboard', 'UpdateCapacity', e);
-      toast({ title: "Failed", description: "Could not update capacity. Check permissions.", variant: "destructive" });
-    }
+  const resetRange = () => {
+    setStartDate('');
+    setEndDate('');
+    setIsRangeActive(false);
   };
-
-  const stats = useMemo(() => {
-    if (!allVisits || !todayDate) return { today: 0, yesterday: 0, week: 0, month: 0 };
-    const yesterdayDate = subDays(todayDate, 1);
-    const weekDate = subDays(todayDate, 7);
-    const monthDate = subDays(todayDate, 30);
-    
-    return {
-      today: allVisits.filter(v => v.timestamp.toDate() >= todayDate).length,
-      yesterday: allVisits.filter(v => {
-        const d = v.timestamp.toDate();
-        return d >= yesterdayDate && d < todayDate;
-      }).length,
-      week: allVisits.filter(v => v.timestamp.toDate() >= weekDate).length,
-      month: allVisits.filter(v => v.timestamp.toDate() >= monthDate).length
-    };
-  }, [allVisits, todayDate]);
-
-  const purposeData = useMemo(() => {
-    if (!allVisits) return [];
-    const counts: Record<string, number> = {};
-    allVisits.forEach(v => { counts[v.purpose] = (counts[v.purpose] || 0) + 1; });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [allVisits]);
-
-  const collegeData = useMemo(() => {
-    if (!allVisits) return [];
-    const counts: Record<string, number> = {};
-    allVisits.forEach(v => { 
-      const college = v.college || 'Other';
-      const label = ABBREVIATIONS[college] || college;
-      counts[label] = (counts[label] || 0) + 1; 
-    });
-    return Object.entries(counts).map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count).slice(0, 5);
-  }, [allVisits]);
 
   return (
     <AdminLayout>
-      <title>NEU Library Log — Dashboard</title>
       <div className="space-y-8">
-        <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-[#d4e4d8] shadow-sm">
+        {/* Header Banner */}
+        <div className="bg-[#1a3a2a] rounded-2xl p-6 flex items-center justify-between shadow-xl">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-[#1a3a2a] rounded-xl text-[#c9a227]">
-              <Sparkles className="h-6 w-6" />
+            <div className="w-14 h-14 bg-[#c9a227]/20 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-7 h-7 text-[#c9a227]" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-[#1a3a2a]">System Overview</h2>
-              <p className="text-xs tracking-widest text-[#4a6741] uppercase mt-1">Live Institutional Metrics</p>
+              <h2 className="text-2xl font-bold text-white">System Overview</h2>
+              <p className="text-white/60 text-sm">
+                The NEU Library Log system is active. 
+                <span className="text-[#c9a227] font-semibold"> {stats.today} visits {isRangeActive ? 'on selected date' : 'today so far'}.</span>
+              </p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Dialog open={isEditingCapacity} onOpenChange={setIsEditingCapacity}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="h-10 px-4 rounded-xl border-[#d4e4d8] font-semibold text-[#1a3a2a] flex gap-2">
-                  <Settings2 className="h-4 w-4" />
-                  CAPACITY: {dailyCapacity}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="rounded-2xl p-6 max-w-sm">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold text-[#1a3a2a]">Daily Threshold</DialogTitle>
-                  <DialogDescription className="text-xs text-[#4a6741] font-medium uppercase tracking-widest">Maximum kiosk entries allowed per day.</DialogDescription>
-                </DialogHeader>
-                <div className="py-6">
-                  <Input type="number" placeholder="200" className="h-14 rounded-xl bg-[#f0f4f1] border-none font-bold text-xl text-center" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} />
-                </div>
-                <DialogFooter>
-                  <Button className="w-full h-12 rounded-xl bg-[#1a3a2a] font-bold" onClick={updateCapacity}>Apply Settings</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            <Button onClick={handleRefresh} disabled={isRefreshing} variant="ghost" className="h-10 w-10 p-0 rounded-xl hover:bg-[#f0f4f1]">
-              <RefreshCcw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
+          <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm transition-all font-bold">
+            <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync Data
+          </button>
         </div>
 
+        {/* Global Filters */}
+        <Card className="p-6 rounded-2xl border-[#d4e4d8] shadow-sm bg-white">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Purpose Filter</Label>
+              <Select value={filterPurpose} onValueChange={setFilterPurpose}>
+                <SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold text-xs">
+                  <SelectValue placeholder="All Purposes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Purposes</SelectItem>
+                  {Object.keys(PURPOSE_COLORS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">College Filter</Label>
+              <Select value={filterCollege} onValueChange={setFilterCollege}>
+                <SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold text-xs">
+                  <SelectValue placeholder="All Colleges" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Colleges</SelectItem>
+                  {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Visitor Type Filter</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold text-xs">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_OPTIONS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-[#f0f4f1] flex flex-col md:flex-row items-end gap-4">
+            <div className="flex-1 grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">Start Date</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] ml-1">End Date</Label>
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-11 rounded-xl bg-[#f0f4f1] border-none font-bold" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => setIsRangeActive(true)} disabled={!startDate || !endDate} className="h-11 px-6 rounded-xl bg-[#1a3a2a] text-white font-bold flex gap-2">
+                <CalendarRange className="h-4 w-4" /> Apply Range
+              </Button>
+              {isRangeActive && (
+                <Button variant="ghost" onClick={resetRange} className="h-11 text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50">
+                  Reset Filter
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { label: 'Visits Today', value: stats.today, prev: stats.yesterday, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'Monthly Total', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100' }
+            { label: isRangeActive ? 'Visits on Start Date' : 'Visits Today', value: stats.today, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: isRangeActive ? 'Range Total' : 'Last 7 Days', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
+            { label: isRangeActive ? 'Month containing Start' : 'Monthly Total', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100' }
           ].map((s, i) => (
-            <Card key={i} className="border border-[#d4e4d8] shadow-sm rounded-2xl bg-white p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl ${s.bg}`}>
-                  <s.icon className={`h-6 w-6 ${s.color}`} />
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-[#4a6741] uppercase tracking-[0.15em]">{s.label}</p>
-                  <h3 className="text-3xl font-bold text-[#1a3a2a] tabular-nums mt-1">
-                    {visitsLoading ? <Skeleton className="h-8 w-16 ml-auto rounded-lg" /> : <CountUp value={s.value} error={!!visitsError} />}
+            <Card key={i} className="border border-[#d4e4d8] shadow-sm rounded-2xl bg-white p-8">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</p>
+                  <h3 className="text-5xl font-black text-[#1a3a2a] mt-2 tabular-nums">
+                    {visitsLoading ? <Skeleton className="h-12 w-20 rounded-lg" /> : s.value}
                   </h3>
                 </div>
+                <div className={`p-4 rounded-2xl ${s.bg}`}>
+                  <s.icon className={`h-8 w-8 ${s.color}`} />
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[10px] font-bold text-[#4a6741]/50 uppercase tracking-widest pt-4 border-t border-[#f0f4f1]">
-                <span>Sync Active</span>
-                {s.prev !== undefined && s.value >= s.prev ? <ArrowUpRight className="h-3 w-3 text-emerald-500" /> : <ArrowDownRight className="h-3 w-3 text-red-400" />}
+              <div className="mt-6 pt-4 border-t border-[#f0f4f1] flex items-center justify-between">
+                <span className="text-[9px] font-bold text-[#4a6741]/50 uppercase tracking-widest">Sync Active</span>
+                <ArrowUpRight className="h-4 w-4 text-emerald-500" />
               </div>
             </Card>
           ))}
         </div>
 
+        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] bg-white p-8">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-lg font-bold text-[#1a3a2a]">Activity Analytics</h3>
-                <p className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">Visit purpose distribution</p>
+                <p className="text-[10px] text-[#4a6741] font-bold uppercase tracking-widest">Purpose distribution</p>
               </div>
               <BookOpen className="h-6 w-6 text-[#c9a227]" />
             </div>
-            <div className="h-[300px] w-full">
-              {visitsLoading ? <Skeleton className="h-full w-full rounded-2xl" /> : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={purposeData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">
-                      {purposeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#9ca3af'} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={purposeData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {purposeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PURPOSE_COLORS[entry.name] || '#9ca3af'} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </Card>
 
@@ -260,19 +310,19 @@ export default function AdminDashboard() {
               </div>
               <GraduationCap className="h-6 w-6 text-[#1a3a2a]" />
             </div>
-            <div className="h-[300px] w-full">
-              {visitsLoading ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full rounded-lg" />)}</div> : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={collegeData} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 10, fontWeight: 'bold' }} />
-                    <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }} />
-                    <Bar dataKey="count" radius={[0, 8, 8, 0]} barSize={24}>
-                      {collegeData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={collegeData} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tick={{ fill: '#4a6741', fontSize: 10, fontWeight: 'bold' }} />
+                  <Tooltip cursor={{ fill: '#f0f4f1' }} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }} />
+                  <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24}>
+                    {collegeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#1a3a2a' : '#c9a227'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </Card>
         </div>

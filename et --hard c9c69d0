@@ -1,0 +1,10 @@
+[33mc4245d0[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Fix two issues in src/app/admin/page.tsx: PART 1 — Fix duplicate key err
+[33m9a1d03e[m ## Error Type Console Error
+[33m24d9dd7[m PART 1 — Fix broken sidebar navigation: The sidebar links for Visitor Lo
+[33m34ba5e9[m when logging in as staff error encountered
+[33m380cf60[m ## Error Type Console Error
+[33medd3593[m Fix these three issues: PART 1 — Fix build errors: Run a TypeScript chec
+[33m1044eec[m ## Error Type Console TypeError
+[33m0837ba0[m[33m ([m[1;31morigin/main[m[33m)[m Make these critical changes for the final submission: PART 1 — Add jcesp
+[33mc9c69d0[m The app looks fantastic across all screens! 🎉 Everything is working — k
+[33m05a411e[m PART 1 — Fix the dropdown blur effect: The dropdown is blurring the enti

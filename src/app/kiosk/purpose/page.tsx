@@ -53,14 +53,19 @@ export default function PurposePage() {
     if (!visitor || isSubmitting || !db) return;
     setIsSubmitting(true);
     try {
+      // Save purpose to session for welcome page
+      const updatedVisitor = { ...visitor, purpose };
+      sessionStorage.setItem('kiosk_visitor', JSON.stringify(updatedVisitor));
+
       await addDoc(collection(db, 'visits'), {
-        studentId: visitor.studentId || '',
-        fullName: visitor.fullName || '',
-        college: visitor.college || '',
-        program: visitor.program || '',
-        email: visitor.email || '',
+        studentId: updatedVisitor.studentId,
+        fullName: updatedVisitor.fullName,
+        college: updatedVisitor.college,
+        program: updatedVisitor.program,
+        visitorType: updatedVisitor.visitorType || 'Student',
+        email: updatedVisitor.email || '',
         purpose: purpose,
-        loginMethod: visitor.loginMethod || 'id',
+        loginMethod: updatedVisitor.loginMethod || 'id',
         timestamp: Timestamp.now(),
       });
       router.push('/kiosk/welcome');
@@ -74,7 +79,6 @@ export default function PurposePage() {
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col items-center justify-center p-6 relative">
-      <title>NEU Library Log — Visit Purpose</title>
       <div className="absolute top-6 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
           <ArrowLeft className="h-4 w-4" /> Cancel Entry
@@ -97,7 +101,7 @@ export default function PurposePage() {
             {PURPOSES.map((item) => (
               <Card 
                 key={item.id} 
-                className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] hover:scale-[1.02] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden hover-shimmer" 
+                className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden" 
                 onClick={() => handleSelect(item.label)}
               >
                 <CardContent className="flex flex-col items-center justify-center p-4 gap-3 h-[140px]">
