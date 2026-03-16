@@ -232,57 +232,61 @@ export default function AdminDashboard() {
             </div>
 
             {editingCapacity ? (
-              <div className="flex items-center gap-2 mt-2">
+              <div className="mt-2">
                 <input
                   type="number"
                   value={capacityInput}
                   onChange={e => setCapacityInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSaveCapacity()}
-                  className="flex-1 h-9 border border-[#d4e4d8] rounded-lg px-3 text-sm font-bold text-[#1a3a2a] focus:outline-none focus:border-[#1a3a2a]"
+                  className="w-full h-10 border border-[#d4e4d8] rounded-lg px-3 text-sm font-bold text-[#1a3a2a] focus:outline-none focus:border-[#1a3a2a] mb-2"
                   min="1"
                   autoFocus
                 />
-                <button
-                  onClick={handleSaveCapacity}
-                  disabled={savingCapacity}
-                  className="h-9 px-3 bg-[#1a3a2a] text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#0a2a1a] transition-colors disabled:opacity-50"
-                >
-                  {savingCapacity ? '...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingCapacity(false);
-                    setCapacityInput(String(capacity));
-                  }}
-                  className="h-9 px-3 bg-[#f8fafc] border border-[#d4e4d8] text-[#4a6741] text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#f0f4f1] transition-colors"
-                >
-                  Cancel
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveCapacity}
+                    disabled={savingCapacity}
+                    className="flex-1 h-9 bg-[#1a3a2a] text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#0a2a1a] transition-colors disabled:opacity-50"
+                  >
+                    {savingCapacity ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingCapacity(false);
+                      setCapacityInput(String(capacity));
+                    }}
+                    className="flex-1 h-9 bg-[#f8fafc] border border-[#d4e4d8] text-[#4a6741] text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#f0f4f1] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="flex items-end justify-between mt-2">
-                <div className="flex-1">
-                  <p className="text-4xl font-black text-[#1a3a2a] tabular-nums">{capacity}</p>
-                  <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tight">
-                    {stats.today} recorded today ({Math.round((stats.today / capacity) * 100)}%)
-                  </p>
-                  {/* Usage bar */}
-                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
-                    <div
-                      className={`h-1.5 rounded-full transition-all duration-1000 ${
-                        stats.today / capacity > 0.9 ? 'bg-red-500' :
-                        stats.today / capacity > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${Math.min(100, Math.round((stats.today / capacity) * 100))}%` }}
-                    />
+              <div className="mt-2">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-4xl font-black text-[#1a3a2a] tabular-nums">{capacity}</p>
+                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tight">
+                      {stats.today} recorded today ({Math.round((stats.today / capacity) * 100)}%)
+                    </p>
                   </div>
+                  <button
+                    onClick={() => setEditingCapacity(true)}
+                    className="text-[9px] font-black uppercase tracking-widest text-[#4a6741] border border-[#d4e4d8] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f1] transition-all"
+                  >
+                    Edit
+                  </button>
                 </div>
-                <button
-                  onClick={() => setEditingCapacity(true)}
-                  className="ml-4 text-[9px] font-black uppercase tracking-widest text-[#4a6741] border border-[#d4e4d8] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f1] transition-all"
-                >
-                  Edit
-                </button>
+                {/* Usage bar */}
+                <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-1000 ${
+                      stats.today / capacity > 0.9 ? 'bg-red-500' :
+                      stats.today / capacity > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((stats.today / capacity) * 100))}%` }}
+                  />
+                </div>
               </div>
             )}
           </div>
