@@ -103,11 +103,15 @@ export default function VisitorLogs() {
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
 
-  // AUTOMATIC CLEANUP: Close panel whenever navigation occurs
-  useEffect(() => {
+  const closePanel = useCallback(() => {
     setSidePanelOpen(false);
     setSelectedVisit(null);
-  }, [pathname]);
+  }, []);
+
+  // AUTOMATIC CLEANUP: Close panel whenever navigation occurs
+  useEffect(() => {
+    closePanel();
+  }, [pathname, closePanel]);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -145,11 +149,6 @@ export default function VisitorLogs() {
       setIsBlocking(false);
     }
   };
-
-  const closePanel = useCallback(() => {
-    setSidePanelOpen(false);
-    setSelectedVisit(null);
-  }, []);
 
   return (
     <AdminLayout>
@@ -265,11 +264,11 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Side panel overlay - SCOPED: Only covers main content, not the sidebar */}
+      {/* Side panel overlay - SCOPED: Only covers main content, not the sidebar area */}
       {sidePanelOpen && (
         <div
-          className="fixed inset-0"
-          style={{ zIndex: 998, background: 'rgba(0,0,0,0.1)' }}
+          className="fixed inset-y-0 right-0 left-[var(--sidebar-width)] z-[998]"
+          style={{ background: 'rgba(0,0,0,0.1)' }}
           onClick={closePanel}
         />
       )}
@@ -279,7 +278,7 @@ export default function VisitorLogs() {
         className={`fixed right-0 top-0 h-full w-[380px] bg-white shadow-2xl transition-transform duration-300 ${
           sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
-        style={{ zIndex: 999 }}
+        style={{ zIndex: 999, pointerEvents: sidePanelOpen ? 'auto' : 'none' }}
       >
         {selectedVisit && (
           <div className="h-full flex flex-col">

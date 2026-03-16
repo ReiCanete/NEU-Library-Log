@@ -121,7 +121,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
         <Sidebar 
           className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white"
-          style={{ zIndex: 1000 }} // CRITICAL: Ensure sidebar is always above all page overlays for reliable navigation
+          style={{ zIndex: 1000, pointerEvents: 'auto' }} // CRITICAL: Ensure sidebar is always above all page overlays for reliable navigation
         >
           <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
             <img 
