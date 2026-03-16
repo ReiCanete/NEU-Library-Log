@@ -3,7 +3,7 @@
  * @fileOverview A professional news ticker for library announcements.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { Megaphone } from 'lucide-react';
@@ -18,7 +18,7 @@ interface Announcement {
   createdAt?: any;
 }
 
-export default function AnnouncementTicker() {
+function AnnouncementTicker() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   useEffect(() => {
@@ -121,3 +121,5 @@ export default function AnnouncementTicker() {
     </div>
   );
 }
+
+export default memo(AnnouncementTicker);
