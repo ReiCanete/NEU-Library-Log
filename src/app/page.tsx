@@ -177,36 +177,43 @@ function KioskEntryContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#0a2a1a] to-[#0d3d24]">
       <AnnouncementTicker />
-
-      <div className="absolute top-16 right-4 z-50 flex gap-2 p-1 bg-black/40 border border-[#c9a227]/30 rounded-xl">
+      
+      {/* Mode Toggle - Absolute positioned so it doesn't affect centering */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-full p-1">
         <button 
           onClick={() => switchMode('user')}
-          className={`px-4 py-1.5 rounded-lg font-black text-xs transition-colors ${loginMode === 'user' ? 'bg-[#c9a227] text-[#0a2a1a]' : 'text-white opacity-60 hover:opacity-100'}`}
+          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-100 ${
+            loginMode === 'user' 
+              ? 'bg-[#c9a227] text-[#0a2a1a] font-bold shadow-sm' 
+              : 'text-white/60 hover:text-white'
+          }`}
           suppressHydrationWarning
         >
           Kiosk
         </button>
         <button 
           onClick={() => switchMode('admin')}
-          className={`px-4 py-1.5 rounded-lg font-black text-xs transition-colors ${loginMode === 'admin' ? 'bg-[#c9a227] text-[#0a2a1a]' : 'text-white opacity-60 hover:opacity-100'}`}
+          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-100 ${
+            loginMode === 'admin' 
+              ? 'bg-[#c9a227] text-[#0a2a1a] font-bold shadow-sm' 
+              : 'text-white/60 hover:text-white'
+          }`}
           suppressHydrationWarning
         >
           Staff
         </button>
       </div>
 
-      <div className={`flex-1 flex flex-col items-center justify-center p-4 transition-opacity duration-100 ${transitioning ? 'opacity-0' : 'opacity-100'}`}>
-        <div className="w-full max-w-md mx-auto flex flex-col items-center gap-4">
-          <div className="flex flex-col items-center gap-2 text-center mb-2">
-            <img src="/neu-logo.png" alt="NEU Logo" width={70} height={70} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
-            <div className="space-y-1">
-              <h1 className="text-3xl font-black tracking-tight text-[#c9a227] drop-shadow-2xl leading-none uppercase">NEU Library</h1>
-              <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.4em]">Digital Visitor Log</p>
-            </div>
-          </div>
+      {/* Main Content Area - Center of the remaining space */}
+      <div className={`flex-1 flex flex-col items-center justify-center px-4 py-6 transition-opacity duration-100 ${transitioning ? 'opacity-0' : 'opacity-100'}`}>
+        <img src="/neu-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-3 shadow-2xl border-2 border-[#c9a227]/30" />
+        
+        <h1 className="text-4xl font-bold text-[#c9a227] text-center drop-shadow-2xl uppercase">NEU LIBRARY</h1>
+        <p className="text-xs tracking-widest text-white/50 uppercase mt-1 mb-6">Digital Visitor Log</p>
 
+        <div className="w-full max-w-[480px]">
           {isAtCapacity ? (
             <Card className="bg-[#0a2a1a]/60 backdrop-blur-2xl w-full border-2 border-red-500/50 rounded-[2rem] p-8 text-center space-y-4">
               <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
