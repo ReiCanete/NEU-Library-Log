@@ -103,15 +103,11 @@ export default function VisitorLogs() {
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
 
-  const closePanel = useCallback(() => {
+  // Close panel whenever navigation occurs
+  useEffect(() => {
     setSidePanelOpen(false);
     setSelectedVisit(null);
-  }, []);
-
-  // AUTOMATIC CLEANUP: Close panel whenever navigation occurs
-  useEffect(() => {
-    closePanel();
-  }, [pathname, closePanel]);
+  }, [pathname]);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -264,28 +260,52 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Side panel overlay - SCOPED: Only covers main content, not the sidebar area */}
+      {/* Side panel overlay - only renders when open, never covers sidebar */}
       {sidePanelOpen && (
         <div
-          className="fixed inset-y-0 right-0 left-[var(--sidebar-width)] z-[998]"
-          style={{ background: 'rgba(0,0,0,0.1)' }}
-          onClick={closePanel}
+          onClick={() => {
+            setSidePanelOpen(false);
+            setTimeout(() => setSelectedVisit(null), 300);
+          }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: '260px',
+            right: 0,
+            bottom: 0,
+            zIndex: 998,
+            background: 'rgba(0,0,0,0.2)',
+            cursor: 'default',
+          }}
         />
       )}
 
       {/* Side panel */}
       <div
-        className={`fixed right-0 top-0 h-full w-[380px] bg-white shadow-2xl transition-transform duration-300 ${
-          sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-        style={{ zIndex: 999, pointerEvents: sidePanelOpen ? 'auto' : 'none' }}
+        style={{
+          position: 'fixed',
+          right: 0,
+          top: 0,
+          height: '100%',
+          width: '380px',
+          background: 'white',
+          zIndex: 999,
+          boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
+          overflowY: 'auto',
+          transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s ease',
+          pointerEvents: sidePanelOpen ? 'all' : 'none',
+        }}
       >
         {selectedVisit && (
           <div className="h-full flex flex-col">
             <div className="bg-[#1a3a2a] p-5 flex items-center justify-between sticky top-0 z-10 shadow-md">
               <h2 className="text-white font-bold text-lg">Visitor Details</h2>
               <button
-                onClick={closePanel}
+                onClick={() => {
+                  setSidePanelOpen(false);
+                  setTimeout(() => setSelectedVisit(null), 300);
+                }}
                 className="text-white/60 hover:text-white p-1 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -341,8 +361,11 @@ export default function VisitorLogs() {
                 <button
                   onClick={() => {
                     setSidePanelOpen(false);
-                    setBlockTarget(selectedVisit);
-                    setBlockModalOpen(true);
+                    setTimeout(() => {
+                      setSelectedVisit(null);
+                      setBlockTarget(selectedVisit);
+                      setBlockModalOpen(true);
+                    }, 300);
                   }}
                   className="w-full py-4 bg-red-50 text-red-700 border border-red-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2"
                 >
