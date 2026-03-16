@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -9,6 +8,7 @@ import { useFirestore } from '@/firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
 
 const PURPOSES = [
   { id: 'reading', label: 'Reading Books', icon: BookOpen },
@@ -78,42 +78,46 @@ export default function PurposePage() {
   if (!visitor) return null;
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col items-center justify-center p-6 relative">
-      <div className="absolute top-6 left-6">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24]">
+      <AnnouncementTicker />
+      
+      <div className="absolute top-16 left-6">
         <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
           <ArrowLeft className="h-4 w-4" /> Cancel Entry
         </Button>
       </div>
 
-      <div className="max-w-4xl w-full flex flex-col gap-6 text-center z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight uppercase">Visit Purpose</h2>
-          <p className="text-sm text-white/50 font-bold uppercase tracking-widest">Hi <span className="text-white">{visitor.fullName.split(' ')[0]}</span>, why are you visiting today?</p>
-        </div>
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="max-w-4xl w-full flex flex-col gap-6">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight uppercase">Visit Purpose</h2>
+            <p className="text-sm text-white/50 font-bold uppercase tracking-widest">Hi <span className="text-white">{visitor?.fullName?.split(' ')[0] || 'Visitor'}</span>, why are you visiting today?</p>
+          </div>
 
-        {isSubmitting ? (
-          <div className="h-[360px] flex flex-col items-center justify-center gap-6 bg-black/20 rounded-[3rem] backdrop-blur-xl border border-[#c9a227]/20">
-            <Loader2 className="h-16 w-16 animate-spin text-[#c9a227]" />
-            <p className="text-2xl font-black text-white uppercase tracking-widest">Logging Entry...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-3xl mx-auto">
-            {PURPOSES.map((item) => (
-              <Card 
-                key={item.id} 
-                className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden" 
-                onClick={() => handleSelect(item.label)}
-              >
-                <CardContent className="flex flex-col items-center justify-center p-4 gap-3 h-[140px]">
-                  <div className="p-3 rounded-xl bg-[#c9a227]/10 group-hover:bg-[#c9a227] transition-all">
-                    <item.icon className="h-8 w-8 text-[#c9a227] group-hover:text-[#0a2a1a]" />
-                  </div>
-                  <span className="text-xs font-black text-white uppercase tracking-tight text-center leading-tight">{item.label}</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+          {isSubmitting ? (
+            <div className="h-[360px] flex flex-col items-center justify-center gap-6 bg-black/20 rounded-[3rem] backdrop-blur-xl border border-[#c9a227]/20">
+              <Loader2 className="h-16 w-16 animate-spin text-[#c9a227]" />
+              <p className="text-2xl font-black text-white uppercase tracking-widest">Logging Entry...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-3xl mx-auto">
+              {PURPOSES.map((item) => (
+                <Card 
+                  key={item.id} 
+                  className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:bg-[#c9a227]/10 hover:border-[#c9a227] transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden" 
+                  onClick={() => handleSelect(item.label)}
+                >
+                  <CardContent className="flex flex-col items-center justify-center p-4 gap-3 h-[140px]">
+                    <div className="p-3 rounded-xl bg-[#c9a227]/10 group-hover:bg-[#c9a227] transition-all">
+                      <item.icon className="h-8 w-8 text-[#c9a227] group-hover:text-[#0a2a1a]" />
+                    </div>
+                    <span className="text-xs font-black text-white uppercase tracking-tight text-center leading-tight">{item.label}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="fixed bottom-0 left-0 w-full h-1 bg-black/40">

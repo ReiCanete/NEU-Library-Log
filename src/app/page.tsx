@@ -6,16 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, AlertCircle, Megaphone, ShieldX, Mail, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, AlertCircle, ShieldX, Mail, CreditCard } from 'lucide-react';
 import { useFirestore, useCollection, useDoc } from '@/firebase';
-import { collection, query, where, limit, getDocs, doc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, doc } from 'firebase/firestore';
 import { db } from '@/firebase/config';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { startOfDay } from 'date-fns';
 import { validateStudentId, validateNEUEmail } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
+import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
 
 function KioskEntryContent() {
   const router = useRouter();
@@ -28,10 +28,8 @@ function KioskEntryContent() {
   const [error, setError] = useState<string | null>(null);
   const [loginMode, setLoginMode] = useState<'user' | 'admin'>('user');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
-
-  const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
-  const [expandedAnnouncements, setExpandedAnnouncements] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -47,37 +45,18 @@ function KioskEntryContent() {
   const currentCount = todayVisits?.length || 0;
   const isAtCapacity = currentCount >= dailyCapacity;
 
-  useEffect(() => {
-    if (!db) return;
-    const q = query(
-      collection(db, 'announcements'),
-      where('isActive', '==', true)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = new Date();
-      const docs = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter((a: any) => {
-          const start = (a.startDate as any)?.toDate ? a.startDate.toDate() : new Date(a.startDate);
-          const end = (a.endDate as any)?.toDate ? a.endDate.toDate() : new Date(a.endDate);
-          return start <= now && end >= now;
-        })
-        .sort((a: any, b: any) => {
-          // Urgent first
-          if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
-          if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
-          // Then by creation date newest first
-          const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
-          const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
-          return timeB - timeA;
-        })
-        .slice(0, 5);
-      setActiveAnnouncements(docs);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const switchMode = (newMode: 'user' | 'admin') => {
+    if (newMode === loginMode) return;
+    setTransitioning(true);
+    setTimeout(() => {
+      if (newMode === 'admin') {
+        router.push('/admin/login');
+      } else {
+        setLoginMode(newMode);
+      }
+      setTransitioning(false);
+    }, 100);
+  };
 
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -197,62 +176,28 @@ function KioskEntryContent() {
     );
   }
 
-  const visibleAnnouncements = expandedAnnouncements 
-    ? activeAnnouncements 
-    : activeAnnouncements.slice(0, 1);
-
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col relative">
-      <div className="w-full shrink-0 flex flex-col">
-        {visibleAnnouncements.map((announcement, index) => (
-          <div
-            key={announcement.id}
-            className={`w-full py-2.5 px-6 flex items-center justify-between gap-4 border-b border-black/10 transition-all ${
-              announcement.priority === 'urgent' 
-                ? 'bg-red-600 text-white animate-pulse' 
-                : 'bg-[#c9a227] text-[#0a2a1a]'
-            }`}
-          >
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              {announcement.priority === 'urgent' ? (
-                <span className="shrink-0 font-black text-[10px] bg-white text-red-600 px-2 py-0.5 rounded uppercase">⚠ Urgent</span>
-              ) : (
-                <Megaphone className="h-4 w-4 shrink-0" />
-              )}
-              <p className="text-sm font-black uppercase tracking-widest truncate">
-                {announcement.message}
-              </p>
-            </div>
-            
-            {index === 0 && activeAnnouncements.length > 1 && (
-              <button
-                onClick={() => setExpandedAnnouncements(!expandedAnnouncements)}
-                className="shrink-0 flex items-center gap-1.5 text-[10px] font-black uppercase underline decoration-2 underline-offset-4 hover:opacity-80"
-              >
-                {expandedAnnouncements ? (
-                  <>Show Less <ChevronUp className="h-3 w-3" /></>
-                ) : (
-                  <>+{activeAnnouncements.length - 1} More Alerts <ChevronDown className="h-3 w-3" /></>
-                )}
-              </button>
-            )}
-          </div>
-        ))}
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24]">
+      <AnnouncementTicker />
+
+      <div className="absolute top-16 right-4 z-50 flex gap-2 p-1 bg-black/40 border border-[#c9a227]/30 rounded-xl">
+        <button 
+          onClick={() => switchMode('user')}
+          className={`px-4 py-1.5 rounded-lg font-black text-xs transition-colors ${loginMode === 'user' ? 'bg-[#c9a227] text-[#0a2a1a]' : 'text-white opacity-60 hover:opacity-100'}`}
+          suppressHydrationWarning
+        >
+          Kiosk
+        </button>
+        <button 
+          onClick={() => switchMode('admin')}
+          className={`px-4 py-1.5 rounded-lg font-black text-xs transition-colors ${loginMode === 'admin' ? 'bg-[#c9a227] text-[#0a2a1a]' : 'text-white opacity-60 hover:opacity-100'}`}
+          suppressHydrationWarning
+        >
+          Staff
+        </button>
       </div>
 
-      <div className="absolute top-16 right-4 z-50">
-        <Tabs value={loginMode} onValueChange={(v) => {
-          if (v === 'admin') router.push('/admin/login');
-          else setLoginMode(v as any);
-        }} className="w-[160px]">
-          <TabsList className="grid w-full grid-cols-2 bg-black/40 border border-[#c9a227]/30 h-10 p-1 rounded-xl">
-            <TabsTrigger value="user" className="data-[state=active]:bg-[#c9a227] data-[state=active]:text-[#0a2a1a] font-black text-xs">Kiosk</TabsTrigger>
-            <TabsTrigger value="admin" className="data-[state=active]:bg-[#c9a227] data-[state=active]:text-[#0a2a1a] font-black text-xs">Staff</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
+      <div className={`flex-1 flex flex-col items-center justify-center p-4 transition-opacity duration-100 ${transitioning ? 'opacity-0' : 'opacity-100'}`}>
         <div className="w-full max-w-md mx-auto flex flex-col items-center gap-4">
           <div className="flex flex-col items-center gap-2 text-center mb-2">
             <img src="/neu-logo.png" alt="NEU Logo" width={70} height={70} className="mx-auto rounded-full shadow-2xl border-2 border-[#c9a227]/30" loading="lazy" />
