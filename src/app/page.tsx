@@ -7,7 +7,7 @@ import { useFirestore, useCollection, useDoc, useAuth } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, setDoc } from 'firebase/firestore';
 import { startOfDay } from 'date-fns';
 import { validateStudentId, validateNEUEmail } from '@/lib/validation';
-import { logAppError } from '@/lib/errorMessages';
+import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
@@ -47,7 +47,7 @@ const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: s
       sessionStorage.setItem('kiosk_visitor_type', visitorType);
       await onSubmit(schoolId.trim(), visitorType);
     } catch (err: any) {
-      setError(err.message || "Connection error.");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -145,7 +145,7 @@ const KioskEmailForm = memo(({ onSubmit }: { onSubmit: (email: string) => Promis
     try {
       await onSubmit(emailInput.trim());
     } catch (err: any) {
-      setError(err.message || "Connection error.");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -197,7 +197,7 @@ const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: str
     try {
       await onSubmit(adminEmail, adminPassword);
     } catch (err: any) {
-      setError("Invalid credentials. Please try again.");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

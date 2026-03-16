@@ -17,9 +17,31 @@ export const getErrorMessage = (error: any): string => {
   if (error?.code && firebaseErrorMessages[error.code]) {
     return firebaseErrorMessages[error.code];
   }
+  // Check if the message contains the code string (common in Firebase v10+)
+  for (const code in firebaseErrorMessages) {
+    if (error?.message?.includes(code)) {
+      return firebaseErrorMessages[code];
+    }
+  }
   return error?.message || 'An unexpected error occurred. Please try again.';
 };
 
 export const logAppError = (component: string, action: string, error: any) => {
+  // Prevent console error overlays for expected authentication failures
+  const errorCode = error?.code || error?.message || '';
+  const commonAuthErrors = [
+    'auth/invalid-credential',
+    'auth/user-not-found',
+    'auth/wrong-password',
+    'auth/too-many-requests',
+    'auth/network-request-failed',
+    'auth/popup-closed-by-user'
+  ];
+
+  if (commonAuthErrors.some(err => errorCode.includes(err))) {
+    console.info(`[Auth Attempt] ${component}/${action}: ${errorCode}`);
+    return;
+  }
+
   console.error(`[NEU Library Log Error] [${component}] [${action}]:`, error);
 };
