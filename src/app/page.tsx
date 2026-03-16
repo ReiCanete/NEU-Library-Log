@@ -11,7 +11,7 @@ import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
-import { signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: string, type: string) => Promise<void>, todayCount: number, capacity: number }) => {
   const [schoolId, setSchoolId] = useState('');
@@ -322,113 +322,12 @@ function KioskEntryContent() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<'kiosk' | 'staff'>('kiosk');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
-  const [checkingRedirect, setCheckingRedirect] = useState(true);
+  const [checkingRedirect, setCheckingRedirect] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Handle Google Redirect Result
-  useEffect(() => {
-    if (!auth || !db) return;
-
-    const handleRedirect = async () => {
-      try {
-        setCheckingRedirect(true);
-        
-        // Small delay to ensure Firebase Auth is fully ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const result = await getRedirectResult(auth);
-        
-        if (!result?.user) {
-          setCheckingRedirect(false);
-          return;
-        }
-
-        const user = result.user;
-        const intent = sessionStorage.getItem('google_signin_intent') || 'kiosk';
-        sessionStorage.removeItem('google_signin_intent');
-
-        if (!user.email?.endsWith('@neu.edu.ph')) {
-          await signOut(auth);
-          setGlobalError('Only @neu.edu.ph Google accounts are allowed.');
-          setCheckingRedirect(false);
-          return;
-        }
-
-        const blockSnap = await getDocs(
-          query(collection(db, 'blocklist'), where('studentId', '==', user.email))
-        );
-        if (!blockSnap.empty) {
-          await signOut(auth);
-          setGlobalError('Your account has been restricted. Please contact library staff.');
-          setCheckingRedirect(false);
-          return;
-        }
-
-        const userSnap = await getDocs(
-          query(collection(db, 'users'), where('email', '==', user.email))
-        );
-
-        if (intent === 'staff') {
-          if (userSnap.empty || userSnap.docs[0].data().role !== 'admin') {
-            await signOut(auth);
-            setGlobalError('You do not have admin access.');
-            setCheckingRedirect(false);
-            return;
-          }
-          sessionStorage.setItem('adminEmail', user.email);
-          sessionStorage.setItem('adminName', user.displayName || '');
-          window.location.href = '/admin';
-          return;
-        }
-
-        if (userSnap.empty) {
-          sessionStorage.setItem('kiosk_google_user', JSON.stringify({
-            email: user.email,
-            fullName: user.displayName || '',
-            loginMethod: 'google'
-          }));
-          window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}`;
-          return;
-        }
-
-        const userData = userSnap.docs[0].data();
-
-        if (userData.role === 'admin') {
-          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-            studentId: userData.studentId || user.email,
-            fullName: userData.fullName || user.displayName || '',
-            college: userData.college || '',
-            program: userData.program || '',
-            email: user.email,
-            loginMethod: 'google',
-            role: 'admin'
-          }));
-          window.location.href = '/kiosk/role-select';
-          return;
-        }
-
-        sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-          studentId: userData.studentId || user.email,
-          fullName: userData.fullName || user.displayName || '',
-          college: userData.college || '',
-          program: userData.program || '',
-          email: user.email,
-          loginMethod: 'google'
-        }));
-        window.location.href = '/kiosk/purpose';
-
-      } catch (err: any) {
-        console.error('[NEU Library Log] Google redirect error:', err.code, err.message);
-        setCheckingRedirect(false);
-      }
-    };
-
-    handleRedirect();
-  }, [auth, db]);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
@@ -517,20 +416,117 @@ function KioskEntryContent() {
     }
   }, [db, router, toast]);
 
-  const handleGoogleSignIn = () => {
-    if (!auth) return;
-    sessionStorage.setItem('google_signin_intent', 'kiosk');
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ hd: 'neu.edu.ph' });
-    signInWithRedirect(auth, provider);
+  const handleGoogleSignIn = async () => {
+    if (!auth || !db) return;
+    try {
+      setCheckingRedirect(true);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ hd: 'neu.edu.ph' });
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (!user.email?.endsWith('@neu.edu.ph')) {
+        await signOut(auth);
+        setGlobalError('Only @neu.edu.ph Google accounts are allowed.');
+        return;
+      }
+
+      const blockSnap = await getDocs(
+        query(collection(db, 'blocklist'), where('studentId', '==', user.email))
+      );
+      if (!blockSnap.empty) {
+        await signOut(auth);
+        setGlobalError('Your account has been restricted. Please contact library staff.');
+        return;
+      }
+
+      const userSnap = await getDocs(
+        query(collection(db, 'users'), where('email', '==', user.email))
+      );
+
+      if (userSnap.empty) {
+        sessionStorage.setItem('kiosk_google_user', JSON.stringify({
+          email: user.email,
+          fullName: user.displayName || '',
+          loginMethod: 'google'
+        }));
+        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}`;
+        return;
+      }
+
+      const userData = userSnap.docs[0].data();
+
+      if (userData.role === 'admin') {
+        sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+          studentId: userData.studentId || user.email,
+          fullName: userData.fullName || user.displayName || '',
+          college: userData.college || '',
+          program: userData.program || '',
+          email: user.email,
+          loginMethod: 'google',
+          role: 'admin'
+        }));
+        window.location.href = '/kiosk/role-select';
+        return;
+      }
+
+      sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+        studentId: userData.studentId || user.email,
+        fullName: userData.fullName || user.displayName || '',
+        college: userData.college || '',
+        program: userData.program || '',
+        email: user.email,
+        loginMethod: 'google'
+      }));
+      window.location.href = '/kiosk/purpose';
+
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setGlobalError('Google sign-in failed. Please try again.');
+        console.error('[NEU Library Log] Google sign-in error:', err.code, err.message);
+      }
+    } finally {
+      setCheckingRedirect(false);
+    }
   };
 
-  const handleStaffGoogleSignIn = () => {
-    if (!auth) return;
-    sessionStorage.setItem('google_signin_intent', 'staff');
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ hd: 'neu.edu.ph' });
-    signInWithRedirect(auth, provider);
+  const handleStaffGoogleSignIn = async () => {
+    if (!auth || !db) return;
+    try {
+      setCheckingRedirect(true);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ hd: 'neu.edu.ph' });
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (!user.email?.endsWith('@neu.edu.ph')) {
+        await signOut(auth);
+        setGlobalError('Only @neu.edu.ph Google accounts are allowed.');
+        return;
+      }
+
+      const userSnap = await getDocs(
+        query(collection(db, 'users'), where('email', '==', user.email))
+      );
+
+      if (userSnap.empty || userSnap.docs[0].data().role !== 'admin') {
+        await signOut(auth);
+        setGlobalError('You do not have admin access.');
+        return;
+      }
+
+      sessionStorage.setItem('adminEmail', user.email);
+      sessionStorage.setItem('adminName', user.displayName || '');
+      window.location.href = '/admin';
+
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setGlobalError('Google sign-in failed. Please try again.');
+        console.error('[NEU Library Log] Staff Google sign-in error:', err.code, err.message);
+      }
+    } finally {
+      setCheckingRedirect(false);
+    }
   };
 
   const handleStaffLogin = useCallback(async (adminEmail: string, adminPassword: string) => {
