@@ -332,30 +332,39 @@ function KioskEntryContent() {
   // Handle Google Redirect Result
   useEffect(() => {
     if (!auth || !db) return;
-    
+
     const handleRedirect = async () => {
       try {
+        setCheckingRedirect(true);
+        
+        // Small delay to ensure Firebase Auth is fully ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const result = await getRedirectResult(auth);
-        if (!result?.user) return;
+        
+        if (!result?.user) {
+          setCheckingRedirect(false);
+          return;
+        }
 
         const user = result.user;
         const intent = sessionStorage.getItem('google_signin_intent') || 'kiosk';
         sessionStorage.removeItem('google_signin_intent');
 
-        // Domain check
         if (!user.email?.endsWith('@neu.edu.ph')) {
           await signOut(auth);
           setGlobalError('Only @neu.edu.ph Google accounts are allowed.');
+          setCheckingRedirect(false);
           return;
         }
 
-        // Check blocklist
         const blockSnap = await getDocs(
           query(collection(db, 'blocklist'), where('studentId', '==', user.email))
         );
         if (!blockSnap.empty) {
           await signOut(auth);
           setGlobalError('Your account has been restricted. Please contact library staff.');
+          setCheckingRedirect(false);
           return;
         }
 
@@ -363,58 +372,63 @@ function KioskEntryContent() {
           query(collection(db, 'users'), where('email', '==', user.email))
         );
 
-        // STAFF intent — check admin role and redirect to admin panel
         if (intent === 'staff') {
           if (userSnap.empty || userSnap.docs[0].data().role !== 'admin') {
             await signOut(auth);
             setGlobalError('You do not have admin access.');
+            setCheckingRedirect(false);
             return;
           }
-          router.push('/admin');
+          sessionStorage.setItem('adminEmail', user.email);
+          sessionStorage.setItem('adminName', user.displayName || '');
+          window.location.href = '/admin';
           return;
         }
 
-        // KIOSK intent
         if (userSnap.empty) {
-          // New user — go to registration
           sessionStorage.setItem('kiosk_google_user', JSON.stringify({
             email: user.email,
             fullName: user.displayName || '',
             loginMethod: 'google'
           }));
-          router.push(`/kiosk/register?method=google&email=${encodeURIComponent(user.email)}`);
-        } else {
-          const userData = userSnap.docs[0].data();
-          const sessionData = {
+          window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}`;
+          return;
+        }
+
+        const userData = userSnap.docs[0].data();
+
+        if (userData.role === 'admin') {
+          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
             studentId: userData.studentId || user.email,
-            fullName: userData.fullName,
+            fullName: userData.fullName || user.displayName || '',
             college: userData.college || '',
             program: userData.program || '',
             email: user.email,
             loginMethod: 'google',
-            role: userData.role
-          };
-
-          if (userData.role === 'admin') {
-            sessionStorage.setItem('kiosk_visitor', JSON.stringify(sessionData));
-            router.push('/kiosk/role-select');
-          } else {
-            sessionStorage.setItem('kiosk_visitor', JSON.stringify(sessionData));
-            router.push('/kiosk/purpose');
-          }
+            role: 'admin'
+          }));
+          window.location.href = '/kiosk/role-select';
+          return;
         }
+
+        sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+          studentId: userData.studentId || user.email,
+          fullName: userData.fullName || user.displayName || '',
+          college: userData.college || '',
+          program: userData.program || '',
+          email: user.email,
+          loginMethod: 'google'
+        }));
+        window.location.href = '/kiosk/purpose';
 
       } catch (err: any) {
-        if (err.code !== 'auth/popup-closed-by-user') {
-          console.error('[NEU Library Log] Google redirect error:', err.code, err.message);
-        }
-      } finally {
+        console.error('[NEU Library Log] Google redirect error:', err.code, err.message);
         setCheckingRedirect(false);
       }
     };
 
     handleRedirect();
-  }, [auth, db, router]);
+  }, [auth, db]);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);

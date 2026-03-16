@@ -30,6 +30,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    // Ensure OAuth redirect pages do full reload to prevent state loss
+  },
 };
 
 export default nextConfig;
