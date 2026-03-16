@@ -1,6 +1,6 @@
 'use client';
 /**
- * @fileOverview A professional sequence of popup announcements for the kiosk.
+ * @fileOverview A professional sequence of popup announcements for the kiosk, positioned in the bottom-right corner.
  */
 
 import { useEffect, useState, memo } from 'react';
@@ -54,22 +54,24 @@ function AnnouncementToast() {
     const current = announcements[currentIndex];
     if (!current) return;
 
-    const duration = Math.min(12000, Math.max(5000, current.message.length * 70));
-    
-    // Slight delay before showing first one or next one
-    const showTimeout = setTimeout(() => setVisible(true), 300);
+    const duration = Math.min(12000, Math.max(4000, current.message.length * 60));
 
-    const hideTimeout = setTimeout(() => {
+    // Small delay before showing so transition is visible
+    const showTimer = setTimeout(() => setVisible(true), 100);
+
+    const hideTimer = setTimeout(() => {
       setVisible(false);
-      // Wait for exit animation before moving to next
+      // Wait for hide animation then move to next
       setTimeout(() => {
-        setCurrentIndex(prev => (prev + 1) % announcements.length);
-      }, 500);
-    }, duration);
+        setCurrentIndex(i => 
+          i < announcements.length - 1 ? i + 1 : 0
+        );
+      }, 600);
+    }, duration + 100);
 
     return () => {
-      clearTimeout(showTimeout);
-      clearTimeout(hideTimeout);
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
     };
   }, [currentIndex, announcements]);
 
@@ -77,71 +79,75 @@ function AnnouncementToast() {
   if (!current || announcements.length === 0) return null;
 
   const isUrgent = current.priority === 'urgent';
+  const displayDuration = Math.min(12000, Math.max(4000, current.message.length * 60));
 
   return (
     <div
-      className={`fixed top-6 left-1/2 z-50 transition-all duration-500 ease-out ${
-        visible 
-          ? 'opacity-100 -translate-x-1/2 translate-y-0' 
-          : 'opacity-0 -translate-x-1/2 -translate-y-8 pointer-events-none'
+      className={`fixed bottom-6 right-6 z-50 transition-all duration-500 ease-out ${
+        visible
+          ? 'opacity-100 translate-x-0'
+          : 'opacity-0 translate-x-full pointer-events-none'
       }`}
-      style={{ width: 'calc(100% - 3rem)', maxWidth: '520px' }}
+      style={{ width: '320px' }}
     >
-      <div className={`w-full rounded-[1.5rem] shadow-2xl overflow-hidden border ${
-        isUrgent 
-          ? 'bg-red-600 border-red-400' 
-          : 'bg-[#0a2a1a] border-[#c9a227]/30'
+      <div className={`w-full rounded-2xl shadow-2xl overflow-hidden ${
+        isUrgent
+          ? 'bg-red-600 border border-red-400'
+          : 'bg-[#0a2a1a] border border-[#c9a227]/30'
       }`}>
-        <div className={`flex items-center justify-between px-5 py-2.5 ${
+        {/* Header bar */}
+        <div className={`flex items-center justify-between px-4 py-2.5 ${
           isUrgent ? 'bg-red-800' : 'bg-[#c9a227]'
         }`}>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {isUrgent ? (
               <AlertTriangle className="w-4 h-4 text-white" />
             ) : (
               <Megaphone className="w-4 h-4 text-[#0a2a1a]" />
             )}
-            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${
+            <span className={`text-[10px] font-black uppercase tracking-widest ${
               isUrgent ? 'text-white' : 'text-[#0a2a1a]'
             }`}>
-              {isUrgent ? 'Urgent Alert' : 'Announcement'}
+              {isUrgent ? '⚠ Urgent Notice' : 'Announcement'}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {announcements.length > 1 && (
               <span className={`text-[9px] font-black tracking-widest ${
-                isUrgent ? 'text-white/60' : 'text-[#0a2a1a]/60'
+                isUrgent ? 'text-white/70' : 'text-[#0a2a1a]/70'
               }`}>
-                {currentIndex + 1} / {announcements.length}
+                {currentIndex + 1}/{announcements.length}
               </span>
             )}
             <button
               onClick={() => setVisible(false)}
-              className={`p-1 hover:bg-black/10 rounded-full transition-colors ${
+              className={`p-1 rounded-full hover:bg-black/10 transition-colors ${
                 isUrgent ? 'text-white' : 'text-[#0a2a1a]'
               }`}
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        <div className="px-6 py-4">
-          <p className="text-sm font-bold leading-relaxed text-white">
+        {/* Message body */}
+        <div className="px-4 py-3">
+          <p className="text-sm font-medium leading-relaxed text-white">
             {current.message}
           </p>
         </div>
 
-        <div className={`h-1.5 ${isUrgent ? 'bg-red-900' : 'bg-[#071a0f]'}`}>
-          <div
-            className={`h-full ${isUrgent ? 'bg-white' : 'bg-[#c9a227]'} transition-none`}
-            style={{
-              animation: visible 
-                ? `shrink ${Math.min(12000, Math.max(5000, current.message.length * 70))}ms linear forwards`
-                : 'none',
-              width: '100%',
-            }}
-          />
+        {/* Progress bar showing remaining display time */}
+        <div className={`h-1 ${isUrgent ? 'bg-red-900' : 'bg-[#071a0f]'}`}>
+          {visible && (
+            <div
+              className={`h-full ${isUrgent ? 'bg-white' : 'bg-[#c9a227]'} transition-none`}
+              style={{
+                animation: `shrink ${displayDuration}ms linear forwards`,
+                width: '100%',
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
