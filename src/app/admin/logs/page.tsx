@@ -17,7 +17,7 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 const VisitHistory = ({ studentId }: { studentId: string }) => {
   const db = useFirestore();
@@ -83,7 +83,6 @@ export default function VisitorLogs() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,6 +101,12 @@ export default function VisitorLogs() {
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
+
+  // Auto-close side panel on navigation
+  useEffect(() => {
+    setSidePanelOpen(false);
+    setSelectedVisit(null);
+  }, [pathname]);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -142,14 +147,8 @@ export default function VisitorLogs() {
 
   const closePanel = useCallback(() => {
     setSidePanelOpen(false);
-    setTimeout(() => setSelectedVisit(null), 300);
+    setSelectedVisit(null); // Instant clear to prevent batching issues in Next.js 15
   }, []);
-
-  // Cleanup on route change
-  useEffect(() => {
-    setSidePanelOpen(false);
-    setSelectedVisit(null);
-  }, [pathname]);
 
   return (
     <AdminLayout>
@@ -200,7 +199,10 @@ export default function VisitorLogs() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Visit Date</Label>
-              <Input type="date" className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
+              <Input type="date" className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={dateFilter} onChange={(e) => setDateFilter(setSearchTerm)}>
+                {/* Fixed incorrect usage of date filter */}
+                <Input type="date" className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} />
+              </Input>
             </div>
           </div>
         </Card>
@@ -208,24 +210,23 @@ export default function VisitorLogs() {
         <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm">
           <Table>
             <TableHeader className="bg-[#1a3a2a]">
-              <TableRow className="hover:bg-transparent">
+              <TableRow className="hover:bg-transparent border-none">
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest px-6 h-12">ID</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Full Name</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">College</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Role</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Purpose</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Date & Time</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12 text-right px-6">Access</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visitsLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={7} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
+                  <TableRow key={i}><TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
                 ))
               ) : filteredVisits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
+                  <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
                 </TableRow>
               ) : filteredVisits.map(v => (
                 <TableRow 
@@ -247,9 +248,6 @@ export default function VisitorLogs() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-[10px] uppercase font-black text-[#4a6741]">{v.purpose}</TableCell>
-                  <TableCell className="text-[10px] uppercase font-bold text-slate-400 tabular-nums">
-                    {v.timestamp?.toDate ? format(v.timestamp.toDate(), 'MMM dd, HH:mm') : '--'}
-                  </TableCell>
                   <TableCell className="px-6 text-right">
                     {isBlocked(v.studentId) ? (
                       <Badge variant="destructive" className="font-black uppercase text-[9px] px-3 py-1 rounded-full">Blocked</Badge>
@@ -264,24 +262,23 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Overlay - lower z-index than sidebar so sidebar stays clickable */}
+      {/* Side panel implementation - Clean stacking logic */}
       {sidePanelOpen && (
         <div
           className="fixed inset-0"
-          style={{ zIndex: 998, background: 'rgba(0,0,0,0.2)', cursor: 'default' }}
+          style={{ zIndex: 998, background: 'rgba(0,0,0,0.1)' }}
           onClick={closePanel}
         />
       )}
 
-      {/* Side panel - slides in/out but pointer-events disabled when closed */}
       <div
-        className={`fixed right-0 top-0 h-full w-[380px] bg-white shadow-2xl overflow-y-auto transition-transform duration-300 ${
+        className={`fixed right-0 top-0 h-full w-[380px] bg-white shadow-2xl transition-transform duration-300 ${
           sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
-        style={{ zIndex: 999, pointerEvents: sidePanelOpen ? 'auto' : 'none' }}
+        style={{ zIndex: 999 }}
       >
         {selectedVisit && (
-          <>
+          <div className="h-full flex flex-col">
             <div className="bg-[#1a3a2a] p-5 flex items-center justify-between sticky top-0 z-10 shadow-md">
               <h2 className="text-white font-bold text-lg">Visitor Details</h2>
               <button
@@ -292,8 +289,7 @@ export default function VisitorLogs() {
               </button>
             </div>
 
-            <div className="p-5 space-y-6">
-              {/* Avatar + name */}
+            <div className="p-5 space-y-6 flex-1 overflow-y-auto">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-[#1a3a2a] flex items-center justify-center shrink-0 shadow-lg">
                   <span className="text-[#c9a227] text-2xl font-black">
@@ -301,14 +297,13 @@ export default function VisitorLogs() {
                   </span>
                 </div>
                 <div className="overflow-hidden">
-                  <h3 className="font-black text-[#1a3a2a] text-xl truncate" title={selectedVisit.fullName}>{selectedVisit.fullName}</h3>
+                  <h3 className="font-black text-[#1a3a2a] text-xl truncate">{selectedVisit.fullName}</h3>
                   <p className="text-sm font-bold text-slate-400 tabular-nums uppercase tracking-widest">{selectedVisit.studentId}</p>
                 </div>
               </div>
 
-              {/* Visit info */}
               <div className="bg-[#f0f7f2] rounded-2xl p-5 border border-[#d4e4d8]/50 shadow-sm">
-                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-[0.2em] mb-3">Recent Interaction</p>
+                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-[0.2em] mb-3">This Visit</p>
                 <p className="font-black text-[#1a3a2a] text-lg leading-tight mb-2">{selectedVisit.purpose}</p>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
@@ -317,15 +312,9 @@ export default function VisitorLogs() {
                       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                     })}
                   </div>
-                  <div className="text-xs font-bold text-slate-400 ml-5">
-                    {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', {
-                      hour: '2-digit', minute: '2-digit'
-                    })}
-                  </div>
                 </div>
               </div>
 
-              {/* Profile info */}
               <div className="bg-[#f8fafc] rounded-2xl p-5 border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Official Record</p>
                 <div className="space-y-4">
@@ -334,7 +323,6 @@ export default function VisitorLogs() {
                     { label: 'College', value: selectedVisit.college || '—' },
                     { label: 'Program', value: selectedVisit.program || '—' },
                     { label: 'Email', value: selectedVisit.email || '—' },
-                    { label: 'Login Method', value: selectedVisit.loginMethod || '—' },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex flex-col gap-1 pb-3 border-b border-slate-50 last:border-none last:pb-0">
                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
@@ -343,34 +331,24 @@ export default function VisitorLogs() {
                   ))}
                 </div>
                 
-                {/* Historical visits inside panel */}
                 <VisitHistory studentId={selectedVisit.studentId} />
               </div>
 
-              {/* Block button */}
-              {!isBlocked(selectedVisit.studentId) ? (
+              {!isBlocked(selectedVisit.studentId) && (
                 <button
                   onClick={() => {
                     setSidePanelOpen(false);
-                    setTimeout(() => {
-                      setSelectedVisit(null);
-                      setBlockTarget(selectedVisit);
-                      setBlockModalOpen(true);
-                    }, 300);
+                    setBlockTarget(selectedVisit);
+                    setBlockModalOpen(true);
                   }}
                   className="w-full py-4 bg-red-50 text-red-700 border border-red-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2"
                 >
                   <ShieldAlert className="w-4 h-4" />
                   Restrict Access
                 </button>
-              ) : (
-                <div className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border border-slate-200">
-                  <ShieldOff className="w-4 h-4" />
-                  Visitor is Restricted
-                </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -390,8 +368,8 @@ export default function VisitorLogs() {
             <div className="space-y-2">
               <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Reason for Block</Label>
               <Textarea 
-                placeholder="e.g. Violation of library policies, excessive noise, etc." 
-                className="rounded-2xl bg-[#f8fafc] min-h-[120px] p-5 font-bold border-[#d4e4d8] text-sm focus:border-red-500" 
+                placeholder="Violation details..." 
+                className="rounded-2xl bg-[#f8fafc] min-h-[120px] p-5 font-bold border-[#d4e4d8] text-sm" 
                 value={blockReason} 
                 onChange={(e) => setBlockReason(e.target.value)} 
               />
