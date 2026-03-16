@@ -1,13 +1,12 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Search, Loader2, ShieldAlert, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, Timestamp, limit } from 'firebase/firestore';
 import { isSameDay, format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -18,18 +17,19 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { usePathname } from 'next/navigation';
 
 export default function VisitorLogs() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
+  const pathname = usePathname();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -38,15 +38,19 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
-  const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
+  // Optimization: Limit the initial fetch to 200 items to prevent main-thread locking
+  const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc'), limit(200)) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
-  const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
+  const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist'), limit(500)) : null);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
     return allVisits.filter(v => {
       const visitType = v.visitorType || 'Student';
-      const matchesSearch = (v.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (v.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const name = (v.fullName || '').toLowerCase();
+      const id = (v.studentId || '').toLowerCase();
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = name.includes(term) || id.includes(term);
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
       const visitDate = v.timestamp?.toDate ? v.timestamp.toDate() : new Date();
       const matchesDate = !dateFilter || isSameDay(visitDate, new Date(dateFilter));
@@ -55,7 +59,12 @@ export default function VisitorLogs() {
     });
   }, [allVisits, searchTerm, purposeFilter, typeFilter, dateFilter]);
 
-  // Reset pagination when filters change
+  // Clean up states on navigation
+  useEffect(() => {
+    setBlockModalOpen(false);
+    setBlockTarget(null);
+  }, [pathname]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, purposeFilter, typeFilter, dateFilter]);
@@ -76,7 +85,7 @@ export default function VisitorLogs() {
         blockedBy: auth?.currentUser?.email || 'Admin',
         blockedAt: Timestamp.now()
       });
-      toast({ title: "Visitor Blocked", description: `${blockTarget.fullName} access restricted.` });
+      toast({ title: "Visitor Restricted", description: `${blockTarget.fullName} has been added to the blocklist.` });
       setBlockModalOpen(false);
       setBlockReason('');
       setBlockTarget(null);
@@ -151,7 +160,7 @@ export default function VisitorLogs() {
           </div>
         </Card>
 
-        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm relative bg-white">
+        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm bg-white">
           <Table>
             <TableHeader className="bg-[#1a3a2a]">
               <TableRow className="hover:bg-transparent border-none">
@@ -213,7 +222,6 @@ export default function VisitorLogs() {
             </TableBody>
           </Table>
 
-          {/* Pagination UI */}
           {!visitsLoading && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#f0f4f1]">
               <div className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
@@ -232,7 +240,6 @@ export default function VisitorLogs() {
                 
                 <div className="flex items-center gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    // Show current page, and maybe 2 neighbors
                     if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
                       return (
                         <Button
@@ -270,36 +277,31 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      <Dialog open={blockModalOpen} onOpenChange={(open) => {
-        if (!open) {
-          setBlockModalOpen(false);
-          setBlockTarget(null);
-        }
-      }}>
-        <DialogContent className="rounded-[2.5rem] p-10 max-w-lg border-none shadow-2xl">
+      <Dialog open={blockModalOpen} onOpenChange={setBlockModalOpen}>
+        <DialogContent className="rounded-2xl p-10 max-w-md">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-3xl font-black text-[#1a3a2a]">Confirm Restriction</DialogTitle>
-            <DialogDescription className="text-[#4a6741] font-bold">You are about to block access for <span className="text-red-600">{blockTarget?.fullName}</span>.</DialogDescription>
+            <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Restrict Visitor</DialogTitle>
+            <DialogDescription className="text-sm text-[#4a6741] font-bold">Block access for <span className="text-red-600 font-black">{blockTarget?.fullName}</span>?</DialogDescription>
           </DialogHeader>
-          <div className="py-6 space-y-4">
+          <div className="py-4 space-y-4">
             <div className="space-y-2">
-              <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Reason for Block</Label>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Reason for Block</Label>
               <Textarea 
-                placeholder="Violation details..." 
-                className="rounded-2xl bg-[#f8fafc] min-h-[120px] p-5 font-bold border-[#d4e4d8] text-sm" 
+                placeholder="Details of violation..." 
+                className="rounded-xl bg-[#f8fafc] min-h-[100px] p-4 font-bold border-[#d4e4d8] text-sm" 
                 value={blockReason} 
                 onChange={(e) => setBlockReason(e.target.value)} 
               />
             </div>
           </div>
-          <DialogFooter className="gap-4">
-            <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-[#d4e4d8]" onClick={() => { setBlockModalOpen(false); setBlockTarget(null); }}>Cancel</Button>
+          <DialogFooter className="gap-3">
+            <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setBlockModalOpen(false)}>Cancel</Button>
             <Button 
-              className="rounded-2xl h-14 px-10 font-black bg-red-600 text-white hover:bg-red-700" 
-              disabled={isBlocking || !blockReason} 
+              className="h-12 rounded-xl font-black bg-red-600 text-white hover:bg-red-700" 
+              disabled={isBlocking || !blockReason.trim()} 
               onClick={handleBlockUser}
             >
-              {isBlocking ? <Loader2 className="animate-spin" /> : "Restrict Access"}
+              {isBlocking ? <Loader2 className="animate-spin h-4 w-4" /> : "Restrict Access"}
             </Button>
           </DialogFooter>
         </DialogContent>

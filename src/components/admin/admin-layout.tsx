@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,7 +6,7 @@ import { LayoutDashboard, Users, UserX, LogOut, Loader2, FileText, Megaphone } f
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser, useFirestore, useAuth } from '@/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
@@ -40,11 +39,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
 
-    const unsubVisits = onSnapshot(query(collection(db, 'visits'), where('timestamp', '>=', start)), (snap) => {
+    const unsubVisits = onSnapshot(query(collection(db, 'visits'), where('timestamp', '>=', start), limit(500)), (snap) => {
       setTodayCount(snap.size);
     });
 
-    const unsubBlocked = onSnapshot(collection(db, 'blocklist'), (snap) => {
+    const unsubBlocked = onSnapshot(query(collection(db, 'blocklist'), limit(500)), (snap) => {
       setBlockedCount(snap.size);
     });
 
@@ -63,10 +62,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const email = user.email?.toLowerCase();
-    const isWhitelisted = email === 'reiangelo.canete@neu.edu.ph' || email?.includes('25-14294-549');
-
-    const unsubscribe = onSnapshot(query(collection(db, 'users'), where('email', '==', user.email)), (snap) => {
+    const unsubscribe = onSnapshot(query(collection(db, 'users'), where('email', '==', user.email), limit(1)), (snap) => {
       let hasAdminAccess = false;
       if (!snap.empty) {
         const userData = snap.docs[0].data();
@@ -74,6 +70,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         hasAdminAccess = userData?.role === 'admin' || userData?.studentId === '25-14294-549';
       }
       
+      const isWhitelisted = user.email?.toLowerCase() === 'reiangelo.canete@neu.edu.ph' || user.email?.toLowerCase().includes('25-14294-549');
+
       if (hasAdminAccess || isWhitelisted) {
         setIsAdmin(true);
       } else {
@@ -81,7 +79,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         signOut(auth).then(() => router.push('/admin/login'));
       }
       setCheckingRole(false);
-    }, (error) => {
+    }, () => {
       setIsAdmin(false);
       setCheckingRole(false);
     });
@@ -117,13 +115,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
+    <SidebarProvider>
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
-        {/* SIDEBAR - Explicitly layered at the top (z-1000) */}
-        <Sidebar 
-          className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white"
-          style={{ zIndex: 1000, pointerEvents: 'auto' }}
-        >
+        <Sidebar className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white">
           <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
             <img 
               src="/neu-logo.png" 
@@ -205,7 +199,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto relative" style={{ zIndex: 1 }}>
+          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto">
             <div className="max-w-7xl mx-auto pb-12">
               {children}
             </div>
