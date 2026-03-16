@@ -124,7 +124,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
-        <Sidebar className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white">
+        <Sidebar 
+          className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white"
+          style={{ zIndex: 1000 }}
+        >
           <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
             <img 
               src="/neu-logo.png" 
