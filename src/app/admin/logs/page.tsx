@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Loader2, BookOpen, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Loader2, BookOpen, ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore } from '@/firebase';
-import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs, where } from 'firebase/firestore';
 import { isSameDay, format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,12 @@ export default function VisitorLogs() {
   const [blocklist, setBlocklist] = useState<any[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
 
+  // Side panel state
+  const [selectedVisit, setSelectedVisit] = useState<any>(null);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [visitHistory, setVisitHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const fetchData = async (isRefresh = false) => {
     if (!db) return;
     try {
@@ -62,14 +68,10 @@ export default function VisitorLogs() {
   };
 
   useEffect(() => {
-    let cancelled = false;
-    
     if (db) {
       setVisitsLoading(true);
       fetchData();
     }
-    
-    return () => { cancelled = true; };
   }, [db]);
 
   const filteredVisits = useMemo(() => {
@@ -92,6 +94,8 @@ export default function VisitorLogs() {
   useEffect(() => {
     setBlockModalOpen(false);
     setBlockTarget(null);
+    setSidePanelOpen(false);
+    setSelectedVisit(null);
   }, [pathname]);
 
   useEffect(() => {
@@ -102,6 +106,38 @@ export default function VisitorLogs() {
   const paginatedVisits = filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const isBlocked = (id: string) => blocklist?.some(b => b.studentId === id);
+
+  const handleRowClick = async (visit: any) => {
+    setSelectedVisit(visit);
+    setSidePanelOpen(true);
+    
+    // Fetch visit history for this visitor
+    if (!db || !visit.studentId) return;
+    setHistoryLoading(true);
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, 'visits'),
+          where('studentId', '==', visit.studentId),
+          orderBy('timestamp', 'desc'),
+          limit(10)
+        )
+      );
+      setVisitHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
+      setVisitHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const closePanel = () => {
+    setSidePanelOpen(false);
+    setTimeout(() => {
+      setSelectedVisit(null);
+      setVisitHistory([]);
+    }, 300);
+  };
 
   const handleBlockUser = async () => {
     if (!blockTarget || !blockReason || !db) return;
@@ -224,7 +260,8 @@ export default function VisitorLogs() {
               ) : paginatedVisits.map(v => (
                 <TableRow 
                   key={v.id} 
-                  className="border-b-[#f0f4f1] hover:bg-[#f0f4f1]/40 transition-colors"
+                  onClick={() => handleRowClick(v)}
+                  className="border-b-[#f0f4f1] hover:bg-[#f0f4f1]/40 transition-colors cursor-pointer"
                 >
                   <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
                   <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
@@ -248,7 +285,8 @@ export default function VisitorLogs() {
                         variant="ghost" 
                         size="sm" 
                         className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setBlockTarget(v);
                           setBlockModalOpen(true);
                         }}
@@ -346,6 +384,123 @@ export default function VisitorLogs() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Side panel - no overlay, just the drawer itself */}
+      <div
+        style={{
+          position: 'fixed',
+          right: 0,
+          top: 0,
+          height: '100%',
+          width: '380px',
+          background: 'white',
+          zIndex: 50,
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+          overflowY: 'auto',
+          transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s ease',
+          pointerEvents: sidePanelOpen ? 'all' : 'none',
+        }}
+      >
+        {selectedVisit && (
+          <>
+            {/* Header */}
+            <div style={{ background: '#1a3a2a', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+              <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '16px', margin: 0 }}>Visitor Details</h2>
+              <button onClick={closePanel} style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {/* Avatar + name */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
+                    {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+                <div>
+                  <h3 style={{ fontWeight: 'bold', color: '#1a3a2a', fontSize: '18px', margin: 0 }}>{selectedVisit.fullName}</h3>
+                  <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>{selectedVisit.studentId}</p>
+                </div>
+              </div>
+
+              {/* This visit */}
+              <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+                <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '8px' }}>This Visit</p>
+                <p style={{ fontWeight: '600', color: '#1a3a2a', margin: '0 0 4px', fontSize: '14px' }}>{selectedVisit.purpose}</p>
+                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                  {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+                <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>
+                  {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+
+              {/* Profile */}
+              <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+                <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '10px' }}>Profile</p>
+                {[
+                  { label: 'Visitor Type', value: selectedVisit.visitorType || 'Student' },
+                  { label: 'College', value: selectedVisit.college || '—' },
+                  { label: 'Program', value: selectedVisit.program || '—' },
+                  { label: 'Email', value: selectedVisit.email || '—' },
+                  { label: 'Login Method', value: selectedVisit.loginMethod || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '7px' }}>
+                    <span style={{ fontSize: '13px', color: '#6b7280', flexShrink: 0 }}>{label}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Visit history */}
+              <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+                <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '10px' }}>
+                  Visit History
+                </p>
+                {historyLoading ? (
+                  <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading...</p>
+                ) : visitHistory.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: '#9ca3af' }}>No visit history found.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 4px' }}>{visitHistory.length} total visit{visitHistory.length !== 1 ? 's' : ''}</p>
+                    {visitHistory.map((v: any) => (
+                      <div key={v.id} style={{ background: 'white', borderRadius: '8px', padding: '8px 10px', border: v.id === selectedVisit.id ? '1px solid #c9a227' : '1px solid #d4e4d8' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '12px', fontWeight: '500', color: '#1a3a2a' }}>{v.purpose}</span>
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                            {v.timestamp?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                        {v.id === selectedVisit.id && (
+                          <span style={{ fontSize: '11px', color: '#c9a227', fontWeight: '600' }}>Current visit</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Block button */}
+              <button
+                onClick={() => {
+                  closePanel();
+                  setTimeout(() => {
+                    setBlockTarget(selectedVisit);
+                    setBlockModalOpen(true);
+                  }, 300);
+                }}
+                style={{ width: '100%', padding: '11px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '12px', fontWeight: '500', cursor: 'pointer', fontSize: '13px' }}
+              >
+                Block This Visitor
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </AdminLayout>
   );
 }
