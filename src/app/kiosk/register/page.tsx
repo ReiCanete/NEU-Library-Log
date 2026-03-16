@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock, UserCircle } from 'lucide-react';
+import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock, UserCircle, Briefcase, User, GraduationCap } from 'lucide-react';
 import { validateFullName, validateStudentId } from '@/lib/validation';
 import { logAppError } from '@/lib/errorMessages';
 
@@ -32,12 +32,39 @@ const COLLEGES = [
   { name: "School of International Relations", programs: ["BA Foreign Service"] }
 ];
 
+const FACULTY_DEPARTMENTS = [
+  'College of Accountancy',
+  'College of Agriculture', 
+  'College of Arts and Sciences',
+  'College of Business Administration',
+  'College of Communication',
+  'College of Informatics and Computing Studies',
+  'College of Criminology',
+  'College of Education',
+  'College of Engineering and Architecture',
+  'College of Medical Technology',
+  'College of Midwifery',
+  'College of Music',
+  'College of Nursing',
+  'College of Physical Therapy',
+  'College of Respiratory Therapy',
+  'School of International Relations',
+  'Office of the President',
+  'Office of the Registrar',
+  'Finance Department',
+  'Human Resources',
+  'IT Department',
+  'Library Department',
+  'Security Office',
+  'Maintenance Department',
+];
+
 const VISITOR_TYPES = [
-  { id: 'Student', label: 'Student' },
-  { id: 'Faculty', label: 'Faculty' },
-  { id: 'Administrative Staff', label: 'Admin Staff' },
-  { id: 'Library Staff', label: 'Library Staff' },
-  { id: 'Guest', label: 'Guest' },
+  { id: 'Student', label: 'Student', icon: GraduationCap },
+  { id: 'Faculty', label: 'Faculty', icon: Briefcase },
+  { id: 'Administrative Staff', label: 'Admin', icon: UserCircle },
+  { id: 'Library Staff', label: 'Library', icon: Briefcase },
+  { id: 'Guest', label: 'Guest', icon: User },
 ];
 
 function RegisterForm() {
@@ -50,6 +77,7 @@ function RegisterForm() {
   const [studentId, setStudentId] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
+  const [department, setDepartment] = useState('');
   const [visitorType, setVisitorType] = useState('Student');
   const [email, setEmail] = useState('');
   
@@ -58,7 +86,6 @@ function RegisterForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [hoveredOption, setHoveredOption] = useState<string | null>(null);
   
   const method = searchParams.get('method');
   const idFromUrl = searchParams.get('id');
@@ -71,7 +98,22 @@ function RegisterForm() {
     setLoading(false);
   }, [db, method, idFromUrl, emailFromUrl]);
 
+  // Transition handling when visitor type changes
+  useEffect(() => {
+    setSelectedCollege('');
+    setSelectedProgram('');
+    setDepartment('');
+    if (visitorType === 'Guest') {
+      setStudentId('');
+    }
+  }, [visitorType]);
+
   const filteredOptions = useMemo(() => {
+    if (visitorType === 'Faculty') {
+      const term = search.toLowerCase();
+      return FACULTY_DEPARTMENTS.filter(d => d.toLowerCase().includes(term)).map(d => ({ type: 'item', label: d, college: d }));
+    }
+
     const term = search.toLowerCase();
     const results: any[] = [];
     COLLEGES.forEach(college => {
@@ -86,60 +128,111 @@ function RegisterForm() {
       }
     });
     return results;
-  }, [search]);
+  }, [search, visitorType]);
 
   const handleSubmit = async () => {
     if (!db || submitting) return;
     setFormError(null);
 
+    // Dynamic Validation
     if (!validateFullName(fullName)) {
       setFormError("Please enter your full name.");
       return;
     }
 
-    if (!validateStudentId(studentId)) {
-      setFormError("Invalid Student ID format.");
+    if (visitorType !== 'Guest') {
+      if (!studentId.trim()) {
+        setFormError(visitorType === 'Student' ? "Student ID is required." : "Employee ID is required.");
+        return;
+      }
+    }
+
+    if (visitorType === 'Student' && !selectedCollege) {
+      setFormError("Please select your college and program.");
       return;
     }
 
-    if (!selectedCollege) {
-      setFormError("Please select your college/program.");
+    if (visitorType === 'Faculty' && !selectedCollege) {
+      setFormError("Please select your department.");
+      return;
+    }
+
+    if (['Administrative Staff', 'Library Staff'].includes(visitorType) && !department.trim()) {
+      setFormError("Please enter your office/department.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const userId = studentId; 
-      const docRef = doc(db, 'users', userId);
+      const finalStudentId = visitorType === 'Guest' ? `GUEST-${Date.now()}` : studentId;
+      const docRef = doc(db, 'users', finalStudentId);
+      
       const userData = {
-        studentId,
+        studentId: finalStudentId,
         fullName,
         displayName: fullName,
-        college: selectedCollege,
-        program: selectedProgram || 'N/A',
+        college: ['Administrative Staff', 'Library Staff'].includes(visitorType) ? department : selectedCollege,
+        program: visitorType === 'Student' ? (selectedProgram || 'N/A') : '',
         visitorType,
         email: email || '',
         role: 'visitor',
         updatedAt: Timestamp.now()
       };
 
-      const existingSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', studentId), limit(1)));
-      if (existingSnap.empty) {
-        await setDoc(docRef, { ...userData, createdAt: Timestamp.now(), uid: userId });
-      } else {
-        await updateDoc(docRef, userData);
+      // For non-guests, we save/update the user profile
+      if (visitorType !== 'Guest') {
+        const existingSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', finalStudentId), limit(1)));
+        if (existingSnap.empty) {
+          await setDoc(docRef, { ...userData, createdAt: Timestamp.now(), uid: finalStudentId });
+        } else {
+          await updateDoc(docRef, userData);
+        }
       }
 
-      sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+      const visitorSession = {
         ...userData,
         loginMethod: method === 'email' ? 'email' : 'id'
-      }));
+      };
+      sessionStorage.setItem('kiosk_visitor', JSON.stringify(visitorSession));
       
-      router.push('/kiosk/purpose');
+      // Guest skip purpose
+      if (visitorType === 'Guest') {
+        await addDoc(collection(db, 'visits'), {
+          ...userData,
+          purpose: 'General Visit / Library Tour',
+          loginMethod: 'id',
+          timestamp: Timestamp.now(),
+        });
+        router.push('/kiosk/welcome');
+      } else {
+        router.push('/kiosk/purpose');
+      }
     } catch (err) {
       logAppError('Registration', 'SaveUser', err);
       setFormError("Registration failed. Please try again.");
       setSubmitting(false);
+    }
+  };
+
+  const handleIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (studentId.trim().length > 0) {
+        document.getElementById('fullName-input')?.focus();
+      }
+    }
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (visitorType === 'Student' || visitorType === 'Faculty') {
+        setIsDropdownOpen(true);
+      } else if (['Administrative Staff', 'Library Staff'].includes(visitorType)) {
+        document.getElementById('department-input')?.focus();
+      } else {
+        handleSubmit();
+      }
     }
   };
 
@@ -164,7 +257,7 @@ function RegisterForm() {
 
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="glass-neu rounded-[2rem] p-8 space-y-6 shadow-2xl border-none">
           {formError && (
-            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-center">
+            <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-center animate-in slide-in-from-top-1">
               <p className="text-red-200 text-[9px] font-black uppercase tracking-widest">{formError}</p>
             </div>
           )}
@@ -178,70 +271,127 @@ function RegisterForm() {
                     key={type.id}
                     type="button"
                     onClick={() => setVisitorType(type.id)}
-                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
                       visitorType === type.id
                         ? 'bg-[#c9a227] text-[#0a2a1a]'
                         : 'bg-[#0d3d24] text-white/60 border border-[#c9a227]/30 hover:border-[#c9a227]'
                     }`}
                   >
+                    <type.icon className="h-3 w-3" />
                     {type.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {email && (
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Institutional Email</Label>
-                <div className="relative">
-                  <Input value={email} readOnly className="h-12 text-xs font-bold bg-black/40 border-2 border-[#c9a227] text-[#c9a227] rounded-xl px-4 cursor-not-allowed" />
-                  <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]/50" />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Student ID</Label>
-              <Input id="studentId-input" placeholder="XX-XXXXX-XXX" className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" value={studentId} onChange={(e) => setStudentId(e.target.value)} required />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
-              <Input id="fullName-input" placeholder="Enter your full name" className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </div>
-
-            <div className="space-y-1 relative">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">College / Program</Label>
-              <div 
-                className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all ${isDropdownOpen ? 'ring-2 ring-[#c9a227]/30' : ''}`}
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              >
-                <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
-                  {selectedProgram || selectedCollege || "Search for your program..."}
-                </span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-              </div>
-
-              {isDropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden shadow-2xl" style={{ background: '#071a0f', border: '1px solid #c9a227', maxHeight: '280px', overflowY: 'auto' }}>
-                  <div className="sticky top-0 p-0">
-                    <input autoFocus className="w-full bg-[#0a2a1a] border-none border-b border-[#c9a227] text-white p-3 text-sm outline-none" placeholder="Type to search..." value={search} onChange={(e) => setSearch(e.target.value)} onClick={(e) => e.stopPropagation()} />
+            <div className="space-y-4 animate-in fade-in duration-500">
+              {email && (
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Institutional Email</Label>
+                  <div className="relative">
+                    <Input value={email} readOnly className="h-12 text-xs font-bold bg-black/40 border-2 border-[#c9a227] text-[#c9a227] rounded-xl px-4 cursor-not-allowed" />
+                    <Lock className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#c9a227]/50" />
                   </div>
-                  {filteredOptions.map((opt, i) => (
-                    <div key={i}>
-                      {opt.type === 'header' ? (
-                        <div className="p-3 text-[9px] font-black text-[#c9a227] uppercase tracking-widest bg-[#071a0f] border-t border-[#c9a227]/10">{opt.label}</div>
-                      ) : (
-                        <div 
-                          className={`p-3 text-sm font-medium text-white cursor-pointer hover:bg-[#0d3d24] transition-colors flex items-center justify-between ${selectedProgram === opt.label ? 'border-l-4 border-[#c9a227]' : ''}`}
-                          onClick={(e) => { e.stopPropagation(); setSelectedCollege(opt.college); setSelectedProgram(opt.label); setIsDropdownOpen(false); setSearch(''); }}
-                        >
-                          <span className="truncate">{opt.label}</span>
-                          {selectedProgram === opt.label && <Check className="h-4 w-4 text-[#c9a227]" />}
+                </div>
+              )}
+
+              {visitorType !== 'Guest' && (
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
+                    {visitorType === 'Student' ? 'Student ID' : 'Employee ID'}
+                  </Label>
+                  <Input 
+                    id="studentId-input"
+                    autoFocus
+                    placeholder={visitorType === 'Student' ? "XX-XXXXX-XXX" : "EMP-2024-XXX"} 
+                    className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
+                    value={studentId} 
+                    onChange={(e) => setStudentId(e.target.value)} 
+                    onKeyDown={handleIdKeyDown}
+                    required 
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
+                <Input 
+                  id="fullName-input"
+                  placeholder="Enter your full name" 
+                  className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
+                  value={fullName} 
+                  onChange={(e) => setFullName(e.target.value)} 
+                  onKeyDown={handleNameKeyDown}
+                  required 
+                />
+              </div>
+
+              {(visitorType === 'Student' || visitorType === 'Faculty') && (
+                <div className="space-y-1 relative">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
+                    {visitorType === 'Student' ? 'College / Program' : 'Department'}
+                  </Label>
+                  <div 
+                    className={`h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all ${isDropdownOpen ? 'ring-2 ring-[#c9a227]/30' : ''}`}
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
+                      {selectedProgram || selectedCollege || (visitorType === 'Student' ? "Search for your program..." : "Select your department...")}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isDropdownOpen && (
+                    <div className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden shadow-2xl" 
+                         style={{ background: '#071a0f', border: '1px solid #c9a227', boxShadow: '0 25px 50px rgba(0,0,0,0.9)', maxHeight: '280px', overflowY: 'auto' }}>
+                      <div className="sticky top-0 p-0">
+                        <input 
+                          autoFocus 
+                          style={{ background: '#0a2a1a', border: 'none', borderBottom: '1px solid rgba(201, 162, 39, 0.2)', color: 'white', padding: '12px 16px', width: '100%', outline: 'none', fontSize: '14px' }}
+                          placeholder="Type to search..." 
+                          value={search} 
+                          onChange={(e) => setSearch(e.target.value)} 
+                          onClick={(e) => e.stopPropagation()} 
+                        />
+                      </div>
+                      {filteredOptions.map((opt, i) => (
+                        <div key={i}>
+                          {opt.type === 'header' ? (
+                            <div style={{ padding: '8px 16px 4px', color: '#c9a227', fontSize: '11px', fontWeight: '600', letterSpacing: '0.1em', textTransform: 'uppercase', background: '#071a0f', borderTop: '1px solid rgba(201, 162, 39, 0.1)' }}>{opt.label}</div>
+                          ) : (
+                            <div 
+                              style={{ padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '14px', borderLeft: (selectedProgram === opt.label || selectedCollege === opt.label) ? '3px solid #c9a227' : '3px solid transparent', background: 'transparent' }}
+                              className="hover:bg-[#0d3d24] transition-colors flex items-center justify-between"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setSelectedCollege(opt.college); 
+                                if (visitorType === 'Student') setSelectedProgram(opt.label);
+                                setIsDropdownOpen(false); 
+                                setSearch(''); 
+                              }}
+                            >
+                              <span className="truncate">{opt.label}</span>
+                              {(selectedProgram === opt.label || (visitorType === 'Faculty' && selectedCollege === opt.label)) && <Check className="h-4 w-4 text-[#c9a227]" />}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+              )}
+
+              {['Administrative Staff', 'Library Staff'].includes(visitorType) && (
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Office / Department</Label>
+                  <Input 
+                    id="department-input"
+                    placeholder="Enter your specific office" 
+                    className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
+                    value={department} 
+                    onChange={(e) => setDepartment(e.target.value)} 
+                    required 
+                  />
                 </div>
               )}
             </div>
