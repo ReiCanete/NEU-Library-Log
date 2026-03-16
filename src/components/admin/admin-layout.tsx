@@ -98,6 +98,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleNavClick = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('closeSidePanel'));
+    }
+  };
+
   if (authLoading || checkingRole || isAdmin === null || !currentTime) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#0a2a1a]">
@@ -142,6 +148,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     <SidebarMenuButton 
                       asChild 
                       isActive={isActive}
+                      onClick={handleNavClick}
                       className={`h-11 rounded-xl px-4 transition-all ${
                         isActive 
                           ? 'bg-[#c9a227] text-[#0a2a1a] font-bold shadow-md' 
@@ -168,7 +175,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           <SidebarFooter className="p-4 border-t border-[#c9a227]/10">
             <Button 
               variant="ghost" 
-              onClick={() => setShowLogoutModal(true)}
+              onClick={() => { handleNavClick(); setShowLogoutModal(true); }}
               className="w-full justify-start gap-3 h-11 rounded-xl text-red-400 hover:bg-red-400/10 hover:text-red-400 font-bold"
             >
               <LogOut className="h-4 w-4" />

@@ -26,6 +26,66 @@ const TYPE_STYLES: Record<string, string> = {
   'Guest': 'bg-slate-50 text-slate-700 border-slate-200',
 };
 
+const VisitHistory = ({ studentId }: { studentId: string }) => {
+  const db = useFirestore();
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!studentId || !db) return;
+    
+    let cancelled = false;
+    
+    const fetchHistory = async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'visits'), where('studentId', '==', studentId))
+        );
+        if (cancelled) return;
+        
+        const visits = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => {
+            const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+            const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
+            return timeB - timeA;
+          });
+        
+        setHistory(visits.slice(0, 5));
+      } catch (err) {
+        if (!cancelled) setHistory([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    
+    fetchHistory();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId, db]);
+
+  if (loading) return <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Loading history...</p>;
+  if (history.length === 0) return <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 italic">No previous visits recorded.</p>;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">{history.length} recent activity logs</p>
+      <div className="space-y-2">
+        {history.map((visit: any) => (
+          <div key={visit.id} className="p-3 rounded-xl bg-white border border-[#f0f4f1] flex justify-between items-center group hover:border-[#c9a227] transition-all">
+            <span className="font-black text-[#1a3a2a] text-[11px] uppercase tracking-tight">{visit.purpose}</span>
+            <span className="text-[9px] font-bold text-slate-400 tabular-nums">
+              {visit.timestamp?.toDate ? format(visit.timestamp.toDate(), 'MMM dd') : '--'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function VisitorLogs() {
   const { toast } = useToast();
   const db = useFirestore();
@@ -45,6 +105,19 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
+  // Close panel on unmount or global event
+  useEffect(() => {
+    const handler = () => {
+      setSidePanelOpen(false);
+      setSelectedVisit(null);
+    };
+    window.addEventListener('closeSidePanel', handler);
+    return () => {
+      window.removeEventListener('closeSidePanel', handler);
+      handler();
+    };
+  }, []);
+
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
@@ -55,7 +128,6 @@ export default function VisitorLogs() {
     const enrich = async () => {
       setEnriching(true);
       const enriched = await Promise.all(allVisits.map(async (visit) => {
-        // Fallback for missing college/program in visit record
         if (!visit.college && visit.studentId) {
           try {
             const userSnap = await getDocs(query(collection(db, 'users'), where('studentId', '==', visit.studentId)));
@@ -226,18 +298,21 @@ export default function VisitorLogs() {
 
       {/* Side panel overlay */}
       {sidePanelOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" onClick={() => setSidePanelOpen(false)} />
+        <div 
+          className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity" 
+          onClick={() => { setSidePanelOpen(false); setSelectedVisit(null); }} 
+        />
       )}
 
       {/* Side panel */}
       <div className={`fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out ${
-        sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
+        sidePanelOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
       } border-l border-[#d4e4d8] flex flex-col`}>
         {selectedVisit && (
           <>
             <div className="bg-[#1a3a2a] p-10 flex flex-col items-center justify-center text-center relative">
               <button 
-                onClick={() => setSidePanelOpen(false)} 
+                onClick={() => { setSidePanelOpen(false); setSelectedVisit(null); }} 
                 className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors"
               >
                 <X className="w-6 h-6" />
@@ -268,7 +343,7 @@ export default function VisitorLogs() {
                   <UserCircle className="w-4 h-4 text-[#c9a227]" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#4a6741]">Profile Details</span>
                 </div>
-                <div className="bg-white rounded-2xl border border-[#f0f4f1] overflow-hidden">
+                <div className="bg-white rounded-2xl border border-[#f0f4f1] overflow-hidden mb-6">
                   {[
                     { label: 'Visitor Type', value: selectedVisit.visitorType || 'Student' },
                     { label: 'College', value: selectedVisit.college || '—' },
@@ -282,6 +357,9 @@ export default function VisitorLogs() {
                     </div>
                   ))}
                 </div>
+                
+                {/* Historical Activity */}
+                <VisitHistory studentId={selectedVisit.studentId} />
               </div>
 
               <div className="pt-6">
