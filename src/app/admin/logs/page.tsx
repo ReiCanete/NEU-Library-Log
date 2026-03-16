@@ -1,14 +1,13 @@
-
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Search, Loader2, UserCircle, X, ShieldOff, Clock, ShieldAlert } from 'lucide-react';
+import { Search, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
-import { format, isSameDay } from 'date-fns';
+import { collection, query, orderBy, addDoc, Timestamp } from 'firebase/firestore';
+import { isSameDay } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,82 +17,17 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
-import { usePathname } from 'next/navigation';
-
-const VisitHistory = ({ studentId }: { studentId: string }) => {
-  const db = useFirestore();
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!studentId || !db) return;
-    
-    let cancelled = false;
-    
-    const fetchHistory = async () => {
-      try {
-        const snap = await getDocs(
-          query(collection(db, 'visits'), where('studentId', '==', studentId))
-        );
-        if (cancelled) return;
-        
-        const visits = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a: any, b: any) => {
-            const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
-            const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
-            return timeB - timeA;
-          });
-        
-        setHistory(visits.slice(0, 5));
-      } catch (err) {
-        if (!cancelled) setHistory([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    
-    fetchHistory();
-    
-    return () => {
-      cancelled = true;
-    };
-  }, [studentId, db]);
-
-  if (loading) return <p className="text-[11px] text-slate-400 uppercase tracking-widest my-2">Loading history...</p>;
-  if (history.length === 0) return <p className="text-[11px] text-slate-400 italic my-2">No previous visits.</p>;
-
-  return (
-    <div className="mt-4">
-      <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mb-2">Recent Activity</p>
-      <div className="space-y-2">
-        {history.map((visit: any) => (
-          <div key={visit.id} className="p-3 rounded-xl bg-white border border-[#f0f4f1] flex justify-between items-center shadow-sm">
-            <span className="font-bold text-[#1a3a2a] text-[10px] uppercase">{visit.purpose}</span>
-            <span className="text-[9px] font-bold text-slate-400">
-              {visit.timestamp?.toDate ? format(visit.timestamp.toDate(), 'MMM dd') : '--'}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 export default function VisitorLogs() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
-  const pathname = usePathname();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   
-  const [selectedVisit, setSelectedVisit] = useState<any>(null);
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
-
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
@@ -102,12 +36,6 @@ export default function VisitorLogs() {
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
-
-  // Close panel whenever navigation occurs
-  useEffect(() => {
-    setSidePanelOpen(false);
-    setSelectedVisit(null);
-  }, [pathname]);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -214,7 +142,7 @@ export default function VisitorLogs() {
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">College</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Role</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Purpose</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12 text-right px-6">Access</TableHead>
+                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12 text-right px-6">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -227,11 +155,7 @@ export default function VisitorLogs() {
                   <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
                 </TableRow>
               ) : filteredVisits.map(v => (
-                <TableRow 
-                  key={v.id} 
-                  onClick={() => { setSelectedVisit(v); setSidePanelOpen(true); }} 
-                  className="cursor-pointer hover:bg-[#f0f7f2] transition-colors border-b-[#f0f4f1]"
-                >
+                <TableRow key={v.id} className="border-b-[#f0f4f1]">
                   <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
                   <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
                   <TableCell className="text-xs font-bold text-slate-600">{v.college || '—'}</TableCell>
@@ -250,7 +174,17 @@ export default function VisitorLogs() {
                     {isBlocked(v.studentId) ? (
                       <Badge variant="destructive" className="font-black uppercase text-[9px] px-3 py-1 rounded-full">Blocked</Badge>
                     ) : (
-                      <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-black uppercase text-[9px] px-3 py-1 rounded-full">Active</Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
+                        onClick={() => {
+                          setBlockTarget(v);
+                          setBlockModalOpen(true);
+                        }}
+                      >
+                        Block
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>
@@ -258,124 +192,6 @@ export default function VisitorLogs() {
             </TableBody>
           </Table>
         </Card>
-      </div>
-
-      {/* Side panel overlay - only renders when open, never covers sidebar */}
-      {sidePanelOpen && (
-        <div
-          onClick={() => {
-            setSidePanelOpen(false);
-            setTimeout(() => setSelectedVisit(null), 300);
-          }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: '260px',
-            right: 0,
-            bottom: 0,
-            zIndex: 998,
-            background: 'rgba(0,0,0,0.2)',
-            cursor: 'default',
-          }}
-        />
-      )}
-
-      {/* Side panel */}
-      <div
-        style={{
-          position: 'fixed',
-          right: 0,
-          top: 0,
-          height: '100%',
-          width: '380px',
-          background: 'white',
-          zIndex: 999,
-          boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
-          overflowY: 'auto',
-          transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.3s ease',
-          pointerEvents: sidePanelOpen ? 'all' : 'none',
-        }}
-      >
-        {selectedVisit && (
-          <div className="h-full flex flex-col">
-            <div className="bg-[#1a3a2a] p-5 flex items-center justify-between sticky top-0 z-10 shadow-md">
-              <h2 className="text-white font-bold text-lg">Visitor Details</h2>
-              <button
-                onClick={() => {
-                  setSidePanelOpen(false);
-                  setTimeout(() => setSelectedVisit(null), 300);
-                }}
-                className="text-white/60 hover:text-white p-1 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-6 flex-1 overflow-y-auto">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-[#1a3a2a] flex items-center justify-center shrink-0 shadow-lg">
-                  <span className="text-[#c9a227] text-2xl font-black">
-                    {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
-                </div>
-                <div className="overflow-hidden">
-                  <h3 className="font-black text-[#1a3a2a] text-xl truncate">{selectedVisit.fullName}</h3>
-                  <p className="text-sm font-bold text-slate-400 tabular-nums uppercase tracking-widest">{selectedVisit.studentId}</p>
-                </div>
-              </div>
-
-              <div className="bg-[#f0f7f2] rounded-2xl p-5 border border-[#d4e4d8]/50 shadow-sm">
-                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-[0.2em] mb-3">This Visit</p>
-                <p className="font-black text-[#1a3a2a] text-lg leading-tight mb-2">{selectedVisit.purpose}</p>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                    <Clock className="w-3.5 h-3.5" />
-                    {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', {
-                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-[#f8fafc] rounded-2xl p-5 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Official Record</p>
-                <div className="space-y-4">
-                  {[
-                    { label: 'Role / Type', value: selectedVisit.visitorType || 'Student' },
-                    { label: 'College', value: selectedVisit.college || '—' },
-                    { label: 'Program', value: selectedVisit.program || '—' },
-                    { label: 'Email', value: selectedVisit.email || '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex flex-col gap-1 pb-3 border-b border-slate-50 last:border-none last:pb-0">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
-                      <span className="text-sm font-bold text-[#1a3a2a] break-all">{value}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                <VisitHistory studentId={selectedVisit.studentId} />
-              </div>
-
-              {!isBlocked(selectedVisit.studentId) && (
-                <button
-                  onClick={() => {
-                    setSidePanelOpen(false);
-                    setTimeout(() => {
-                      setSelectedVisit(null);
-                      setBlockTarget(selectedVisit);
-                      setBlockModalOpen(true);
-                    }, 300);
-                  }}
-                  className="w-full py-4 bg-red-50 text-red-700 border border-red-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2"
-                >
-                  <ShieldAlert className="w-4 h-4" />
-                  Restrict Access
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Block Modal */}
