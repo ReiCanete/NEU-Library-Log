@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, AlertCircle, Megaphone, ShieldX, Mail, CreditCard } from 'lucide-react';
+import { Loader2, AlertCircle, Megaphone, ShieldX, Mail, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
 import { useFirestore, useCollection, useDoc } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase/config';
@@ -31,7 +30,12 @@ function KioskEntryContent() {
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
 
   const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [expandedAnnouncements, setExpandedAnnouncements] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
@@ -58,21 +62,22 @@ function KioskEntryContent() {
           const start = (a.startDate as any)?.toDate ? a.startDate.toDate() : new Date(a.startDate);
           const end = (a.endDate as any)?.toDate ? a.endDate.toDate() : new Date(a.endDate);
           return start <= now && end >= now;
-        });
+        })
+        .sort((a: any, b: any) => {
+          // Urgent first
+          if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
+          if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
+          // Then by creation date newest first
+          const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
+          const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
+          return timeB - timeA;
+        })
+        .slice(0, 5);
       setActiveAnnouncements(docs);
-      setCurrentIndex(0);
     });
 
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (activeAnnouncements.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % activeAnnouncements.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [activeAnnouncements]);
 
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -110,6 +115,7 @@ function KioskEntryContent() {
           college: d.college, 
           program: d.program, 
           email: d.email || '',
+          visitorType: d.visitorType || 'Student',
           loginMethod: 'id' 
         }));
         router.push('/kiosk/purpose');
@@ -142,7 +148,6 @@ function KioskEntryContent() {
     const cleanEmail = emailInput.trim().toLowerCase();
 
     try {
-      // Check blocklist for email
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanEmail), limit(1)));
       if (!blockSnap.empty) {
         setBlockedData(blockSnap.docs[0].data());
@@ -150,7 +155,6 @@ function KioskEntryContent() {
         return;
       }
 
-      // Query users by email
       const userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', cleanEmail), limit(1)));
       if (!userSnap.empty) {
         const d = userSnap.docs[0].data();
@@ -160,6 +164,7 @@ function KioskEntryContent() {
           college: d.college, 
           program: d.program, 
           email: d.email,
+          visitorType: d.visitorType || 'Student',
           loginMethod: 'email' 
         }));
         toast({ title: `Welcome back, ${d.fullName.split(' ')[0]}!`, description: "Redirecting to selection...", className: "bg-[#1a3a2a] text-white border-[#c9a227]" });
@@ -173,6 +178,8 @@ function KioskEntryContent() {
       setLoading(false);
     }
   };
+
+  if (!mounted) return null;
 
   if (blockedData) {
     return (
@@ -190,24 +197,50 @@ function KioskEntryContent() {
     );
   }
 
+  const visibleAnnouncements = expandedAnnouncements 
+    ? activeAnnouncements 
+    : activeAnnouncements.slice(0, 1);
+
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] flex flex-col relative">
-      <div className="w-full h-[48px] shrink-0">
-        {activeAnnouncements[currentIndex] && (
-          <div className={`w-full py-2 px-6 flex items-center justify-center gap-3 transition-all duration-1000 animate-in slide-in-from-top ${
-            activeAnnouncements[currentIndex].priority === 'urgent' 
-              ? 'bg-[#dc2626] text-white animate-pulse' 
-              : 'bg-[#c9a227] text-[#0a2a1a]'
-          } shadow-xl`}>
-            <Megaphone className="h-4 w-4 shrink-0" />
-            <p className="text-sm font-black uppercase tracking-widest text-center truncate max-w-4xl">
-              {activeAnnouncements[currentIndex].priority === 'urgent' && "⚠ URGENT: "}{activeAnnouncements[currentIndex].message}
-            </p>
+      <div className="w-full shrink-0 flex flex-col">
+        {visibleAnnouncements.map((announcement, index) => (
+          <div
+            key={announcement.id}
+            className={`w-full py-2.5 px-6 flex items-center justify-between gap-4 border-b border-black/10 transition-all ${
+              announcement.priority === 'urgent' 
+                ? 'bg-red-600 text-white animate-pulse' 
+                : 'bg-[#c9a227] text-[#0a2a1a]'
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {announcement.priority === 'urgent' ? (
+                <span className="shrink-0 font-black text-[10px] bg-white text-red-600 px-2 py-0.5 rounded uppercase">⚠ Urgent</span>
+              ) : (
+                <Megaphone className="h-4 w-4 shrink-0" />
+              )}
+              <p className="text-sm font-black uppercase tracking-widest truncate">
+                {announcement.message}
+              </p>
+            </div>
+            
+            {index === 0 && activeAnnouncements.length > 1 && (
+              <button
+                onClick={() => setExpandedAnnouncements(!expandedAnnouncements)}
+                className="shrink-0 flex items-center gap-1.5 text-[10px] font-black uppercase underline decoration-2 underline-offset-4 hover:opacity-80"
+              >
+                {expandedAnnouncements ? (
+                  <>Show Less <ChevronUp className="h-3 w-3" /></>
+                ) : (
+                  <>+{activeAnnouncements.length - 1} More Alerts <ChevronDown className="h-3 w-3" /></>
+                )}
+              </button>
+            )}
           </div>
-        )}
+        ))}
       </div>
 
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-16 right-4 z-50">
         <Tabs value={loginMode} onValueChange={(v) => {
           if (v === 'admin') router.push('/admin/login');
           else setLoginMode(v as any);
@@ -255,9 +288,10 @@ function KioskEntryContent() {
                       value={studentId} 
                       onChange={(e) => { setStudentId(e.target.value); setError(null); }} 
                       disabled={loading} 
+                      suppressHydrationWarning
                     />
                   </div>
-                  <Button className="w-full h-12 text-sm font-black rounded-xl bg-[#c9a227] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={loading} type="submit">
+                  <Button className="w-full h-12 text-sm font-black rounded-xl bg-[#c9a227] text-[#0a2a1a] hover:opacity-90 shadow-lg" disabled={loading} type="submit" suppressHydrationWarning>
                     {loading && studentId.trim() ? <Loader2 className="animate-spin h-4 w-4" /> : "Continue with ID"}
                   </Button>
                 </form>
@@ -280,10 +314,11 @@ function KioskEntryContent() {
                       value={emailInput} 
                       onChange={(e) => { setEmailInput(e.target.value); setError(null); }} 
                       disabled={loading} 
+                      suppressHydrationWarning
                     />
                   </div>
                   {error && <p className="text-red-400 text-[9px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
-                  <Button className="w-full h-12 text-sm font-black rounded-xl border-2 border-[#c9a227] bg-transparent text-[#c9a227] hover:bg-[#c9a227] hover:text-[#0a2a1a] shadow-lg transition-all" disabled={loading} type="submit">
+                  <Button className="w-full h-12 text-sm font-black rounded-xl border-2 border-[#c9a227] bg-transparent text-[#c9a227] hover:bg-[#c9a227] hover:text-[#0a2a1a] shadow-lg transition-all" disabled={loading} type="submit" suppressHydrationWarning>
                     {loading && emailInput.trim() ? <Loader2 className="animate-spin h-4 w-4" /> : "Continue with Email"}
                   </Button>
                 </form>

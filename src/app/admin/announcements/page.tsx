@@ -6,7 +6,7 @@ import { Megaphone, Plus, Trash2, Edit2, Send, Loader2, AlertCircle, Clock, Cale
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc, getDocs, where } from 'firebase/firestore';
 import { format, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -69,7 +69,7 @@ export default function AnnouncementsPage() {
     setFormError(null);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!db) return;
     setFormError(null);
 
@@ -78,9 +78,17 @@ export default function AnnouncementsPage() {
       return;
     }
 
+    // Check active limit (max 5)
+    // We only check if we are creating a new one or changing an inactive one to active
+    const currentlyActiveCount = active.length;
+    if (!editingId && currentlyActiveCount >= 5) {
+      setFormError("Maximum of 5 active announcements reached. Please deactivate or delete an existing one.");
+      return;
+    }
+
     setIsProcessing(true);
 
-    const data = {
+    const data: any = {
       message: message.trim(),
       priority,
       isActive: true,
@@ -90,40 +98,22 @@ export default function AnnouncementsPage() {
       updatedAt: Timestamp.now()
     };
 
-    if (editingId) {
-      const docRef = doc(db, 'announcements', editingId);
-      updateDoc(docRef, data)
-        .then(() => {
-          toast({ title: "Updated", description: "Announcement updated successfully.", className: "bg-emerald-500 text-white border-none" });
-          setShowModal(false);
-          resetForm();
-        })
-        .catch(async (err) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'update',
-            requestResourceData: data
-          }));
-          toast({ title: "Error", description: "Failed to update. Please try again.", variant: "destructive" });
-        })
-        .finally(() => setIsProcessing(false));
-    } else {
-      const newData = { ...data, createdAt: Timestamp.now() };
-      addDoc(collection(db, 'announcements'), newData)
-        .then(() => {
-          toast({ title: "Success", description: "Announcement posted successfully!", className: "bg-emerald-500 text-white border-none" });
-          setShowModal(false);
-          resetForm();
-        })
-        .catch(async (err) => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'announcements',
-            operation: 'create',
-            requestResourceData: newData
-          }));
-          toast({ title: "Error", description: "Failed to post. Please try again.", variant: "destructive" });
-        })
-        .finally(() => setIsProcessing(false));
+    try {
+      if (editingId) {
+        const docRef = doc(db, 'announcements', editingId);
+        await updateDoc(docRef, data);
+        toast({ title: "Updated", description: "Announcement updated successfully.", className: "bg-emerald-500 text-white border-none" });
+      } else {
+        data.createdAt = Timestamp.now();
+        await addDoc(collection(db, 'announcements'), data);
+        toast({ title: "Success", description: "Announcement posted successfully!", className: "bg-emerald-500 text-white border-none" });
+      }
+      setShowModal(false);
+      resetForm();
+    } catch (err: any) {
+      toast({ title: "Error", description: "Failed to save announcement.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -136,17 +126,25 @@ export default function AnnouncementsPage() {
     setShowModal(true);
   };
 
-  const toggleActive = (id: string, currentState: boolean) => {
+  const toggleActive = async (id: string, currentState: boolean) => {
     if (!db) return;
-    const docRef = doc(db, 'announcements', id);
-    updateDoc(docRef, { isActive: !currentState })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'update',
-          requestResourceData: { isActive: !currentState }
-        }));
+    
+    // Check limit if activating
+    if (!currentState && active.length >= 5) {
+      toast({ 
+        title: "Limit Reached", 
+        description: "Cannot activate more than 5 announcements. Please deactivate another one first.",
+        variant: "destructive" 
       });
+      return;
+    }
+
+    const docRef = doc(db, 'announcements', id);
+    try {
+      await updateDoc(docRef, { isActive: !currentState });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to toggle status.", variant: "destructive" });
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -249,6 +247,21 @@ export default function AnnouncementsPage() {
                   Enter message and schedule for the kiosk display.
                 </DialogDescription>
               </DialogHeader>
+              
+              {active.length >= 4 && !editingId && (
+                <div className={`mt-2 flex items-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors ${
+                  active.length >= 5 
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {active.length >= 5 ? (
+                    <>⚠ Maximum limit reached (5/5). Deactivate an announcement to add more.</>
+                  ) : (
+                    <>⚡ Approaching limit ({active.length}/5 active announcements)</>
+                  )}
+                </div>
+              )}
+
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a]">Message</Label>
@@ -285,7 +298,7 @@ export default function AnnouncementsPage() {
               </div>
               <DialogFooter className="gap-2 pt-4">
                 <Button variant="ghost" className="h-12 px-4 rounded-xl font-black text-xs" onClick={() => setShowModal(false)} disabled={isProcessing}>Cancel</Button>
-                <Button className="h-12 px-8 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing} onClick={handleSave}>
+                <Button className="h-12 px-8 rounded-xl bg-[#1a3a2a] text-white font-black flex gap-2 text-xs" disabled={isProcessing || (!editingId && active.length >= 5)} onClick={handleSave}>
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {isProcessing ? (editingId ? "Updating..." : "Posting...") : (editingId ? "Update Broadcast" : "Post Broadcast")}
                 </Button>
@@ -297,9 +310,20 @@ export default function AnnouncementsPage() {
         <div className="space-y-12">
           {/* Active Section */}
           <div className="space-y-4">
-            <h3 className="text-xs font-black text-[#4a6741] uppercase tracking-[0.2em] flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Active Announcements
-            </h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xs font-black text-[#4a6741] uppercase tracking-[0.2em] flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Active Announcements
+              </h3>
+              {!loading && (
+                <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest border ${
+                  active.length >= 5 
+                    ? 'bg-red-50 text-red-600 border-red-100'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                }`}>
+                  {active.length}/5 Active
+                </span>
+              )}
+            </div>
             <div className="grid gap-4">
               {loading ? (
                 Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)
