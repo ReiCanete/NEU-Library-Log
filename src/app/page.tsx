@@ -431,6 +431,7 @@ function KioskEntryContent() {
         return;
       }
 
+      // Check blocklist
       const blockSnap = await getDocs(
         query(collection(db, 'blocklist'), where('studentId', '==', user.email))
       );
@@ -440,22 +441,38 @@ function KioskEntryContent() {
         return;
       }
 
+      // Check if user exists in Firestore
       const userSnap = await getDocs(
         query(collection(db, 'users'), where('email', '==', user.email))
       );
 
       if (userSnap.empty) {
+        // First time Google user — go to registration
         sessionStorage.setItem('kiosk_google_user', JSON.stringify({
           email: user.email,
           fullName: user.displayName || '',
-          loginMethod: 'google'
+          loginMethod: 'google',
+          isFirstTime: true
         }));
-        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}`;
+        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.displayName || '')}`;
         return;
       }
 
       const userData = userSnap.docs[0].data();
 
+      // Check for incomplete profile
+      if (!userData.studentId || !userData.college) {
+        sessionStorage.setItem('kiosk_google_user', JSON.stringify({
+          email: user.email,
+          fullName: userData.fullName || user.displayName || '',
+          loginMethod: 'google',
+          isFirstTime: false
+        }));
+        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(userData.fullName || user.displayName || '')}`;
+        return;
+      }
+
+      // Returning user with complete profile
       if (userData.role === 'admin') {
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: userData.studentId || user.email,
