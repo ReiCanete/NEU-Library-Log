@@ -34,14 +34,22 @@ const VisitHistory = ({ studentId, currentVisitId }: { studentId: string, curren
     if (!db || !studentId) return;
     const fetchHistory = async () => {
       try {
+        // Fetch without orderBy to avoid composite index requirement
         const q = query(
           collection(db, 'visits'),
-          where('studentId', '==', studentId),
-          orderBy('timestamp', 'desc'),
-          limit(10)
+          where('studentId', '==', studentId)
         );
         const snap = await getDocs(q);
-        setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const visits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Sort client-side by timestamp descending
+        visits.sort((a: any, b: any) => {
+          const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+          const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
+          return timeB - timeA;
+        });
+        
+        setHistory(visits.slice(0, 10));
       } catch (e) {
         console.error("[NEU Library Log Error] [VisitHistory]:", e);
       } finally {
@@ -63,11 +71,11 @@ const VisitHistory = ({ studentId, currentVisitId }: { studentId: string, curren
             <div className="flex justify-between items-start">
               <span className="font-bold text-[#1a3a2a] text-xs">{visit.purpose}</span>
               <span className="text-[9px] font-black text-gray-400 uppercase">
-                {format(visit.timestamp?.toDate(), 'MMM dd')}
+                {visit.timestamp?.toDate ? format(visit.timestamp.toDate(), 'MMM dd') : ''}
               </span>
             </div>
             <div className="flex justify-between items-center mt-1">
-              <span className="text-[9px] text-gray-400">{format(visit.timestamp?.toDate(), 'p')}</span>
+              <span className="text-[9px] text-gray-400">{visit.timestamp?.toDate ? format(visit.timestamp.toDate(), 'p') : ''}</span>
               {visit.id === currentVisitId && (
                 <span className="text-[9px] text-[#c9a227] font-black uppercase tracking-tighter">Selected Visit</span>
               )}
@@ -427,4 +435,3 @@ export default function VisitorLogs() {
     </AdminLayout>
   );
 }
-
