@@ -57,11 +57,13 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string) => Pr
         value={studentId}
         onChange={e => { setStudentId(e.target.value); setError(null); }}
         placeholder="e.g. 25-12946-343"
+        suppressHydrationWarning
         className={`w-full h-14 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-base font-mono text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
       />
       {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
       <button
         type="submit"
+        suppressHydrationWarning
         className="w-full h-14 mt-4 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-base rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-black/40 flex items-center justify-center"
         disabled={loading || disabled}
       >
@@ -112,11 +114,13 @@ const KioskEmailForm = memo(({ onSubmit, disabled }: { onSubmit: (email: string)
         value={emailInput}
         onChange={e => { setEmailInput(e.target.value); setError(null); }}
         placeholder="e.g. juan@neu.edu.ph"
+        suppressHydrationWarning
         className={`w-full h-14 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-base font-bold text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
       />
       {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
       <button
         type="submit"
+        suppressHydrationWarning
         className="w-full h-14 mt-4 bg-transparent border-2 border-[#c9a227] text-[#c9a227] font-black text-base rounded-xl hover:bg-[#c9a227]/10 active:scale-[0.98] transition-all disabled:opacity-50"
         disabled={loading || disabled}
       >
@@ -174,6 +178,7 @@ const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: str
               value={adminEmail}
               onChange={e => { setAdminEmail(e.target.value); setError(null); }}
               placeholder="staff@neu.edu.ph"
+              suppressHydrationWarning
               className="w-full h-14 bg-[#071a0f] border border-[#c9a227]/30 rounded-xl pl-11 pr-4 text-white placeholder-white/30 focus:border-[#c9a227] focus:outline-none text-base font-bold transition-all"
               required
             />
@@ -191,6 +196,7 @@ const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: str
               value={adminPassword}
               onChange={e => { setAdminPassword(e.target.value); setError(null); }}
               placeholder="••••••••"
+              suppressHydrationWarning
               className="w-full h-14 bg-[#071a0f] border border-[#c9a227]/30 rounded-xl pl-11 pr-4 text-white placeholder-white/30 focus:border-[#c9a227] focus:outline-none text-base font-bold transition-all"
               required
             />
@@ -206,6 +212,7 @@ const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: str
         <button
           type="submit"
           disabled={loading}
+          suppressHydrationWarning
           className="w-full h-14 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-base rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-black/40 flex items-center justify-center"
         >
           {loading ? (
@@ -225,8 +232,13 @@ function KioskEntryContent() {
   const { toast } = useToast();
   const auth = useAuth();
   
+  const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<'kiosk' | 'staff'>('kiosk');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
@@ -342,6 +354,8 @@ function KioskEntryContent() {
     }
   }, [auth, db, router]);
 
+  if (!mounted) return null;
+
   if (blockedData) {
     return (
       <div className="h-screen bg-[#0a2a1a] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
@@ -352,7 +366,7 @@ function KioskEntryContent() {
             <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-1">Reason</p>
             <p className="font-bold text-sm italic">{blockedData.reason || 'Safety/Policy Violation'}</p>
           </div>
-          <button onClick={() => setBlockedData(null)} className="w-full h-12 bg-white text-[#0a2a1a] font-black rounded-xl">Return</button>
+          <button suppressHydrationWarning onClick={() => setBlockedData(null)} className="w-full h-12 bg-white text-[#0a2a1a] font-black rounded-xl">Return</button>
         </div>
       </div>
     );
@@ -364,6 +378,7 @@ function KioskEntryContent() {
       
       <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-full p-1 shadow-xl">
         <button 
+          suppressHydrationWarning
           onClick={() => setMode('kiosk')}
           className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${
             mode === 'kiosk' 
@@ -374,6 +389,7 @@ function KioskEntryContent() {
           Kiosk
         </button>
         <button 
+          suppressHydrationWarning
           onClick={() => setMode('staff')}
           className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${
             mode === 'staff' 
@@ -397,7 +413,7 @@ function KioskEntryContent() {
               <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Full Capacity</h2>
               <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity}).</p>
-              <button className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</button>
+              <button suppressHydrationWarning className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</button>
             </div>
           ) : (
             mode === 'kiosk' ? (
