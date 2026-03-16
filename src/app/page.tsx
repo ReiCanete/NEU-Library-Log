@@ -14,23 +14,31 @@ import { useToast } from '@/hooks/use-toast';
 import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
-// KioskIdForm - isolated component with its own state to prevent focus stealing on parent re-renders
-const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string) => Promise<void>, disabled: boolean }) => {
-  const [studentId, setStudentId] = useState('');
+// KioskIdForm - isolated component with its own state
+const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string, type: string) => Promise<void>, disabled: boolean }) => {
+  const [schoolId, setSchoolId] = useState('');
+  const [visitorType, setVisitorType] = useState('Student');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Focus once on mount only
     inputRef.current?.focus();
   }, []);
 
+  const visitorTypes = [
+    { value: 'Student', label: 'Student' },
+    { value: 'Faculty', label: 'Faculty' },
+    { value: 'Administrative Staff', label: 'Admin Staff' },
+    { value: 'Library Staff', label: 'Library' },
+    { value: 'Guest', label: 'Guest' },
+  ];
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (loading || disabled || !studentId.trim()) return;
+    if (loading || disabled || !schoolId.trim()) return;
 
-    if (!validateStudentId(studentId.trim())) {
+    if (visitorType === 'Student' && !validateStudentId(schoolId.trim())) {
       setError("Invalid ID format (XX-XXXXX-XXX).");
       return;
     }
@@ -38,7 +46,8 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string) => Pr
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(studentId.trim());
+      sessionStorage.setItem('kiosk_visitor_type', visitorType);
+      await onSubmit(schoolId.trim(), visitorType);
     } catch (err: any) {
       setError(err.message || "Connection error.");
     } finally {
@@ -48,31 +57,64 @@ const KioskIdForm = memo(({ onSubmit, disabled }: { onSubmit: (id: string) => Pr
 
   return (
     <form onSubmit={handleSubmit} className="mb-4">
-      <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-2 ml-1">
-        <CreditCard className="w-3.5 h-3.5" /> School ID Entry
-      </label>
-      <input
-        ref={inputRef}
-        type="text"
-        value={studentId}
-        onChange={e => { setStudentId(e.target.value); setError(null); }}
-        placeholder="e.g. 25-12946-343"
-        suppressHydrationWarning
-        className={`w-full h-14 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-base font-mono text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
-      />
+      <div className="mb-6">
+        <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-3 ml-1">
+          Visitor Type
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {visitorTypes.map(type => (
+            <button
+              key={type.value}
+              type="button"
+              suppressHydrationWarning
+              onClick={() => { setVisitorType(type.value); setError(null); }}
+              className={`px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                visitorType === type.value
+                  ? 'bg-[#c9a227] text-[#0a2a1a] shadow-lg shadow-[#c9a227]/20'
+                  : 'bg-[#071a0f] text-white/50 border border-[#c9a227]/20 hover:border-[#c9a227]/60'
+              }`}
+            >
+              {type.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-2">
+        <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-2 ml-1">
+          {visitorType === 'Student' ? (
+            <><CreditCard className="w-3.5 h-3.5" /> School ID Entry</>
+          ) : visitorType === 'Guest' ? (
+            <><ShieldCheck className="w-3.5 h-3.5" /> Full Name</>
+          ) : (
+            <><CreditCard className="w-3.5 h-3.5" /> Employee ID</>
+          )}
+        </label>
+        <input
+          ref={inputRef}
+          type="text"
+          value={schoolId}
+          onChange={e => { setSchoolId(e.target.value); setError(null); }}
+          placeholder={visitorType === 'Student' ? 'e.g. 25-12946-343' : visitorType === 'Guest' ? 'Enter your full name' : 'e.g. EMP-2024-001'}
+          suppressHydrationWarning
+          className={`w-full h-14 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-base font-bold text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
+        />
+      </div>
+
       {error && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{error}</p>}
+      
       <button
         type="submit"
         suppressHydrationWarning
-        className="w-full h-14 mt-4 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-base rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-black/40 flex items-center justify-center"
-        disabled={loading || disabled}
+        className="w-full h-14 mt-4 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-base rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-black/40 flex items-center justify-center disabled:opacity-40"
+        disabled={loading || disabled || !schoolId.trim()}
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
             <Loader2 className="w-5 h-5 animate-spin" />
             Verifying...
           </span>
-        ) : 'Continue with ID'}
+        ) : 'Continue'}
       </button>
     </form>
   );
@@ -250,12 +292,17 @@ function KioskEntryContent() {
   const currentCount = todayVisits?.length || 0;
   const isAtCapacity = currentCount >= dailyCapacity;
 
-  const handleIdSubmit = useCallback(async (cleanId: string) => {
+  const handleIdSubmit = useCallback(async (cleanId: string, visitorType: string) => {
     if (!db) return;
     try {
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
       if (!blockSnap.empty) {
         setBlockedData(blockSnap.docs[0].data());
+        return;
+      }
+
+      if (visitorType === 'Guest') {
+        router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}&type=Guest`);
         return;
       }
 
@@ -268,12 +315,12 @@ function KioskEntryContent() {
           college: d.college, 
           program: d.program, 
           email: d.email || '',
-          visitorType: d.visitorType || 'Student',
+          visitorType: d.visitorType || visitorType,
           loginMethod: 'id' 
         }));
         router.push('/kiosk/purpose');
       } else { 
-        router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}`); 
+        router.push(`/kiosk/register?id=${encodeURIComponent(cleanId)}&type=${encodeURIComponent(visitorType)}`); 
       }
     } catch (err: any) { 
       logAppError('KioskEntry', 'IdSubmit', err);
@@ -305,7 +352,7 @@ function KioskEntryContent() {
         toast({ title: `Welcome back, ${d.fullName.split(' ')[0]}!`, description: "Redirecting to selection...", className: "bg-[#1a3a2a] text-white border-[#c9a227]" });
         setTimeout(() => router.push('/kiosk/purpose'), 1500);
       } else { 
-        router.push(`/kiosk/register?method=email&email=${encodeURIComponent(cleanEmail)}`); 
+        router.push(`/kiosk/register?method=email&email=${encodeURIComponent(cleanEmail)}&type=Student`); 
       }
     } catch (err: any) { 
       logAppError('KioskEntry', 'EmailSubmit', err);
