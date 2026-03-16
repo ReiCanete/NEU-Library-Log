@@ -65,20 +65,9 @@
   100% { transform: translateX(100%); }
 }
 
-@keyframes ticker {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.ticker-scroll {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  animation: ticker 20s linear infinite;
-}
-
-.ticker-scroll:hover {
-  animation-play-state: paused;
+@keyframes marquee {
+  0% { transform: translateY(-50%) translateX(0); }
+  100% { transform: translateY(-50%) translateX(-50%); }
 }
 
 .hover-shimmer {

@@ -49,16 +49,35 @@ export default function AnnouncementTicker() {
   if (announcements.length === 0) return null;
 
   const hasUrgent = announcements.some(a => a.priority === 'urgent');
-  // Dynamic duration based on content length
-  const tickerDuration = Math.max(15, announcements.length * 8 +
-    announcements.reduce((acc, a) => acc + a.message.length * 0.1, 0));
+  
+  // Increased scroll speed (lower duration)
+  const tickerDuration = Math.max(8, 
+    announcements.reduce((acc, a) => acc + a.message.length * 0.06, 6)
+  );
+
+  const tickerText = announcements.map((a, i) => (
+    <span key={a.id} className="inline-flex items-center gap-2">
+      {a.priority === 'urgent' && (
+        <span className="bg-white text-red-700 text-[10px] font-black px-2 py-0.5 rounded mr-1">
+          ⚠ URGENT
+        </span>
+      )}
+      <span className={a.priority === 'urgent' ? 'font-black' : 'font-medium'}>
+        {a.message}
+      </span>
+      <span className="mx-10 opacity-30">◆</span>
+    </span>
+  ));
 
   return (
-    <div className={`w-full overflow-hidden flex items-center shrink-0 shadow-lg relative z-[100] ${
-      hasUrgent ? 'bg-red-600 text-white' : 'bg-[#c9a227] text-[#0a2a1a]'
-    }`} style={{ height: '36px' }}>
-      {/* Label section */}
-      <div className={`shrink-0 px-3 font-black text-[10px] tracking-widest uppercase border-r h-full flex items-center gap-2 ${
+    <div 
+      className={`w-full flex items-center shrink-0 shadow-lg relative z-[100] ${
+        hasUrgent ? 'bg-red-600 text-white' : 'bg-[#c9a227] text-[#0a2a1a]'
+      }`} 
+      style={{ height: '36px', overflow: 'hidden' }}
+    >
+      {/* Static label on left */}
+      <div className={`shrink-0 px-3 h-full flex items-center font-black text-[10px] tracking-widest uppercase border-r z-10 ${
         hasUrgent 
           ? 'bg-red-800 text-white border-red-500' 
           : 'bg-[#a07d1a] text-[#0a2a1a] border-[#0a2a1a]/20'
@@ -71,37 +90,23 @@ export default function AnnouncementTicker() {
         ) : 'NOTICE'}
       </div>
 
-      {/* Ticker Window */}
-      <div className="flex-1 overflow-hidden relative h-full flex items-center">
-        <div 
-          className="ticker-scroll whitespace-nowrap text-sm font-medium"
-          style={{ animationDuration: `${tickerDuration}s` }}
+      {/* Ticker wrapper with absolute positioning for marquee effect */}
+      <div className="flex-1 h-full overflow-hidden relative">
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            whiteSpace: 'nowrap',
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            animation: `marquee ${tickerDuration}s linear infinite`,
+            fontSize: '13px',
+          }}
         >
-          {/* Duplicate for seamless loop */}
-          {[0, 1].map(copy => (
-            <span key={copy} className="inline-flex items-center">
-              {announcements.map((a, i) => (
-                <span key={`${copy}-${a.id}`} className="inline-flex items-center">
-                  {a.priority === 'urgent' && (
-                    <span className="bg-white text-red-700 text-[9px] font-black px-1.5 py-0.5 rounded mx-2 shadow-sm uppercase">
-                      Urgent
-                    </span>
-                  )}
-                  {a.priority === 'normal' && i > 0 && (
-                    <span className="mx-4 opacity-30">|</span>
-                  )}
-                  <span className={a.priority === 'urgent' ? 'font-black' : 'font-bold'}>
-                    {a.message}
-                  </span>
-                  {i < announcements.length - 1 && (
-                    <span className="mx-10 opacity-30 text-xs">◆</span>
-                  )}
-                </span>
-              ))}
-              {/* Spacing between loops */}
-              <span className="mx-20 opacity-20">◆ ◆ ◆</span>
-            </span>
-          ))}
+          {/* Content repeated twice for seamless loop */}
+          <span className="inline-flex items-center pr-24">{tickerText}</span>
+          <span className="inline-flex items-center pr-24">{tickerText}</span>
         </div>
       </div>
     </div>
