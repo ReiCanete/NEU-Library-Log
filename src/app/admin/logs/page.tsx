@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Search, Loader2, ShieldAlert, X, User, Mail, Calendar, Clock, BookOpen } from 'lucide-react';
+import { Search, Loader2, ShieldAlert, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
@@ -18,10 +18,8 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
-import { usePathname } from 'next/navigation';
 
 export default function VisitorLogs() {
-  const pathname = usePathname();
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
@@ -31,17 +29,14 @@ export default function VisitorLogs() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   
-  const [selectedVisit, setSelectedVisit] = useState<any>(null);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<any>(null);
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
-
-  // Auto-cleanup on navigation to prevent "stuck" UI
-  useEffect(() => {
-    setSelectedVisit(null);
-    setBlockModalOpen(false);
-  }, [pathname]);
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
@@ -60,6 +55,14 @@ export default function VisitorLogs() {
     });
   }, [allVisits, searchTerm, purposeFilter, typeFilter, dateFilter]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, purposeFilter, typeFilter, dateFilter]);
+
+  const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
+  const paginatedVisits = filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const isBlocked = (id: string) => blocklist?.some(b => b.studentId === id);
 
   const handleBlockUser = async () => {
@@ -77,7 +80,6 @@ export default function VisitorLogs() {
       setBlockModalOpen(false);
       setBlockReason('');
       setBlockTarget(null);
-      setSelectedVisit(null);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -149,7 +151,7 @@ export default function VisitorLogs() {
           </div>
         </Card>
 
-        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm relative">
+        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm relative bg-white">
           <Table>
             <TableHeader className="bg-[#1a3a2a]">
               <TableRow className="hover:bg-transparent border-none">
@@ -163,18 +165,17 @@ export default function VisitorLogs() {
             </TableHeader>
             <TableBody>
               {visitsLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
+                Array.from({ length: 10 }).map((_, i) => (
                   <TableRow key={i}><TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
                 ))
-              ) : filteredVisits.length === 0 ? (
+              ) : paginatedVisits.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
                 </TableRow>
-              ) : filteredVisits.map(v => (
+              ) : paginatedVisits.map(v => (
                 <TableRow 
                   key={v.id} 
-                  className="border-b-[#f0f4f1] cursor-pointer hover:bg-[#f0f4f1]/40"
-                  onClick={() => setSelectedVisit(v)}
+                  className="border-b-[#f0f4f1] hover:bg-[#f0f4f1]/40 transition-colors"
                 >
                   <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
                   <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
@@ -198,8 +199,7 @@ export default function VisitorLogs() {
                         variant="ghost" 
                         size="sm" 
                         className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           setBlockTarget(v);
                           setBlockModalOpen(true);
                         }}
@@ -212,92 +212,64 @@ export default function VisitorLogs() {
               ))}
             </TableBody>
           </Table>
-        </Card>
-      </div>
 
-      {/* VISITOR DETAILS PANEL - Simplified absolute overlay to prevent blocking sidebar */}
-      {selectedVisit && (
-        <div 
-          className="fixed inset-0 z-[998] flex justify-end pointer-events-none"
-        >
-          {/* Transparent click catcher only for the content area, NOT THE SIDEBAR */}
-          <div 
-            className="flex-1 pointer-events-auto"
-            onClick={() => setSelectedVisit(null)}
-          />
-          
-          {/* Sliding Panel */}
-          <div 
-            className="w-[380px] h-full bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] border-l border-[#d4e4d8] pointer-events-auto overflow-y-auto animate-in slide-in-from-right duration-300"
-          >
-            <div className="sticky top-0 bg-[#1a3a2a] p-6 flex justify-between items-center z-10">
-              <h3 className="text-white font-black uppercase text-xs tracking-widest">Entry Details</h3>
-              <button onClick={() => setSelectedVisit(null)} className="text-white/50 hover:text-white transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-8 space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-[#f0f4f1] flex items-center justify-center text-[#1a3a2a]">
-                  <User className="h-8 w-8" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-black text-[#1a3a2a]">{selectedVisit.fullName}</h4>
-                  <p className="text-xs font-mono font-bold text-slate-400">{selectedVisit.studentId}</p>
-                </div>
+          {/* Pagination UI */}
+          {!visitsLoading && totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#f0f4f1]">
+              <div className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredVisits.length)} of {filteredVisits.length} logs
               </div>
-
-              <div className="space-y-4">
-                <div className="p-4 bg-[#f8fafc] rounded-2xl border border-[#d4e4d8]">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-2">Institutional Info</Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <BookOpen className="h-4 w-4 text-[#c9a227]" />
-                      <span className="text-xs font-bold text-[#1a3a2a]">{selectedVisit.college || 'No College Specified'}</span>
-                    </div>
-                    {selectedVisit.email && (
-                      <div className="flex items-center gap-3">
-                        <Mail className="h-4 w-4 text-[#c9a227]" />
-                        <span className="text-xs font-bold text-[#1a3a2a]">{selectedVisit.email}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-4 bg-[#f8fafc] rounded-2xl border border-[#d4e4d8]">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-2">Visit History</Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-[#1a3a2a]" />
-                      <span className="text-xs font-bold text-[#1a3a2a]">{format(selectedVisit.timestamp.toDate(), 'MMMM dd, yyyy')}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Clock className="h-4 w-4 text-[#1a3a2a]" />
-                      <span className="text-xs font-bold text-[#1a3a2a]">{format(selectedVisit.timestamp.toDate(), 'hh:mm a')}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-[#f0f4f1]">
-                <Button 
-                  className="w-full h-12 bg-red-50 text-red-600 border border-red-100 font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all rounded-xl"
-                  onClick={() => {
-                    setBlockTarget(selectedVisit);
-                    setBlockModalOpen(true);
-                  }}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg border-[#d4e4d8]"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
                 >
-                  <ShieldAlert className="h-4 w-4 mr-2" /> 
-                  Restrict Access
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Show current page, and maybe 2 neighbors
+                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? 'default' : 'outline'}
+                          size="sm"
+                          className={`h-8 w-8 rounded-lg text-[10px] font-black ${
+                            currentPage === page ? 'bg-[#1a3a2a] text-white' : 'border-[#d4e4d8] text-[#1a3a2a]'
+                          }`}
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    }
+                    if (page === currentPage - 2 || page === currentPage + 2) {
+                      return <span key={page} className="text-slate-300 px-1">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg border-[#d4e4d8]"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </Card>
+      </div>
 
-      {/* Block Modal */}
       <Dialog open={blockModalOpen} onOpenChange={(open) => {
         if (!open) {
           setBlockModalOpen(false);

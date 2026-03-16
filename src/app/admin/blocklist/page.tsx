@@ -1,8 +1,9 @@
+
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { ShieldX, Search, Trash2, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Search, Trash2, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth } from '@/firebase';
@@ -24,9 +25,15 @@ export default function BlocklistManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  
+  // Form state
   const [newBlockId, setNewBlockId] = useState('');
   const [newBlockName, setNewBlockName] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const blocklistQuery = useMemo(() => {
     if (!db) return null;
@@ -41,6 +48,14 @@ export default function BlocklistManagement() {
       b.studentId.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [blocklist, searchTerm]);
+
+  // Reset pagination when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.ceil(filteredBlocklist.length / itemsPerPage);
+  const paginatedBlocks = filteredBlocklist.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleUnblockUser = async (docId: string, studentName: string) => {
     if (!db) return;
@@ -150,10 +165,10 @@ export default function BlocklistManagement() {
               </TableHeader>
               <TableBody>
                 {blocklistLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
+                  Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-12 w-full rounded-2xl" /></TableCell></TableRow>
                   ))
-                ) : filteredBlocklist.length === 0 ? (
+                ) : paginatedBlocks.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-96 text-center">
                       <div className="flex flex-col items-center justify-center space-y-6">
@@ -165,7 +180,7 @@ export default function BlocklistManagement() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredBlocklist.map((b) => (
+                ) : paginatedBlocks.map((b) => (
                   <TableRow key={b.id} className="group hover:bg-red-50/30 transition-colors border-b-[#f0f4f1]">
                     <TableCell className="px-10 font-mono text-sm font-bold text-slate-500">{b.studentId}</TableCell>
                     <TableCell className="font-black text-[#1a3a2a]">{b.fullName}</TableCell>
@@ -182,6 +197,60 @@ export default function BlocklistManagement() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Pagination UI */}
+            {!blocklistLoading && totalPages > 1 && (
+              <div className="flex items-center justify-between px-10 py-6 border-t border-[#f0f4f1] bg-white">
+                <div className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredBlocklist.length)} of {filteredBlocklist.length} restricted records
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg border-[#d4e4d8]"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                        return (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? 'default' : 'outline'}
+                            size="sm"
+                            className={`h-8 w-8 rounded-lg text-[10px] font-black ${
+                              currentPage === page ? 'bg-[#1a3a2a] text-white' : 'border-[#d4e4d8] text-[#1a3a2a]'
+                            }`}
+                            onClick={() => setCurrentPage(page)}
+                          >
+                            {page}
+                          </Button>
+                        );
+                      }
+                      if (page === currentPage - 2 || page === currentPage + 2) {
+                        return <span key={page} className="text-slate-300 px-1">...</span>;
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg border-[#d4e4d8]"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
