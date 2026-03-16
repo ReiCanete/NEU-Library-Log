@@ -216,28 +216,6 @@ function RegisterForm() {
     }
   };
 
-  const handleIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (studentId.trim().length > 0) {
-        document.getElementById('fullName-input')?.focus();
-      }
-    }
-  };
-
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (visitorType === 'Student' || visitorType === 'Faculty') {
-        setIsDropdownOpen(true);
-      } else if (['Administrative Staff', 'Library Staff'].includes(visitorType)) {
-        document.getElementById('department-input')?.focus();
-      } else {
-        handleSubmit();
-      }
-    }
-  };
-
   if (loading) return null;
 
   return (
@@ -305,16 +283,23 @@ function RegisterForm() {
                     <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
                       {visitorType === 'Student' ? 'Student ID' : 'Employee ID'}
                     </Label>
-                    <Input 
-                      id="studentId-input"
-                      autoFocus
-                      placeholder={visitorType === 'Student' ? "XX-XXXXX-XXX" : "EMP-2024-XXX"} 
-                      className="h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
-                      value={studentId} 
-                      onChange={(e) => setStudentId(e.target.value)} 
-                      onKeyDown={handleIdKeyDown}
-                      required 
-                    />
+                    <div className="relative">
+                      <Input 
+                        id="studentId-input"
+                        placeholder={visitorType === 'Student' ? "XX-XXXXX-XXX" : "EMP-2024-XXX"} 
+                        className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : ''}`} 
+                        value={studentId} 
+                        onChange={(e) => !idFromUrl && setStudentId(e.target.value)} 
+                        readOnly={!!idFromUrl}
+                        required 
+                      />
+                      {idFromUrl && (
+                        <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#c9a227]/50" />
+                      )}
+                    </div>
+                    {idFromUrl && (
+                      <p className="text-[9px] text-white/40 mt-1 font-black uppercase tracking-widest">ID carried over from entry screen</p>
+                    )}
                   </div>
                 )}
 
@@ -326,7 +311,6 @@ function RegisterForm() {
                     className="h-12 text-base font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4" 
                     value={fullName} 
                     onChange={(e) => setFullName(e.target.value)} 
-                    onKeyDown={handleNameKeyDown}
                     required 
                   />
                 </div>

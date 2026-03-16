@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Loader2, AlertCircle, ShieldX, Mail, CreditCard, Lock, ShieldCheck } from 'lucide-react';
 import { useFirestore, useCollection, useDoc, useAuth } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, setDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db } from '@/firebase/config';
 import { startOfDay } from 'date-fns';
 import { validateStudentId, validateNEUEmail } from '@/lib/validation';
@@ -17,12 +16,14 @@ import { logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import AnnouncementTicker from '@/components/kiosk/AnnouncementTicker';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 function KioskEntryContent() {
   const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const schoolIdRef = useRef<HTMLInputElement>(null);
+  const hasFocused = useRef(false);
   
   // States
   const [mode, setMode] = useState<'kiosk' | 'staff'>('kiosk');
@@ -32,18 +33,24 @@ function KioskEntryContent() {
   // Kiosk States
   const [studentId, setStudentId] = useState('');
   const [emailInput, setEmailInput] = useState('');
-  const [kioskLoading, setKioskLoading] = useState(false);
+  const [idLoading, setIdLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
   const [kioskError, setKioskError] = useState<string | null>(null);
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
 
   // Staff States
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminLoading, setAdminLoading] = useState(false);
+  const [staffLoading, setStaffLoading] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    // Only focus once on initial page load, never on re-renders
+    if (!hasFocused.current && schoolIdRef.current) {
+      schoolIdRef.current.focus();
+      hasFocused.current = true;
+    }
   }, []);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
@@ -67,11 +74,11 @@ function KioskEntryContent() {
 
   const handleIdSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (kioskLoading || isAtCapacity || !db) return;
+    if (idLoading || isAtCapacity || !db) return;
 
     if (!studentId.trim()) {
       setKioskError("Please enter your School ID.");
-      inputRef.current?.focus();
+      schoolIdRef.current?.focus();
       return;
     }
 
@@ -80,7 +87,7 @@ function KioskEntryContent() {
       return;
     }
 
-    setKioskLoading(true);
+    setIdLoading(true);
     setKioskError(null);
     const cleanId = studentId.trim();
 
@@ -88,7 +95,7 @@ function KioskEntryContent() {
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanId), limit(1)));
       if (!blockSnap.empty) {
         setBlockedData(blockSnap.docs[0].data());
-        setKioskLoading(false);
+        setIdLoading(false);
         return;
       }
 
@@ -111,13 +118,13 @@ function KioskEntryContent() {
     } catch (err: any) { 
       logAppError('KioskEntry', 'IdSubmit', err);
       setKioskError("Connection error. Please try again.");
-      setKioskLoading(false);
+      setIdLoading(false);
     }
   };
 
   const handleEmailSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (kioskLoading || isAtCapacity || !db) return;
+    if (emailLoading || isAtCapacity || !db) return;
 
     if (!emailInput.trim()) {
       setKioskError("Please enter your NEU email.");
@@ -129,7 +136,7 @@ function KioskEntryContent() {
       return;
     }
 
-    setKioskLoading(true);
+    setEmailLoading(true);
     setKioskError(null);
     const cleanEmail = emailInput.trim().toLowerCase();
 
@@ -137,7 +144,7 @@ function KioskEntryContent() {
       const blockSnap = await getDocs(query(collection(db, 'blocklist'), where('studentId', '==', cleanEmail), limit(1)));
       if (!blockSnap.empty) {
         setBlockedData(blockSnap.docs[0].data());
-        setKioskLoading(false);
+        setEmailLoading(false);
         return;
       }
 
@@ -161,19 +168,19 @@ function KioskEntryContent() {
     } catch (err: any) { 
       logAppError('KioskEntry', 'EmailSubmit', err);
       setKioskError("Connection error. Please try again.");
-      setKioskLoading(false);
+      setEmailLoading(false);
     }
   };
 
   const handleStaffLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (adminLoading || !auth || !db) return;
+    if (staffLoading || !auth || !db) return;
 
     if (!adminEmail) { setAdminError('Please enter your email.'); return; }
     if (!adminPassword) { setAdminError('Please enter your password.'); return; }
 
     try {
-      setAdminLoading(true);
+      setStaffLoading(true);
       setAdminError(null);
       
       const result = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
@@ -207,12 +214,12 @@ function KioskEntryContent() {
       } else {
         await signOut(auth);
         setAdminError('Unauthorized account. Contact the library administrator.');
-        setAdminLoading(false);
+        setStaffLoading(false);
       }
     } catch (err: any) {
       logAppError('StaffLogin', 'SignIn', err);
       setAdminError("Invalid credentials. Please try again.");
-      setAdminLoading(false);
+      setStaffLoading(false);
     }
   };
 
@@ -228,20 +235,24 @@ function KioskEntryContent() {
           <CreditCard className="w-3.5 h-3.5" /> School ID Entry
         </label>
         <input
-          ref={inputRef}
+          ref={schoolIdRef}
           type="text"
           value={studentId}
           onChange={e => { setStudentId(e.target.value); setKioskError(null); }}
           placeholder="e.g. 25-12946-343"
-          autoFocus
           className={`w-full h-14 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-base font-mono text-center transition-all ${kioskError ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
         />
         <button
           type="submit"
           className="w-full h-14 mt-4 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-base rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-black/40 flex items-center justify-center"
-          disabled={kioskLoading}
+          disabled={idLoading}
         >
-          {kioskLoading && studentId ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue with ID'}
+          {idLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Verifying...
+            </span>
+          ) : 'Continue with ID'}
         </button>
       </form>
       
@@ -265,10 +276,15 @@ function KioskEntryContent() {
         {kioskError && <p className="text-red-400 text-[10px] font-black uppercase tracking-widest text-center mt-2">{kioskError}</p>}
         <button
           type="submit"
-          className="w-full h-14 mt-4 bg-transparent border-2 border-[#c9a227] text-[#c9a227] font-black text-base rounded-xl hover:bg-[#c9a227]/10 active:scale-[0.98] transition-all"
-          disabled={kioskLoading}
+          className="w-full h-14 mt-4 bg-transparent border-2 border-[#c9a227] text-[#c9a227] font-black text-base rounded-xl hover:bg-[#c9a227]/10 active:scale-[0.98] transition-all disabled:opacity-50"
+          disabled={emailLoading}
         >
-          {kioskLoading && emailInput ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue with Email'}
+          {emailLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Verifying...
+            </span>
+          ) : 'Continue with Email'}
         </button>
       </form>
     </div>
@@ -326,10 +342,15 @@ function KioskEntryContent() {
 
         <button
           type="submit"
-          disabled={adminLoading}
+          disabled={staffLoading}
           className="w-full h-14 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-base rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-black/40 flex items-center justify-center"
         >
-          {adminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Sign In to Portal'}
+          {staffLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              Signing in...
+            </span>
+          ) : 'Sign In to Portal'}
         </button>
       </form>
     </div>
