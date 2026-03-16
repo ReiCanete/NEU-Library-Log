@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Search, Mail, Filter, Loader2, UserCircle, X, ShieldOff, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
+import { Search, Filter, Loader2, UserCircle, X, ShieldOff, Clock, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore, useCollection } from '@/firebase';
@@ -17,6 +17,7 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { usePathname } from 'next/navigation';
 
 const TYPE_STYLES: Record<string, string> = {
   'Student': 'bg-blue-50 text-blue-700 border-blue-200',
@@ -90,6 +91,7 @@ export default function VisitorLogs() {
   const { toast } = useToast();
   const db = useFirestore();
   const auth = useAuth();
+  const pathname = usePathname();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
@@ -105,17 +107,23 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
-  // Close panel on unmount or global event
+  const closePanel = () => {
+    setSidePanelOpen(false);
+    // Small delay before clearing selected visit so animation completes
+    setTimeout(() => setSelectedVisit(null), 300);
+  };
+
+  // Force close on navigation or unmount
   useEffect(() => {
-    const handler = () => {
-      setSidePanelOpen(false);
-      setSelectedVisit(null);
-    };
+    setSidePanelOpen(false);
+    setSelectedVisit(null);
+  }, [pathname]);
+
+  // Global listener for nav changes
+  useEffect(() => {
+    const handler = () => closePanel();
     window.addEventListener('closeSidePanel', handler);
-    return () => {
-      window.removeEventListener('closeSidePanel', handler);
-      handler();
-    };
+    return () => window.removeEventListener('closeSidePanel', handler);
   }, []);
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
@@ -180,7 +188,7 @@ export default function VisitorLogs() {
       toast({ title: "Visitor Blocked", description: `${selectedVisit.fullName} access restricted.` });
       setBlockModalOpen(false);
       setBlockReason('');
-      setSidePanelOpen(false);
+      closePanel();
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -296,23 +304,26 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Side panel overlay */}
+      {/* Overlay - only exists in DOM when panel is open */}
       {sidePanelOpen && (
         <div 
           className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity" 
-          onClick={() => { setSidePanelOpen(false); setSelectedVisit(null); }} 
+          onClick={closePanel} 
         />
       )}
 
       {/* Side panel */}
-      <div className={`fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out ${
-        sidePanelOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
-      } border-l border-[#d4e4d8] flex flex-col`}>
+      <div 
+        className={`fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-[70] transform transition-transform duration-500 ease-in-out ${
+          sidePanelOpen ? 'translate-x-0' : 'translate-x-full'
+        } border-l border-[#d4e4d8] flex flex-col`}
+        style={{ pointerEvents: sidePanelOpen ? 'auto' : 'none' }}
+      >
         {selectedVisit && (
           <>
             <div className="bg-[#1a3a2a] p-10 flex flex-col items-center justify-center text-center relative">
               <button 
-                onClick={() => { setSidePanelOpen(false); setSelectedVisit(null); }} 
+                onClick={closePanel} 
                 className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors"
               >
                 <X className="w-6 h-6" />
