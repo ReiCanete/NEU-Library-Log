@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Loader2, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, BookOpen, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, addDoc, Timestamp, limit } from 'firebase/firestore';
+import { useAuth, useFirestore } from '@/firebase';
+import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs } from 'firebase/firestore';
 import { isSameDay, format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -38,10 +38,39 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
-  // Optimization: Limit the initial fetch to 200 items to prevent main-thread locking
-  const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc'), limit(200)) : null, [db]);
-  const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
-  const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist'), limit(500)) : null);
+  // Switching from useCollection to manual one-time fetch to prevent navigation blocking
+  const [allVisits, setAllVisits] = useState<any[]>([]);
+  const [blocklist, setBlocklist] = useState<any[]>([]);
+  const [visitsLoading, setVisitsLoading] = useState(true);
+
+  const fetchData = async (isRefresh = false) => {
+    if (!db) return;
+    try {
+      if (isRefresh) setVisitsLoading(true);
+      const [visitsSnap, blockSnap] = await Promise.all([
+        getDocs(query(collection(db, 'visits'), orderBy('timestamp', 'desc'), limit(200))),
+        getDocs(query(collection(db, 'blocklist'), limit(500)))
+      ]);
+      setAllVisits(visitsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setBlocklist(blockSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      console.error('Failed to fetch logs:', e);
+      toast({ title: "Fetch Failed", description: "Could not load library logs.", variant: "destructive" });
+    } finally {
+      setVisitsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    
+    if (db) {
+      setVisitsLoading(true);
+      fetchData();
+    }
+    
+    return () => { cancelled = true; };
+  }, [db]);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -89,6 +118,8 @@ export default function VisitorLogs() {
       setBlockModalOpen(false);
       setBlockReason('');
       setBlockTarget(null);
+      // Re-fetch to update block status in local UI
+      fetchData();
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -104,6 +135,15 @@ export default function VisitorLogs() {
             <h2 className="text-3xl font-black text-[#1a3a2a] uppercase tracking-tight">Visitor Logs</h2>
             <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Institutional Activity Archive</p>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={() => fetchData(true)} 
+            disabled={visitsLoading}
+            className="h-10 px-4 rounded-xl border-[#d4e4d8] text-[#1a3a2a] font-bold flex gap-2"
+          >
+            {visitsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh
+          </Button>
         </div>
 
         <Card className="p-6 rounded-2xl border-[#d4e4d8] bg-white border-t-2 border-t-[#c9a227] shadow-sm">
