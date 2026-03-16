@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -102,7 +103,7 @@ export default function VisitorLogs() {
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
   const { data: blocklist } = useCollection(db ? query(collection(db, 'blocklist')) : null);
 
-  // Auto-close side panel on navigation
+  // AUTOMATIC CLEANUP: Close panel whenever navigation occurs
   useEffect(() => {
     setSidePanelOpen(false);
     setSelectedVisit(null);
@@ -264,7 +265,7 @@ export default function VisitorLogs() {
         </Card>
       </div>
 
-      {/* Side panel overlay - Clean stacking logic */}
+      {/* Side panel overlay - SCOPED: Only covers main content, not the sidebar */}
       {sidePanelOpen && (
         <div
           className="fixed inset-0"
@@ -273,6 +274,7 @@ export default function VisitorLogs() {
         />
       )}
 
+      {/* Side panel */}
       <div
         className={`fixed right-0 top-0 h-full w-[380px] bg-white shadow-2xl transition-transform duration-300 ${
           sidePanelOpen ? 'translate-x-0' : 'translate-x-full'

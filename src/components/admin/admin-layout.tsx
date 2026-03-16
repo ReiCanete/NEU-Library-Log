@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -120,7 +121,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
         <Sidebar 
           className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white"
-          style={{ zIndex: 1000 }} // Ensure sidebar is always above page overlays
+          style={{ zIndex: 1000 }} // CRITICAL: Ensure sidebar is always above all page overlays for reliable navigation
         >
           <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
             <img 
@@ -203,7 +204,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto">
+          <main className="p-8 flex-1 bg-[#f0f4f1] overflow-y-auto relative">
             <div className="max-w-7xl mx-auto pb-12">
               {children}
             </div>
