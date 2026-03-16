@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase/config';
+import { Megaphone } from 'lucide-react';
 
 interface Announcement {
   id: string;
@@ -34,7 +35,6 @@ export default function AnnouncementTicker() {
             return now >= start && now <= end;
           })
           .sort((a, b) => {
-            // Urgent first
             if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
             if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
             return 0;
@@ -49,64 +49,48 @@ export default function AnnouncementTicker() {
   if (announcements.length === 0) return null;
 
   const hasUrgent = announcements.some(a => a.priority === 'urgent');
-  
-  // Increased scroll speed (lower duration)
-  const tickerDuration = Math.max(8, 
-    announcements.reduce((acc, a) => acc + a.message.length * 0.06, 6)
-  );
 
-  const tickerText = announcements.map((a, i) => (
-    <span key={a.id} className="inline-flex items-center gap-2">
+  const tickerContent = announcements.map((a, i) => (
+    <span key={a.id} className="inline-flex items-center gap-3">
       {a.priority === 'urgent' && (
-        <span className="bg-white text-red-700 text-[10px] font-black px-2 py-0.5 rounded mr-1">
+        <span className="bg-white text-red-700 text-xs font-black px-2 py-0.5 rounded">
           ⚠ URGENT
         </span>
       )}
-      <span className={a.priority === 'urgent' ? 'font-black' : 'font-medium'}>
+      <span className={a.priority === 'urgent' ? 'font-bold' : 'font-medium'}>
         {a.message}
       </span>
-      <span className="mx-10 opacity-30">◆</span>
+      <span className="mx-8 opacity-40">◆</span>
     </span>
   ));
 
   return (
-    <div 
-      className={`w-full flex items-center shrink-0 shadow-lg relative z-[100] ${
+    <div
+      className={`w-full flex items-center shrink-0 ${
         hasUrgent ? 'bg-red-600 text-white' : 'bg-[#c9a227] text-[#0a2a1a]'
-      }`} 
-      style={{ height: '36px', overflow: 'hidden' }}
+      }`}
+      style={{ height: '36px', overflow: 'hidden', position: 'relative' }}
     >
-      {/* Static label on left */}
-      <div className={`shrink-0 px-3 h-full flex items-center font-black text-[10px] tracking-widest uppercase border-r z-10 ${
-        hasUrgent 
-          ? 'bg-red-800 text-white border-red-500' 
+      {/* Megaphone icon label on left */}
+      <div className={`shrink-0 px-3 h-full flex items-center gap-1.5 border-r z-10 ${
+        hasUrgent
+          ? 'bg-red-800 text-white border-red-500'
           : 'bg-[#a07d1a] text-[#0a2a1a] border-[#0a2a1a]/20'
       }`}>
-        {hasUrgent ? (
-          <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            ALERT
-          </span>
-        ) : 'NOTICE'}
+        <Megaphone className="w-4 h-4" />
       </div>
 
-      {/* Ticker wrapper with absolute positioning for marquee effect */}
-      <div className="flex-1 h-full overflow-hidden relative">
+      {/* Scrolling area */}
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative', height: '100%' }}>
         <div
+          className="ticker-track text-sm"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            whiteSpace: 'nowrap',
-            position: 'absolute',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            animation: `marquee ${tickerDuration}s linear infinite`,
-            fontSize: '13px',
+            animationDuration: `${Math.max(12, announcements.reduce((acc, a) => acc + a.message.length * 0.12, 10))}s`
           }}
         >
-          {/* Content repeated twice for seamless loop */}
-          <span className="inline-flex items-center pr-24">{tickerText}</span>
-          <span className="inline-flex items-center pr-24">{tickerText}</span>
+          {tickerContent}
+          {/* Duplicate for seamless loop */}
+          {tickerContent}
         </div>
       </div>
     </div>

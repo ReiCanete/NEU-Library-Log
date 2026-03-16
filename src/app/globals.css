@@ -66,8 +66,22 @@
 }
 
 @keyframes marquee {
-  0% { transform: translateY(-50%) translateX(0); }
-  100% { transform: translateY(-50%) translateX(-50%); }
+  0%   { transform: translateX(100vw) translateY(-50%); }
+  100% { transform: translateX(-100%) translateY(-50%); }
+}
+
+.ticker-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  animation: marquee 18s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
 }
 
 .hover-shimmer {
