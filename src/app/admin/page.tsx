@@ -1,10 +1,11 @@
+
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, Filter, X } from 'lucide-react';
+import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, Filter, X, Users } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, getDoc, doc, setDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { format, startOfDay, subDays, isWithinInterval, endOfDay, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +28,12 @@ export default function AdminDashboard() {
   const db = useFirestore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Capacity Management States
+  const [capacity, setCapacity] = useState(200);
+  const [capacityInput, setCapacityInput] = useState('200');
+  const [editingCapacity, setEditingCapacity] = useState(false);
+  const [savingCapacity, setSavingCapacity] = useState(false);
+
   // Filters
   const [filterPurpose, setFilterPurpose] = useState('all');
   const [filterCollege, setFilterCollege] = useState('all');
@@ -36,6 +43,38 @@ export default function AdminDashboard() {
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
+
+  useEffect(() => {
+    // Fetch capacity setting on mount
+    if (db) {
+      getDoc(doc(db, 'settings', 'library')).then(snap => {
+        if (snap.exists()) {
+          const cap = snap.data().dailyCapacity;
+          if (cap) {
+            setCapacity(cap);
+            setCapacityInput(String(cap));
+          }
+        }
+      }).catch(() => {});
+    }
+  }, [db]);
+
+  const handleSaveCapacity = async () => {
+    const val = parseInt(capacityInput);
+    if (isNaN(val) || val < 1 || !db) return;
+    setSavingCapacity(true);
+    try {
+      await setDoc(doc(db, 'settings', 'library'), { dailyCapacity: val }, { merge: true });
+      setCapacity(val);
+      setEditingCapacity(false);
+      toast({ title: "Settings Updated", description: "Daily library capacity has been modified." });
+    } catch (e) {
+      console.error('Failed to save capacity:', e);
+      toast({ title: "Update Failed", description: "Could not save capacity setting.", variant: "destructive" });
+    } finally {
+      setSavingCapacity(false);
+    }
+  };
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -166,19 +205,87 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { label: 'Visits (Filtered)', value: filteredVisits.length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
             { label: 'Monthly Volume', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100' }
           ].map((s, i) => (
-            <Card key={i} className="border border-[#d4e4d8] border-t-2 border-t-[#c9a227] shadow-sm rounded-2xl bg-white p-8">
+            <Card key={i} className="border border-[#d4e4d8] border-t-2 border-t-[#c9a227] shadow-sm rounded-2xl bg-white p-6">
               <div className="flex items-center justify-between">
-                <div><p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</p><h3 className="text-5xl font-black text-[#1a3a2a] mt-2 tabular-nums">{visitsLoading ? <Skeleton className="h-12 w-20" /> : s.value}</h3></div>
-                <div className={`p-4 rounded-2xl ${s.bg}`}><s.icon className={`h-8 w-8 ${s.color}`} /></div>
+                <div><p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</p><h3 className="text-4xl font-black text-[#1a3a2a] mt-2 tabular-nums">{visitsLoading ? <Skeleton className="h-10 w-20" /> : s.value}</h3></div>
+                <div className={`p-4 rounded-xl ${s.bg}`}><s.icon className={`h-6 w-6 ${s.color}`} /></div>
               </div>
             </Card>
           ))}
+
+          {/* Daily Capacity Card */}
+          <div className="bg-white rounded-2xl border border-[#d4e4d8] border-t-2 border-t-purple-500 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">Daily Capacity</p>
+                <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-tight">Kiosk Entry limit</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                <Users className="w-5 h-5 text-purple-600" />
+              </div>
+            </div>
+
+            {editingCapacity ? (
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="number"
+                  value={capacityInput}
+                  onChange={e => setCapacityInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveCapacity()}
+                  className="flex-1 h-9 border border-[#d4e4d8] rounded-lg px-3 text-sm font-bold text-[#1a3a2a] focus:outline-none focus:border-[#1a3a2a]"
+                  min="1"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveCapacity}
+                  disabled={savingCapacity}
+                  className="h-9 px-3 bg-[#1a3a2a] text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#0a2a1a] transition-colors disabled:opacity-50"
+                >
+                  {savingCapacity ? '...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingCapacity(false);
+                    setCapacityInput(String(capacity));
+                  }}
+                  className="h-9 px-3 bg-[#f8fafc] border border-[#d4e4d8] text-[#4a6741] text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#f0f4f1] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-end justify-between mt-2">
+                <div className="flex-1">
+                  <p className="text-4xl font-black text-[#1a3a2a] tabular-nums">{capacity}</p>
+                  <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tight">
+                    {stats.today} recorded today ({Math.round((stats.today / capacity) * 100)}%)
+                  </p>
+                  {/* Usage bar */}
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-1000 ${
+                        stats.today / capacity > 0.9 ? 'bg-red-500' :
+                        stats.today / capacity > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.round((stats.today / capacity) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingCapacity(true)}
+                  className="ml-4 text-[9px] font-black uppercase tracking-widest text-[#4a6741] border border-[#d4e4d8] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f1] transition-all"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

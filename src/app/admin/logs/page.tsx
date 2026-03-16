@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -107,7 +108,22 @@ export default function VisitorLogs() {
 
   const isBlocked = (id: string) => blocklist?.some(b => b.studentId === id);
 
+  const closePanel = () => {
+    setSidePanelOpen(false);
+    setTimeout(() => {
+      setSelectedVisit(null);
+      setVisitHistory([]);
+    }, 300);
+  };
+
   const handleRowClick = async (visit: any) => {
+    // If clicking the same row that is already open — close the panel
+    if (selectedVisit?.id === visit.id && sidePanelOpen) {
+      closePanel();
+      return;
+    }
+
+    // Otherwise open panel with new visit
     setSelectedVisit(visit);
     setSidePanelOpen(true);
     
@@ -129,14 +145,6 @@ export default function VisitorLogs() {
     } finally {
       setHistoryLoading(false);
     }
-  };
-
-  const closePanel = () => {
-    setSidePanelOpen(false);
-    setTimeout(() => {
-      setSelectedVisit(null);
-      setVisitHistory([]);
-    }, 300);
   };
 
   const handleBlockUser = async () => {
@@ -261,7 +269,11 @@ export default function VisitorLogs() {
                 <TableRow 
                   key={v.id} 
                   onClick={() => handleRowClick(v)}
-                  className="border-b-[#f0f4f1] hover:bg-[#f0f4f1]/40 transition-colors cursor-pointer"
+                  className={`cursor-pointer transition-colors border-b-[#f0f4f1] ${
+                    selectedVisit?.id === v.id && sidePanelOpen
+                      ? 'bg-[#f0f7f2] border-l-2 border-l-[#c9a227]'
+                      : 'hover:bg-[#f0f4f1]/40'
+                  }`}
                 >
                   <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
                   <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
