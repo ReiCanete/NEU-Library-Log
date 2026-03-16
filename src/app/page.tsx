@@ -11,7 +11,7 @@ import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 
 const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: string, type: string) => Promise<void>, todayCount: number, capacity: number }) => {
   const [schoolId, setSchoolId] = useState('');
@@ -126,7 +126,7 @@ const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: s
   );
 });
 
-const KioskEmailForm = memo(({ onSubmit }: { onSubmit: (email: string) => Promise<void> }) => {
+const KioskEmailForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: string) => Promise<void>, onGoogleSignIn: () => void }) => {
   const [emailInput, setEmailInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,37 +152,58 @@ const KioskEmailForm = memo(({ onSubmit }: { onSubmit: (email: string) => Promis
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-2 ml-1">
-        <Mail className="w-3.5 h-3.5" /> Institutional Email
-      </label>
-      <input
-        type="email"
-        value={emailInput}
-        onChange={e => { setEmailInput(e.target.value); setError(null); }}
-        placeholder="e.g. juan@neu.edu.ph"
-        suppressHydrationWarning
-        className={`w-full h-11 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-sm font-bold text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
-      />
-      {error && <p className="text-red-400 text-[9px] font-black uppercase tracking-widest text-center mt-1">{error}</p>}
+    <div>
+      <form onSubmit={handleSubmit}>
+        <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-2 ml-1">
+          <Mail className="w-3.5 h-3.5" /> Institutional Email
+        </label>
+        <input
+          type="email"
+          value={emailInput}
+          onChange={e => { setEmailInput(e.target.value); setError(null); }}
+          placeholder="e.g. juan@neu.edu.ph"
+          suppressHydrationWarning
+          className={`w-full h-11 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-sm font-bold text-center transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
+        />
+        {error && <p className="text-red-400 text-[9px] font-black uppercase tracking-widest text-center mt-1">{error}</p>}
+        <button
+          type="submit"
+          suppressHydrationWarning
+          className="w-full h-11 mt-2.5 bg-transparent border-2 border-[#c9a227] text-[#c9a227] font-black text-sm rounded-xl hover:bg-[#c9a227]/10 active:scale-[0.98] transition-all disabled:opacity-50"
+          disabled={loading}
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Verifying...
+            </span>
+          ) : 'Continue with Email'}
+        </button>
+      </form>
+
+      <div className="flex items-center gap-3 my-3">
+        <div className="flex-1 h-px bg-white/10" />
+        <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">or</span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
       <button
-        type="submit"
-        suppressHydrationWarning
-        className="w-full h-11 mt-2.5 bg-transparent border-2 border-[#c9a227] text-[#c9a227] font-black text-sm rounded-xl hover:bg-[#c9a227]/10 active:scale-[0.98] transition-all disabled:opacity-50"
-        disabled={loading}
+        onClick={onGoogleSignIn}
+        className="w-full h-11 bg-white text-gray-800 font-bold text-xs rounded-xl border border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-md"
       >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Verifying...
-          </span>
-        ) : 'Continue with Email'}
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Sign in with Google (@neu.edu.ph)
       </button>
-    </form>
+    </div>
   );
 });
 
-const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: string) => Promise<void> }) => {
+const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: string, pass: string) => Promise<void>, onGoogleSignIn: () => void }) => {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -269,6 +290,25 @@ const StaffLoginForm = memo(({ onSubmit }: { onSubmit: (email: string, pass: str
           ) : 'Sign In to Portal'}
         </button>
       </form>
+
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px bg-white/10" />
+        <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">or</span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
+      <button
+        onClick={onGoogleSignIn}
+        className="w-full h-11 bg-white text-gray-800 font-bold text-xs rounded-xl border border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-md"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Sign in with Google
+      </button>
     </div>
   );
 });
@@ -282,10 +322,99 @@ function KioskEntryContent() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<'kiosk' | 'staff'>('kiosk');
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
+  const [checkingRedirect, setCheckingRedirect] = useState(true);
+  const [globalError, setGlobalError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Handle Google Redirect Result
+  useEffect(() => {
+    if (!auth || !db) return;
+    
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (!result?.user) return;
+
+        const user = result.user;
+        const intent = sessionStorage.getItem('google_signin_intent') || 'kiosk';
+        sessionStorage.removeItem('google_signin_intent');
+
+        // Domain check
+        if (!user.email?.endsWith('@neu.edu.ph')) {
+          await signOut(auth);
+          setGlobalError('Only @neu.edu.ph Google accounts are allowed.');
+          return;
+        }
+
+        // Check blocklist
+        const blockSnap = await getDocs(
+          query(collection(db, 'blocklist'), where('studentId', '==', user.email))
+        );
+        if (!blockSnap.empty) {
+          await signOut(auth);
+          setGlobalError('Your account has been restricted. Please contact library staff.');
+          return;
+        }
+
+        const userSnap = await getDocs(
+          query(collection(db, 'users'), where('email', '==', user.email))
+        );
+
+        // STAFF intent — check admin role and redirect to admin panel
+        if (intent === 'staff') {
+          if (userSnap.empty || userSnap.docs[0].data().role !== 'admin') {
+            await signOut(auth);
+            setGlobalError('You do not have admin access.');
+            return;
+          }
+          router.push('/admin');
+          return;
+        }
+
+        // KIOSK intent
+        if (userSnap.empty) {
+          // New user — go to registration
+          sessionStorage.setItem('kiosk_google_user', JSON.stringify({
+            email: user.email,
+            fullName: user.displayName || '',
+            loginMethod: 'google'
+          }));
+          router.push(`/kiosk/register?method=google&email=${encodeURIComponent(user.email)}`);
+        } else {
+          const userData = userSnap.docs[0].data();
+          const sessionData = {
+            studentId: userData.studentId || user.email,
+            fullName: userData.fullName,
+            college: userData.college || '',
+            program: userData.program || '',
+            email: user.email,
+            loginMethod: 'google',
+            role: userData.role
+          };
+
+          if (userData.role === 'admin') {
+            sessionStorage.setItem('kiosk_visitor', JSON.stringify(sessionData));
+            router.push('/kiosk/role-select');
+          } else {
+            sessionStorage.setItem('kiosk_visitor', JSON.stringify(sessionData));
+            router.push('/kiosk/purpose');
+          }
+        }
+
+      } catch (err: any) {
+        if (err.code !== 'auth/popup-closed-by-user') {
+          console.error('[NEU Library Log] Google redirect error:', err.code, err.message);
+        }
+      } finally {
+        setCheckingRedirect(false);
+      }
+    };
+
+    handleRedirect();
+  }, [auth, db, router]);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
@@ -374,6 +503,22 @@ function KioskEntryContent() {
     }
   }, [db, router, toast]);
 
+  const handleGoogleSignIn = () => {
+    if (!auth) return;
+    sessionStorage.setItem('google_signin_intent', 'kiosk');
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ hd: 'neu.edu.ph' });
+    signInWithRedirect(auth, provider);
+  };
+
+  const handleStaffGoogleSignIn = () => {
+    if (!auth) return;
+    sessionStorage.setItem('google_signin_intent', 'staff');
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ hd: 'neu.edu.ph' });
+    signInWithRedirect(auth, provider);
+  };
+
   const handleStaffLogin = useCallback(async (adminEmail: string, adminPassword: string) => {
     if (!auth || !db) return;
     try {
@@ -412,6 +557,29 @@ function KioskEntryContent() {
   }, [auth, db, router]);
 
   if (!mounted) return null;
+
+  if (checkingRedirect) {
+    return (
+      <div className="fixed inset-0 bg-[#0a2a1a] flex flex-col items-center justify-center z-[1000]">
+        <img src="/neu-logo.png" alt="NEU Logo" className="w-16 h-16 rounded-full mb-4 animate-pulse shadow-2xl" />
+        <div className="w-8 h-8 border-2 border-[#c9a227]/30 border-t-[#c9a227] rounded-full animate-spin mb-3" />
+        <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Verifying your account...</p>
+      </div>
+    );
+  }
+
+  if (globalError) {
+    return (
+      <div className="h-screen bg-[#0a2a1a] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
+        <div className="bg-red-500/10 p-10 rounded-[3rem] border-2 border-red-500/30 flex flex-col items-center max-w-md animate-in zoom-in duration-300">
+          <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
+          <h2 className="text-2xl font-black mb-4 uppercase tracking-tighter">Login Failed</h2>
+          <p className="text-white/60 text-sm font-bold mb-8">{globalError}</p>
+          <button suppressHydrationWarning onClick={() => { setGlobalError(null); window.location.reload(); }} className="w-full h-12 bg-white text-[#0a2a1a] font-black rounded-xl">Try Again</button>
+        </div>
+      </div>
+    );
+  }
 
   if (blockedData) {
     return (
@@ -462,10 +630,10 @@ function KioskEntryContent() {
                     <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">or</span>
                     <div className="flex-1 h-px bg-white/10" />
                   </div>
-                  <KioskEmailForm onSubmit={handleEmailSubmit} />
+                  <KioskEmailForm onSubmit={handleEmailSubmit} onGoogleSignIn={handleGoogleSignIn} />
                 </>
               ) : (
-                <StaffLoginForm onSubmit={handleStaffLogin} />
+                <StaffLoginForm onSubmit={handleStaffLogin} onGoogleSignIn={handleStaffGoogleSignIn} />
               )}
             </div>
           )}
