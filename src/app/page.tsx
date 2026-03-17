@@ -397,8 +397,8 @@ function KioskEntryContent() {
       if (!userSnap.empty) {
         const d = userSnap.docs[0].data();
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
-          studentId: d.studentId, 
-          fullName: d.displayName || d.fullName, 
+          studentId: d.studentId || d.email || `GUEST-${Date.now()}`, 
+          fullName: d.displayName || d.fullName,
           college: d.college, 
           program: d.program, 
           email: d.email,

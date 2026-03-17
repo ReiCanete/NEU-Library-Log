@@ -57,7 +57,7 @@ export default function PurposePage() {
       sessionStorage.setItem('kiosk_visitor', JSON.stringify(updatedVisitor));
 
       await addDoc(collection(db, 'visits'), {
-        studentId: updatedVisitor.studentId,
+        studentId: updatedVisitor.studentId || updatedVisitor.email || `GUEST-${Date.now()}`,
         fullName: updatedVisitor.fullName,
         college: updatedVisitor.college || '',
         program: updatedVisitor.program || '',
