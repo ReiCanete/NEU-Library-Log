@@ -92,19 +92,19 @@ const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: s
 });
 
 const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: string, pass: string) => Promise<void>, onGoogleSignIn: () => void }) => {
-  const [adminEmail, setAdminEmail] = useState('');
+  const [emailPrefix, setEmailPrefix] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (loading || !adminEmail || !adminPassword) return;
+    if (loading || !emailPrefix.trim() || !adminPassword) return;
 
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(adminEmail, adminPassword);
+      await onSubmit(`${emailPrefix.trim().toLowerCase()}@neu.edu.ph`, adminPassword);
     } catch (err: any) {
       setError(getErrorMessage(err));
     } finally {
@@ -126,17 +126,27 @@ const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: s
           <label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 flex items-center gap-2 mb-1.5 ml-1">
             <Mail className="w-3 h-3" /> Official Email
           </label>
-          <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+          <div className="flex items-center h-12 bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-[#c9a227]/60 focus-within:ring-1 focus-within:ring-[#c9a227]/30 transition-all">
+            <div className="pl-3.5 flex items-center shrink-0">
+              <Mail className="w-3.5 h-3.5 text-white/30" />
+            </div>
             <input
-              type="email"
-              value={adminEmail}
-              onChange={e => { setAdminEmail(e.target.value); setError(null); }}
-              placeholder="staff@neu.edu.ph"
+              type="text"
+              value={emailPrefix}
+              onChange={e => {
+                const val = e.target.value.replace(/@.*/, '');
+                setEmailPrefix(val);
+                setError(null);
+              }}
+              placeholder="username"
               suppressHydrationWarning
-              className="w-full h-12 bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 text-white placeholder-white/20 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 focus:outline-none text-sm font-bold transition-all"
+              className="flex-1 h-full bg-transparent pl-2.5 pr-0 text-white placeholder-white/20 focus:outline-none text-sm font-bold"
               required
+              autoComplete="username"
             />
+            <div className="h-full flex items-center px-3 bg-white/5 border-l border-white/10 shrink-0">
+              <span className="text-[#c9a227]/70 text-xs font-black select-none whitespace-nowrap">@neu.edu.ph</span>
+            </div>
           </div>
         </div>
 
