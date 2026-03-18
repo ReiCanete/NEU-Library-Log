@@ -630,12 +630,15 @@ export default function VisitorLogs() {
               </DialogContent>
             </Dialog>
 
-            {/* Side panel - no overlay, just the drawer itself */}
+            {/* Side panel overlay */}
             {sidePanelOpen && (
               <div
                 style={{
                   position: 'fixed',
-                  inset: 0,
+                  top: '64px',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   zIndex: 49,
                   cursor: 'pointer',
                 }}
@@ -647,8 +650,8 @@ export default function VisitorLogs() {
               style={{
                 position: 'fixed',
                 right: 0,
-                top: 0,
-                height: '100%',
+                top: '64px',
+                height: 'calc(100% - 64px)',
                 width: '380px',
                 background: 'white',
                 zIndex: 50,
@@ -657,6 +660,8 @@ export default function VisitorLogs() {
                 transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
                 transition: 'transform 0.3s ease',
                 pointerEvents: sidePanelOpen ? 'all' : 'none',
+                borderTop: '1px solid rgba(201,162,39,0.15)',
+                borderTopLeftRadius: '16px',
               }}
             >
               {selectedVisit && (
