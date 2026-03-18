@@ -28,6 +28,8 @@ export default function VisitorLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
+  const [collegeFilter, setCollegeFilter] = useState('all');
+  const [programFilter, setProgramFilter] = useState('all');
   
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -129,9 +131,11 @@ export default function VisitorLogs() {
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
       const visitDate = v.timestamp?.toDate ? v.timestamp.toDate() : new Date();
       const matchesDate = !dateFilter || isSameDay(visitDate, new Date(dateFilter));
-      return matchesSearch && matchesPurpose && matchesDate;
+      const matchesCollege = collegeFilter === 'all' || (v.college || '') === collegeFilter;
+      const matchesProgram = programFilter === 'all' || (v.program || '') === programFilter;
+      return matchesSearch && matchesPurpose && matchesDate && matchesCollege && matchesProgram;
     });
-  }, [allVisits, searchTerm, purposeFilter, dateFilter]);
+  }, [allVisits, searchTerm, purposeFilter, dateFilter, collegeFilter, programFilter]);
 
   const NEU_COLLEGES = [
     'College of Accountancy','College of Agriculture','College of Arts and Sciences',
@@ -155,6 +159,15 @@ export default function VisitorLogs() {
       return matchSearch && matchCollege && matchProgram;
     });
   }, [allUsers, userSearch, userCollegeFilter, userProgramFilter]);
+
+  const availableLogPrograms = useMemo(() => {
+    if (collegeFilter === 'all') return [];
+    return Array.from(new Set(
+      allVisits
+        .filter(v => v.college === collegeFilter && v.program)
+        .map(v => v.program)
+    )).sort();
+  }, [collegeFilter, allVisits]);
 
   const availablePrograms = useMemo(() => {
     if (userCollegeFilter === 'all') return [];
@@ -187,11 +200,13 @@ export default function VisitorLogs() {
     setEditTarget(null);
     setSidePanelOpen(false);
     setSelectedVisit(null);
+    setCollegeFilter('all');
+    setProgramFilter('all');
   }, [pathname]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, purposeFilter, dateFilter]);
+  }, [searchTerm, purposeFilter, dateFilter, collegeFilter, programFilter]);
 
   const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
   const paginatedVisits = filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -397,40 +412,64 @@ export default function VisitorLogs() {
         {activeTab === 'logs' && (
           <>
             <Card className="p-6 rounded-2xl border border-[#d4e4d8] bg-white ring-1 ring-[#1a3a2a]/5 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
-                  <Input 
-                    placeholder="Search name/ID..." 
-                    className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
-                  />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
+                    <Input
+                      placeholder="Search name/ID..."
+                      className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Purpose</Label>
+                    <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+                      <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Purposes</SelectItem>
+                        <SelectItem value="Reading Books">Reading Books</SelectItem>
+                        <SelectItem value="Research / Study">Research / Study</SelectItem>
+                        <SelectItem value="Computer / Internet">Computer / Internet</SelectItem>
+                        <SelectItem value="Group Discussion">Group Discussion</SelectItem>
+                        <SelectItem value="Thesis / Archival">Thesis / Archival</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Visit Date</Label>
+                    <Input
+                      type="date"
+                      className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Purpose</Label>
-                  <Select value={purposeFilter} onValueChange={setPurposeFilter}>
-                    <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Purposes</SelectItem>
-                      <SelectItem value="Reading Books">Reading Books</SelectItem>
-                      <SelectItem value="Research / Study">Research / Study</SelectItem>
-                      <SelectItem value="Computer / Internet">Computer / Internet</SelectItem>
-                      <SelectItem value="Group Discussion">Group Discussion</SelectItem>
-                      <SelectItem value="Thesis / Archival">Thesis / Archival</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Visit Date</Label>
-                  <Input 
-                    type="date" 
-                    className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
-                    value={dateFilter} 
-                    onChange={(e) => setDateFilter(e.target.value)} 
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[#f0f4f1]">
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">College</Label>
+                    <Select value={collegeFilter} onValueChange={v => { setCollegeFilter(v); setProgramFilter('all'); }}>
+                      <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Colleges</SelectItem>
+                        {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Program</Label>
+                    <Select value={programFilter} onValueChange={setProgramFilter} disabled={collegeFilter === 'all'}>
+                      <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold">
+                        <SelectValue placeholder={collegeFilter === 'all' ? 'Select college first' : 'All Programs'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Programs</SelectItem>
+                        {availableLogPrograms.map((p: string) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -654,7 +693,7 @@ export default function VisitorLogs() {
                 height: 'calc(100vh - 110px)',
                 width: '380px',
                 background: 'white',
-                zIndex: 50,
+                zIndex: 51,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                 overflowY: 'auto',
                 transform: sidePanelOpen ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
@@ -667,7 +706,7 @@ export default function VisitorLogs() {
               {selectedVisit && (
                 <>
                   {/* Header */}
-                  <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+                  <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 11 }}>
                     <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '16px', margin: 0 }}>Visitor Details</h2>
                     <button onClick={closePanel} style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                       <X size={18} />
