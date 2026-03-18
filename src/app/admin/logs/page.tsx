@@ -605,7 +605,7 @@ export default function VisitorLogs() {
             </Dialog>
 
             <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-              <DialogContent className="rounded-2xl p-10 max-w-md">
+              <DialogContent className="rounded-2xl p-10 max-md">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Edit Visit Log</DialogTitle>
                   <DialogDescription>Update purpose for <span className="font-black text-[#1a3a2a]">{editTarget?.fullName}</span></DialogDescription>
@@ -631,6 +631,18 @@ export default function VisitorLogs() {
             </Dialog>
 
             {/* Side panel - no overlay, just the drawer itself */}
+            {sidePanelOpen && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 49,
+                  cursor: 'pointer',
+                }}
+                onClick={closePanel}
+                aria-label="Close panel"
+              />
+            )}
             <div
               style={{
                 position: 'fixed',
