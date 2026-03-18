@@ -82,7 +82,7 @@ export default function AdminDashboard() {
       const visitType = visit.visitorType || 'Student';
       const purposeMatch = filterPurpose === 'all' || visit.purpose === filterPurpose;
       const collegeMatch = filterCollege === 'all' || visit.college === filterCollege;
-      let typeMatch = filterType === 'all' ? true : (filterType === 'employee' ? ['Faculty', 'Administrative Staff', 'Library Staff'].includes(visitType) : visitType === filterType);
+      let typeMatch = filterType === 'all' || visitType === filterType;
       
       const visitDate = visit.timestamp?.toDate ? visit.timestamp.toDate() : new Date();
       const dateMatch = isWithinInterval(visitDate, { 
@@ -176,11 +176,6 @@ export default function AdminDashboard() {
               >
                 <option value="all">All Types</option>
                 <option value="Student">Student</option>
-                <option value="Faculty">Faculty</option>
-                <option value="Administrative Staff">Admin Staff</option>
-                <option value="Library Staff">Library Staff</option>
-                <option value="Guest">Guest</option>
-                <option value="employee">All Staff Total</option>
               </select>
             </div>
           </div>

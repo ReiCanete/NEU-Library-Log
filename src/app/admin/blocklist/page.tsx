@@ -112,8 +112,8 @@ export default function BlocklistManagement() {
               </DialogHeader>
               <div className="py-6 space-y-6">
                 <div className="space-y-2">
-                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Student ID</Label>
-                  <Input placeholder="e.g. 25-12946-343" className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" value={newBlockId} onChange={(e) => setNewBlockId(e.target.value)} />
+                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">ID / Email</Label>
+                  <Input placeholder="e.g. 25-12946-343 or email@neu.edu.ph" className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" value={newBlockId} onChange={(e) => setNewBlockId(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Full Name (Optional)</Label>
@@ -156,7 +156,7 @@ export default function BlocklistManagement() {
             <Table>
               <TableHeader className="bg-[#f0f4f1]">
                 <TableRow className="border-none">
-                  <TableHead className="px-10 h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Student ID</TableHead>
+                  <TableHead className="px-10 h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">ID / Email</TableHead>
                   <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Full Name</TableHead>
                   <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Reason</TableHead>
                   <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Date</TableHead>
@@ -182,7 +182,7 @@ export default function BlocklistManagement() {
                   </TableRow>
                 ) : paginatedBlocks.map((b) => (
                   <TableRow key={b.id} className="group hover:bg-red-50/30 transition-colors border-b-[#f0f4f1]">
-                    <TableCell className="px-10 font-mono text-sm font-bold text-slate-500">{b.studentId}</TableCell>
+                    <TableCell className="px-10 font-mono text-sm font-bold text-slate-500 max-w-[180px] truncate" title={b.studentId}>{b.studentId}</TableCell>
                     <TableCell className="font-black text-[#1a3a2a]">{b.fullName}</TableCell>
                     <TableCell className="max-w-[250px] font-bold text-xs text-[#4a6741] truncate">{b.reason}</TableCell>
                     <TableCell className="text-slate-400 font-bold text-[10px] uppercase tabular-nums">
