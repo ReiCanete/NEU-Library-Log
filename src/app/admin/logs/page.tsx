@@ -688,10 +688,10 @@ export default function VisitorLogs() {
             <div
               style={{
                 position: 'fixed',
-                right: '16px',
-                top: '80px',
-                height: 'calc(100vh - 110px)',
-                width: '380px',
+                right: '24px',
+                top: '72px',
+                height: 'calc(100vh - 105px)',
+                width: '340px',
                 background: 'white',
                 zIndex: 51,
                 boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
