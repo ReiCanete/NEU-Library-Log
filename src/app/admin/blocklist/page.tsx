@@ -72,10 +72,11 @@ export default function BlocklistManagement() {
 
   const handleManualBlock = async () => {
     if (!newBlockId || !newBlockReason || !db) return;
+    const normalizedBlockId = newBlockId.trim().toLowerCase();
     setIsProcessing(true);
     try {
       await addDoc(collection(db, 'blocklist'), {
-        studentId: newBlockId,
+        studentId: normalizedBlockId,
         fullName: newBlockName || 'Unregistered Account',
         reason: newBlockReason,
         blockedBy: auth.currentUser?.email || 'Staff',
