@@ -47,17 +47,17 @@ const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: s
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4 pb-2.5 border-b border-[#c9a227]/20">
-        <span className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-1.5">
+      <div className="flex justify-between items-center mb-4 pb-2.5 border-b border-white/10">
+        <span className="text-[10px] font-black uppercase tracking-widest text-[#c9a227]/80 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
           Entry Count
         </span>
-        <span className="text-[10px] font-black text-white uppercase tabular-nums">{todayCount} / {capacity}</span>
+        <span className="text-[11px] font-black text-white/80 uppercase tabular-nums bg-white/5 px-2.5 py-0.5 rounded-full">{todayCount} / {capacity}</span>
       </div>
 
       <form onSubmit={handleSubmit} className="mb-2">
         <div className="mb-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-2 ml-1">
+          <label className="text-[10px] font-black uppercase tracking-widest text-[#c9a227]/70 flex items-center gap-2 mb-2 ml-1">
             <CreditCard className="w-3.5 h-3.5" /> School ID Entry
           </label>
           <input
@@ -67,7 +67,7 @@ const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: s
             onChange={e => { setSchoolId(e.target.value); setError(null); }}
             placeholder="e.g. 25-12946-343"
             suppressHydrationWarning
-            className={`w-full h-11 bg-[#071a0f] border rounded-xl px-4 text-white placeholder-white/30 focus:outline-none text-sm font-bold transition-all ${error ? 'border-red-500' : 'border-[#c9a227]/30 focus:border-[#c9a227]'}`}
+            className={`w-full h-12 bg-white/5 border rounded-2xl px-4 text-white placeholder-white/20 focus:outline-none text-sm font-bold transition-all ${error ? 'border-red-500' : 'border-white/10 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30'}`}
           />
         </div>
 
@@ -76,7 +76,7 @@ const KioskIdForm = memo(({ onSubmit, todayCount, capacity }: { onSubmit: (id: s
         <button
           type="submit"
           suppressHydrationWarning
-          className="w-full h-11 mt-2.5 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-sm rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg flex items-center justify-center disabled:opacity-40"
+          className="w-full h-12 mt-3 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-sm rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#c9a227]/20 flex items-center justify-center disabled:opacity-40"
           disabled={loading || !schoolId.trim()}
         >
           {loading ? (
@@ -114,16 +114,16 @@ const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: s
 
   return (
     <div className="w-full">
-      <div className="flex flex-col items-center mb-4 pb-2 border-b border-[#c9a227]/20">
-        <div className="w-10 h-10 bg-[#c9a227]/10 border border-[#c9a227]/30 rounded-xl flex items-center justify-center mb-2">
+      <div className="flex flex-col items-center mb-4 pb-2 border-b border-white/10">
+        <div className="w-10 h-10 bg-[#c9a227]/10 border border-[#c9a227]/30 rounded-xl flex items-center justify-center mb-2 shadow-lg">
           <ShieldCheck className="w-5 h-5 text-[#c9a227]" />
         </div>
-        <h2 className="text-white font-black tracking-widest uppercase text-[9px]">Staff Credentials</h2>
+        <h2 className="text-white font-black tracking-[0.2em] uppercase text-[9px]">Staff Credentials</h2>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
-          <label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-1.5 ml-1">
+          <label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 flex items-center gap-2 mb-1.5 ml-1">
             <Mail className="w-3 h-3" /> Official Email
           </label>
           <div className="relative">
@@ -134,14 +134,14 @@ const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: s
               onChange={e => { setAdminEmail(e.target.value); setError(null); }}
               placeholder="staff@neu.edu.ph"
               suppressHydrationWarning
-              className="w-full h-11 bg-[#071a0f] border border-[#c9a227]/30 rounded-xl pl-10 pr-4 text-white placeholder-white/30 focus:border-[#c9a227] focus:outline-none text-sm font-bold transition-all"
+              className="w-full h-12 bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 text-white placeholder-white/20 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 focus:outline-none text-sm font-bold transition-all"
               required
             />
           </div>
         </div>
 
         <div className="mb-4">
-          <label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] flex items-center gap-2 mb-1.5 ml-1">
+          <label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 flex items-center gap-2 mb-1.5 ml-1">
             <Lock className="w-3 h-3" /> Password
           </label>
           <div className="relative">
@@ -152,14 +152,14 @@ const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: s
               onChange={e => { setAdminPassword(e.target.value); setError(null); }}
               placeholder="••••••••"
               suppressHydrationWarning
-              className="w-full h-11 bg-[#071a0f] border border-[#c9a227]/30 rounded-xl pl-10 pr-4 text-white placeholder-white/30 focus:border-[#c9a227] focus:outline-none text-sm font-bold transition-all"
+              className="w-full h-12 bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 text-white placeholder-white/20 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 focus:outline-none text-sm font-bold transition-all"
               required
             />
           </div>
         </div>
 
         {error && (
-          <div className="mb-3 p-2 bg-red-900/30 border border-red-500/30 rounded-lg text-red-400 text-[9px] font-black uppercase tracking-widest text-center">
+          <div className="mb-3 p-2 bg-red-900/30 border border-red-500/30 rounded-xl text-red-400 text-[9px] font-black uppercase tracking-widest text-center">
             {error}
           </div>
         )}
@@ -168,7 +168,7 @@ const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: s
           type="submit"
           disabled={loading}
           suppressHydrationWarning
-          className="w-full h-11 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-sm rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg flex items-center justify-center"
+          className="w-full h-12 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black text-sm rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#c9a227]/20 flex items-center justify-center"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
@@ -187,7 +187,7 @@ const StaffLoginForm = memo(({ onSubmit, onGoogleSignIn }: { onSubmit: (email: s
 
       <button
         onClick={onGoogleSignIn}
-        className="w-full h-11 bg-white text-gray-800 font-bold text-xs rounded-xl border border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-md"
+        className="w-full h-12 bg-white/95 text-gray-800 font-bold text-xs rounded-2xl border border-white/20 hover:bg-white transition-all flex items-center justify-center gap-3 shadow-lg shadow-black/20"
       >
         <svg width="18" height="18" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -289,7 +289,6 @@ function KioskEntryContent() {
       );
 
       if (userSnap.empty) {
-        // First time Google user — go to registration
         sessionStorage.setItem('kiosk_google_user', JSON.stringify({
           email: user.email,
           fullName: user.displayName || '',
@@ -302,7 +301,6 @@ function KioskEntryContent() {
 
       const userData = userSnap.docs[0].data();
 
-      // Check for incomplete profile
       if (!userData.studentId || !userData.college) {
         sessionStorage.setItem('kiosk_google_user', JSON.stringify({
           email: user.email,
@@ -314,7 +312,6 @@ function KioskEntryContent() {
         return;
       }
 
-      // Returning user with complete profile
       if (userData.role === 'admin') {
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
           studentId: userData.studentId || user.email,
@@ -430,7 +427,7 @@ function KioskEntryContent() {
   if (checkingRedirect) {
     return (
       <div className="fixed inset-0 bg-[#0a2a1a] flex flex-col items-center justify-center z-[1000]">
-        <img src="/neu-logo.png" alt="NEU Logo" className="w-16 h-16 rounded-full mb-4 animate-pulse shadow-2xl" />
+        <img src="/neu-library-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-4 animate-pulse shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
         <div className="w-8 h-8 border-2 border-[#c9a227]/30 border-t-[#c9a227] rounded-full animate-spin mb-3" />
         <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Verifying your account...</p>
       </div>
@@ -439,8 +436,8 @@ function KioskEntryContent() {
 
   if (globalError) {
     return (
-      <div className="h-screen bg-[#0a2a1a] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
-        <div className="bg-red-500/10 p-10 rounded-[3rem] border-2 border-red-500/30 flex flex-col items-center max-w-md animate-in zoom-in duration-300">
+      <div className="h-screen bg-[#071a0f] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
+        <div className="bg-white/5 backdrop-blur-xl p-10 rounded-[3rem] border border-red-500/30 flex flex-col items-center max-w-md animate-in zoom-in duration-300 ring-1 ring-red-500/20 shadow-2xl">
           <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
           <h2 className="text-2xl font-black mb-4 uppercase tracking-tighter">Login Failed</h2>
           <p className="text-white/60 text-sm font-bold mb-8">{globalError}</p>
@@ -452,8 +449,8 @@ function KioskEntryContent() {
 
   if (blockedData) {
     return (
-      <div className="h-screen bg-[#0a2a1a] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
-        <div className="bg-red-500/10 p-10 rounded-[3rem] border-2 border-red-500/30 flex flex-col items-center max-w-md animate-in zoom-in duration-300">
+      <div className="h-screen bg-[#071a0f] flex flex-col items-center justify-center p-8 text-center text-white z-[200]">
+        <div className="bg-white/5 backdrop-blur-xl p-10 rounded-[3rem] border border-red-500/30 flex flex-col items-center max-w-md animate-in zoom-in duration-300 ring-1 ring-red-500/20 shadow-2xl">
           <ShieldX className="h-16 w-16 text-red-500 mb-4" />
           <h2 className="text-2xl font-black mb-2 uppercase tracking-tighter">Access Restricted</h2>
           <div className="bg-black/30 p-6 rounded-2xl w-full text-left mb-6 border border-white/10">
@@ -467,30 +464,32 @@ function KioskEntryContent() {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-gradient-to-b from-[#0a2a1a] to-[#0d3d24]">
+    <div className="h-screen overflow-hidden flex flex-col bg-[#071a0f] relative">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1a5c2e33_0%,_transparent_60%)] pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#c9a22711_0%,_transparent_50%)] pointer-events-none z-0" />
       <AnnouncementToast />
       
-      <div className="absolute top-3 right-4 z-20 flex items-center gap-1 bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-full p-1 shadow-xl">
-        <button suppressHydrationWarning onClick={() => setMode('kiosk')} className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-150 ${mode === 'kiosk' ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' : 'text-white/60 hover:text-white'}`}>Kiosk</button>
-        <button suppressHydrationWarning onClick={() => setMode('staff')} className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-150 ${mode === 'staff' ? 'bg-[#c9a227] text-[#0a2a1a] font-black shadow-md' : 'text-white/60 hover:text-white'}`}>Staff</button>
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-full p-1 shadow-2xl">
+        <button suppressHydrationWarning onClick={() => setMode('kiosk')} className={`px-4 py-1.5 rounded-full text-[11px] transition-all duration-200 ${mode === 'kiosk' ? 'bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black shadow-md' : 'text-white/50 hover:text-white/80 font-medium'}`}>Kiosk</button>
+        <button suppressHydrationWarning onClick={() => setMode('staff')} className={`px-4 py-1.5 rounded-full text-[11px] transition-all duration-200 ${mode === 'staff' ? 'bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black shadow-md' : 'text-white/50 hover:text-white/80 font-medium'}`}>Staff</button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 relative">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 relative z-10">
         <div className="absolute w-40 h-40 rounded-full bg-[#c9a227]/5 blur-3xl -z-10" />
-        <img src="/neu-logo.png" alt="NEU Logo" className="w-16 h-16 rounded-full mb-2 shadow-2xl border-2 border-[#c9a227]/30" />
-        <h1 className="text-3xl font-black text-[#c9a227] text-center drop-shadow-2xl uppercase tracking-tight leading-none">NEU LIBRARY</h1>
-        <p className="text-[10px] font-black tracking-widest text-white/40 uppercase mt-1 mb-4">Digital Visitor Log</p>
+        <img src="/neu-library-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-3 shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
+        <h1 className="text-4xl font-black text-[#c9a227] text-center drop-shadow-lg uppercase tracking-tight leading-none">NEU LIBRARY</h1>
+        <p className="text-[10px] font-black tracking-[0.3em] text-white/30 uppercase mt-1.5 mb-5">Digital Visitor Log</p>
 
         <div className="w-full max-w-[460px] mx-auto animate-in fade-in zoom-in duration-500">
           {isAtCapacity && mode === 'kiosk' ? (
-            <div className="bg-[#0a2a1a]/60 backdrop-blur-2xl w-full border-2 border-red-500/50 rounded-[2rem] p-8 text-center space-y-4">
+            <div className="bg-white/5 backdrop-blur-xl w-full border border-red-500/30 rounded-3xl p-8 text-center space-y-4 ring-1 ring-red-500/20 shadow-2xl">
               <AlertCircle className="h-10 w-10 text-red-500 mx-auto" />
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Full Capacity</h2>
               <p className="text-white/60 text-xs font-bold">The library is at maximum capacity ({dailyCapacity}).</p>
-              <button suppressHydrationWarning className="w-full h-12 rounded-xl bg-white/10 text-white font-black" onClick={() => window.location.reload()}>Retry</button>
+              <button suppressHydrationWarning className="w-full h-12 rounded-2xl bg-white/10 text-white font-black hover:bg-white/20 transition-all" onClick={() => window.location.reload()}>Retry</button>
             </div>
           ) : (
-            <div className="w-full bg-[#0d3d24]/80 backdrop-blur-sm border border-[#c9a227]/20 rounded-2xl p-5 shadow-2xl">
+            <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl ring-1 ring-[#c9a227]/10">
               {mode === 'kiosk' ? (
                 <>
                   <KioskIdForm onSubmit={handleIdSubmit} todayCount={currentCount} capacity={dailyCapacity} />
@@ -501,7 +500,7 @@ function KioskEntryContent() {
                   </div>
                   <button
                     onClick={handleGoogleSignIn}
-                    className="w-full h-11 bg-white text-gray-800 font-bold text-xs rounded-xl border border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-3 shadow-md"
+                    className="w-full h-12 bg-white/95 text-gray-800 font-bold text-xs rounded-2xl border border-white/20 hover:bg-white transition-all flex items-center justify-center gap-3 shadow-lg shadow-black/20"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

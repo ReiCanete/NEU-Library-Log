@@ -77,42 +77,43 @@ export default function PurposePage() {
   if (!visitor) return null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24]">
+    <div className="min-h-screen flex flex-col bg-[#071a0f] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#1a5c2e28_0%,_transparent_65%)] pointer-events-none" />
       <AnnouncementToast />
       
-      <div className="absolute top-16 left-6">
-        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-[#c9a227]/30 text-xs">
+      <div className="absolute top-16 left-6 z-20">
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-black px-4 h-10 rounded-full border border-white/10 text-xs">
           <ArrowLeft className="h-4 w-4" /> Cancel Entry
         </Button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
         <div className="max-w-4xl w-full flex flex-col gap-6">
           <div className="space-y-1">
-            <h2 className="text-2xl font-black text-[#c9a227] drop-shadow-2xl tracking-tight uppercase">Visit Purpose</h2>
+            <h2 className="text-3xl font-black text-[#c9a227] drop-shadow-lg tracking-tight uppercase">Visit Purpose</h2>
             <p className="text-sm text-white/50 font-bold uppercase tracking-widest">
               Hi <span className="text-[#c9a227] font-black">{visitor?.fullName?.split(' ')[0] || 'Visitor'}</span>, why are you visiting today?
             </p>
           </div>
 
           {isSubmitting ? (
-            <div className="h-[360px] flex flex-col items-center justify-center gap-6 bg-black/20 rounded-[3rem] backdrop-blur-xl border border-[#c9a227]/20">
+            <div className="h-[360px] flex flex-col items-center justify-center gap-6 bg-white/5 rounded-3xl backdrop-blur-xl border border-white/10 ring-1 ring-[#c9a227]/10 shadow-2xl">
               <Loader2 className="h-16 w-16 animate-spin text-[#c9a227]" />
-              <p className="text-2xl font-black text-white uppercase tracking-widest">Logging Entry...</p>
+              <p className="text-2xl font-black text-white uppercase tracking-widest drop-shadow-lg">Logging Entry...</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-3xl mx-auto">
               {PURPOSES.map((item) => (
                 <Card 
                   key={item.id} 
-                  className="group cursor-pointer bg-black/30 backdrop-blur-xl border-[#c9a227]/20 hover:border-[#c9a227] hover:scale-105 transition-all duration-300 rounded-[1.5rem] shadow-xl overflow-hidden active:bg-[#c9a227]/20" 
+                  className="group cursor-pointer bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#c9a227]/60 hover:bg-[#c9a227]/10 hover:scale-105 transition-all duration-300 rounded-3xl shadow-xl overflow-hidden active:bg-[#c9a227]/20 ring-0 hover:ring-1 hover:ring-[#c9a227]/30 hover:shadow-[#c9a227]/10 hover:shadow-2xl" 
                   onClick={() => handleSelect(item.label)}
                 >
                   <CardContent className="flex flex-col items-center justify-center p-4 gap-3 h-[140px]">
-                    <div className="p-3 rounded-xl bg-[#c9a227]/10 group-hover:bg-[#c9a227] transition-all">
-                      <item.icon className="h-8 w-8 text-[#c9a227] group-hover:text-[#0a2a1a]" />
+                    <div className="p-3 rounded-2xl bg-[#c9a227]/10 border border-[#c9a227]/20 group-hover:bg-[#c9a227] group-hover:border-transparent transition-all duration-300 group-hover:shadow-md group-hover:shadow-[#c9a227]/30">
+                      <item.icon className="h-8 w-8 text-[#c9a227] group-hover:text-[#0a2a1a] transition-colors" />
                     </div>
-                    <span className="text-xs font-black text-white uppercase tracking-tight text-center leading-tight">{item.label}</span>
+                    <span className="text-xs font-black text-white uppercase tracking-tight text-center leading-tight group-hover:text-[#c9a227] transition-colors">{item.label}</span>
                   </CardContent>
                 </Card>
               ))}
@@ -121,8 +122,8 @@ export default function PurposePage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full h-1 bg-black/40">
-        <div className="h-full bg-[#c9a227] transition-all duration-100 ease-linear shadow-[0_0_10px_#c9a227]" style={{ width: `${progress}%` }} />
+      <div className="fixed bottom-0 left-0 w-full h-1.5 bg-black/60">
+        <div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_12px_#c9a227aa]" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );

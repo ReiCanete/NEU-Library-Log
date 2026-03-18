@@ -65,7 +65,6 @@ function RegisterForm() {
     setLoading(false);
   }, [db]);
 
-  // Handle name parsing for Google Sign-in
   useEffect(() => {
     if (nameFromUrl) {
       const parts = nameFromUrl.trim().split(' ');
@@ -78,7 +77,6 @@ function RegisterForm() {
     }
   }, [nameFromUrl]);
 
-  // Derived Full Name
   const fullName = [firstName.trim(), middleInitial.trim() ? middleInitial.trim() + '.' : '', lastName.trim()]
     .filter(Boolean)
     .join(' ');
@@ -104,7 +102,6 @@ function RegisterForm() {
     if (!db || submitting) return;
     setFormError(null);
 
-    // Validation
     if (!firstName.trim()) { setFormError('Please enter your first name.'); return; }
     if (!lastName.trim()) { setFormError('Please enter your last name.'); return; }
     
@@ -126,7 +123,6 @@ function RegisterForm() {
     try {
       const finalStudentId = studentId.trim();
 
-      // CHANGE 4: Fix Admin Google overwriting role
       if (isGoogleSignIn) {
         const emailSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
         if (!emailSnap.empty && emailSnap.docs[0].data().role === 'admin') {
@@ -162,16 +158,13 @@ function RegisterForm() {
         updatedAt: Timestamp.now()
       };
 
-      // Save to Firestore users collection
       await setDoc(docRef, { ...userData, createdAt: Timestamp.now() }, { merge: true });
 
-      // Save to session storage for the immediate flow
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
         ...userData, 
         loginMethod: isGoogleSignIn ? 'google' : 'id' 
       }));
 
-      // Navigate
       router.push('/kiosk/purpose');
     } catch (err) {
       logAppError('Registration', 'SaveUser', err);
@@ -183,24 +176,26 @@ function RegisterForm() {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a2a1a] to-[#0d3d24] overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-[#071a0f] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_#1a5c2e30_0%,_transparent_55%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#c9a22710_0%,_transparent_50%)] pointer-events-none" />
       <AnnouncementToast />
-      <div className="absolute top-16 left-6">
-        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-[#c9a227]/20 text-xs">
+      <div className="absolute top-16 left-6 z-20">
+        <Button variant="ghost" onClick={() => router.push('/')} className="text-[#c9a227] hover:bg-white/10 gap-2 font-bold h-10 rounded-full border border-white/10 text-xs">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 overflow-y-auto relative z-10">
         <div className="max-w-[480px] w-full space-y-4">
           <div className="text-center space-y-3">
-            <h2 className="text-2xl font-black text-[#c9a227] tracking-tight uppercase leading-none">Profile Setup</h2>
-            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">Complete your institutional record</p>
+            <h2 className="text-3xl font-black text-[#c9a227] tracking-tight uppercase leading-none drop-shadow-lg">Profile Setup</h2>
+            <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.3em] mt-1">Complete your institutional record</p>
           </div>
 
-          <div className="glass-neu rounded-[2rem] p-8 space-y-6 shadow-2xl border-none">
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 space-y-6 shadow-2xl ring-1 ring-[#c9a227]/10">
             {isGoogleSignIn && (
-              <div className="mb-4 p-3 bg-[#c9a227]/10 border border-[#c9a227]/30 rounded-xl flex items-center gap-3">
+              <div className="mb-4 p-3 bg-[#c9a227]/10 border border-[#c9a227]/20 rounded-2xl flex items-center gap-3 backdrop-blur-sm">
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -221,15 +216,14 @@ function RegisterForm() {
             )}
 
             <div className="space-y-4">
-              {/* Dynamic ID Field */}
               <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 ml-1">
                   Student ID
                 </Label>
                 <div className="relative">
                   <Input 
                     placeholder="XX-XXXXX-XXX" 
-                    className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : ''}`} 
+                    className={`h-12 text-sm font-bold bg-white/5 border text-white rounded-2xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : 'border-white/10 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20'}`} 
                     value={studentId} 
                     onChange={(e) => !idFromUrl && setStudentId(e.target.value)} 
                     readOnly={!!idFromUrl} 
@@ -239,14 +233,13 @@ function RegisterForm() {
                 </div>
               </div>
 
-              {/* Name Fields */}
               <div className="space-y-2">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Full Name</Label>
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 ml-1">Full Name</Label>
                 <div className="flex gap-2">
                   <div className="flex-1 space-y-1">
                     <Input 
                       placeholder="First name" 
-                      className="h-12 text-sm font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-3" 
+                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
                       value={firstName} 
                       onChange={(e) => setFirstName(e.target.value)} 
                     />
@@ -255,7 +248,7 @@ function RegisterForm() {
                   <div className="w-[64px] space-y-1">
                     <Input 
                       placeholder="MI" 
-                      className="h-12 text-sm font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-3 text-center" 
+                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20 text-center" 
                       value={middleInitial} 
                       maxLength={2}
                       onChange={(e) => {
@@ -268,7 +261,7 @@ function RegisterForm() {
                   <div className="flex-1 space-y-1">
                     <Input 
                       placeholder="Last name" 
-                      className="h-12 text-sm font-bold bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-3" 
+                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
                       value={lastName} 
                       onChange={(e) => setLastName(e.target.value)} 
                     />
@@ -282,12 +275,11 @@ function RegisterForm() {
                 )}
               </div>
 
-              {/* Dynamic Department/College Field */}
               <div className="space-y-1 relative">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 ml-1">
                   College / Program
                 </Label>
-                <div className="h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+                <div className="h-12 flex items-center justify-between px-4 bg-white/5 border border-white/10 text-white rounded-2xl cursor-pointer hover:border-[#c9a227]/60 transition-all" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                   <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
                     {selectedProgram || selectedCollege || "Select..."}
                   </span>
@@ -296,11 +288,11 @@ function RegisterForm() {
                 {isDropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-                    <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl overflow-hidden" style={{ background: '#071a0f', border: '1px solid #c9a227', boxShadow: '0 25px 50px rgba(0,0,0,0.9)', maxHeight: '240px', overflowY: 'auto', top: '100%' }}>
+                    <div className="absolute left-0 right-0 z-50 mt-1 rounded-2xl overflow-hidden" style={{ background: '#071a0f', border: '1px solid #c9a227', boxShadow: '0 25px 50px rgba(0,0,0,0.9)', maxHeight: '240px', overflowY: 'auto', top: '100%' }}>
                       <div className="sticky top-0 p-2" style={{ background: '#071a0f', borderBottom: '1px solid rgba(201,162,39,0.2)' }}>
                         <input 
                           autoFocus 
-                          style={{ background: '#0a2a1a', border: '1px solid rgba(201,162,39,0.3)', color: 'white', padding: '10px 14px', width: '100%', outline: 'none', fontSize: '14px', borderRadius: '8px' }} 
+                          style={{ background: '#0a2a1a', border: '1px solid rgba(201,162,39,0.3)', color: 'white', padding: '10px 14px', width: '100%', outline: 'none', fontSize: '14px', borderRadius: '12px' }} 
                           placeholder="Search..." 
                           value={search} 
                           onChange={(e) => setSearch(e.target.value)} 
@@ -338,7 +330,7 @@ function RegisterForm() {
             </div>
 
             <Button 
-              className="w-full h-14 text-lg font-black rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg" 
+              className="w-full h-14 text-base font-black rounded-2xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] hover:opacity-90 shadow-lg shadow-[#c9a227]/20" 
               disabled={submitting} 
               onClick={handleSubmit}
             >
