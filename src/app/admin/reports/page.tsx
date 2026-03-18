@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from 'react';
@@ -117,45 +116,40 @@ export default function ReportsPage() {
   const generatePDF = async () => {
     if (!stats) return;
     setIsGenerating(true);
-
-    let logoBase64 = '';
-    try {
-      const response = await fetch('/neu-logo.png');
-      const blob = await response.blob();
-      logoBase64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) {
-      console.warn('Could not load NEU logo for PDF:', e);
-    }
-
     try {
       const pageW = 210;
+
+      // Fetch NEU logo as base64
+      let logoBase64 = '';
+      try {
+        const response = await fetch('/neu-library-logo.png');
+        const blob = await response.blob();
+        logoBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn('Could not load NEU logo for PDF:', e);
+      }
+
       const doc = new jsPDF('p', 'mm', 'a4');
       const adminEmail = auth?.currentUser?.email || 'System Administrator';
       const generatedAt = format(new Date(), 'MMMM dd, yyyy hh:mm a');
       const periodLabel = `${format(new Date(startDate), 'MMM dd, yyyy')} — ${format(new Date(endDate), 'MMM dd, yyyy')}`;
 
-      // Deep green header block — taller to fit logo
+      // ── PAGE 1 HEADER ────────────────────────────────────────────────────
       doc.setFillColor(26, 58, 42);
       doc.rect(0, 0, pageW, 68, 'F');
-
-      // Gold accent bar
       doc.setFillColor(201, 162, 39);
       doc.rect(0, 68, pageW, 3, 'F');
 
-      // NEU Logo
+      // Logo top-left (transparent PNG, no circle needed)
       if (logoBase64) {
-        // Draw green filled circle as background behind logo to fix transparency issues
-        doc.setFillColor(26, 58, 42);
-        doc.circle(36, 34, 28, 'F');
-        // Place logo centered over the circle
         doc.addImage(logoBase64, 'PNG', 10, 8, 52, 52);
       }
 
-      // University name — to the right of the logo
+      // University name to the right of logo
       doc.setTextColor(201, 162, 39);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
@@ -172,12 +166,12 @@ export default function ReportsPage() {
       doc.text('NEU Library Log — Official System Export', 72, 44);
       doc.text(`Period: ${periodLabel}`, 72, 52);
 
-      // Thin gold divider line inside header separating logo area
+      // Thin gold vertical divider between logo and text
       doc.setDrawColor(201, 162, 39);
       doc.setLineWidth(0.3);
       doc.line(68, 10, 68, 62);
 
-      // Meta info row below gold bar
+      // Meta row below gold bar
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
       doc.setFont('helvetica', 'normal');
@@ -185,7 +179,7 @@ export default function ReportsPage() {
       doc.text(`Date: ${generatedAt}`, pageW - 14, 78, { align: 'right' });
 
       // Active filters notice
-      const activeFilters = [];
+      const activeFilters: string[] = [];
       if (filterPurpose !== 'all') activeFilters.push(`Purpose: ${filterPurpose}`);
       if (filterCollege !== 'all') activeFilters.push(`College: ${filterCollege}`);
       if (activeFilters.length > 0) {
@@ -194,9 +188,10 @@ export default function ReportsPage() {
         doc.text(`Filters applied: ${activeFilters.join(' | ')}`, 14, 86);
       }
 
-      let y = activeFilters.length > 0 ? 94 : 88;
+      let y = activeFilters.length > 0 ? 96 : 90;
 
-      // Section: Executive Summary
+      // ── EXECUTIVE SUMMARY ────────────────────────────────────────────────
+      if (y > 200) { doc.addPage(); y = 20; }
       doc.setFillColor(26, 58, 42);
       doc.rect(14, y, pageW - 28, 7, 'F');
       doc.setTextColor(201, 162, 39);
@@ -215,34 +210,18 @@ export default function ReportsPage() {
           ['Most Active Program', `${stats.topPr?.[0] || 'N/A'} (${stats.topPr?.[1] || 0} visits)`],
           ['Restrictions Issued (period)', stats.restrictions.toString()],
         ],
-        styles: {
-          fontSize: 9,
-          cellPadding: { top: 4, bottom: 4, left: 6, right: 6 },
-          valign: 'middle',
-        },
-        headStyles: {
-          halign: 'center',
-          valign: 'middle',
-          fontStyle: 'bold',
-          fontSize: 9,
-          fillColor: [26, 58, 42],
-          textColor: [201, 162, 39],
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-        },
+        headStyles: { fillColor: [26, 58, 42], textColor: [201, 162, 39], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: { top: 5, bottom: 5, left: 6, right: 6 } },
+        bodyStyles: { fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 }, valign: 'middle' },
         alternateRowStyles: { fillColor: [240, 247, 242] },
-        columnStyles: {
-          0: { fontStyle: 'bold', cellWidth: 90 },
-          1: { halign: 'center' },
-        },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 90 }, 1: { halign: 'center' } },
         margin: { left: 14, right: 14 },
-        pageBreak: 'avoid',
         rowPageBreak: 'avoid',
       });
 
       y = (doc as any).lastAutoTable.finalY + 14;
 
-      // Section: Purpose Breakdown
-      if (y > 220) { doc.addPage(); y = 20; }
+      // ── PURPOSE BREAKDOWN ────────────────────────────────────────────────
+      if (y > 200) { doc.addPage(); y = 20; }
       doc.setFillColor(201, 162, 39);
       doc.rect(14, y, pageW - 28, 7, 'F');
       doc.setTextColor(26, 58, 42);
@@ -257,35 +236,18 @@ export default function ReportsPage() {
         body: Object.entries(stats.purposes)
           .sort((a, b) => b[1] - a[1])
           .map(([n, c]) => [n, c.toString(), `${((c / stats.total) * 100).toFixed(1)}%`]),
-        styles: {
-          fontSize: 9,
-          cellPadding: { top: 4, bottom: 4, left: 6, right: 6 },
-          valign: 'middle',
-        },
-        headStyles: {
-          halign: 'center',
-          valign: 'middle',
-          fontStyle: 'bold',
-          fontSize: 9,
-          fillColor: [201, 162, 39],
-          textColor: [26, 58, 42],
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-        },
+        headStyles: { fillColor: [201, 162, 39], textColor: [26, 58, 42], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: { top: 5, bottom: 5, left: 6, right: 6 } },
+        bodyStyles: { fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 }, valign: 'middle' },
         alternateRowStyles: { fillColor: [254, 249, 235] },
-        columnStyles: {
-          0: { cellWidth: 'auto' },
-          1: { halign: 'center', cellWidth: 22 },
-          2: { halign: 'center', cellWidth: 22 },
-        },
+        columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'center', cellWidth: 22 }, 2: { halign: 'center', cellWidth: 22 } },
         margin: { left: 14, right: 14 },
-        pageBreak: 'avoid',
         rowPageBreak: 'avoid',
       });
 
       y = (doc as any).lastAutoTable.finalY + 14;
 
-      // Section: College Breakdown
-      if (y > 220) { doc.addPage(); y = 20; }
+      // ── COLLEGE BREAKDOWN ────────────────────────────────────────────────
+      if (y > 200) { doc.addPage(); y = 20; }
       doc.setFillColor(26, 58, 42);
       doc.rect(14, y, pageW - 28, 7, 'F');
       doc.setTextColor(201, 162, 39);
@@ -300,42 +262,23 @@ export default function ReportsPage() {
         body: Object.entries(stats.colleges)
           .sort((a, b) => b[1] - a[1])
           .map(([n, c]) => [n, c.toString(), `${((c / stats.total) * 100).toFixed(1)}%`]),
-        styles: {
-          fontSize: 9,
-          cellPadding: { top: 4, bottom: 4, left: 6, right: 6 },
-          valign: 'middle',
-        },
-        headStyles: {
-          halign: 'center',
-          valign: 'middle',
-          fontStyle: 'bold',
-          fontSize: 9,
-          fillColor: [26, 58, 42],
-          textColor: [201, 162, 39],
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-        },
+        headStyles: { fillColor: [26, 58, 42], textColor: [201, 162, 39], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: { top: 5, bottom: 5, left: 6, right: 6 } },
+        bodyStyles: { fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 }, valign: 'middle' },
         alternateRowStyles: { fillColor: [240, 247, 242] },
-        columnStyles: {
-          0: { cellWidth: 'auto' },
-          1: { halign: 'center', cellWidth: 22 },
-          2: { halign: 'center', cellWidth: 22 },
-        },
+        columnStyles: { 0: { cellWidth: 'auto' }, 1: { halign: 'center', cellWidth: 22 }, 2: { halign: 'center', cellWidth: 22 } },
         margin: { left: 14, right: 14 },
-        pageBreak: 'avoid',
         rowPageBreak: 'avoid',
       });
 
-      // ── PAGE 2: Full Visit Log ────────────────────────────────────────────
+      // ── PAGE 2: DETAILED ACTIVITY LOG ────────────────────────────────────
       doc.addPage();
+
       doc.setFillColor(26, 58, 42);
       doc.rect(0, 0, pageW, 22, 'F');
       doc.setFillColor(201, 162, 39);
       doc.rect(0, 22, pageW, 2, 'F');
 
-      // Small logo on page 2 header
       if (logoBase64) {
-        doc.setFillColor(26, 58, 42);
-        doc.circle(16, 11, 9, 'F');
         doc.addImage(logoBase64, 'PNG', 7, 2, 18, 18);
       }
 
@@ -344,13 +287,13 @@ export default function ReportsPage() {
       doc.setFont('helvetica', 'bold');
       doc.text('DETAILED ACTIVITY LOG', pageW / 2, 14, { align: 'center' });
 
-      doc.setTextColor(26, 58, 42);
+      doc.setTextColor(80, 80, 80);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${filteredData.length} records  |  ${periodLabel}`, 14, 32);
+      doc.text(`${filteredData.length} records  |  ${periodLabel}`, 14, 30);
 
       autoTable(doc, {
-        startY: 36,
+        startY: 34,
         head: [['Student ID', 'Full Name', 'College', 'Purpose', 'Date', 'Time']],
         body: filteredData.map(v => [
           v.studentId || '—',
@@ -360,20 +303,9 @@ export default function ReportsPage() {
           format(v.timestamp.toDate(), 'MMM dd, yyyy'),
           format(v.timestamp.toDate(), 'hh:mm a'),
         ]),
-        styles: {
-          fontSize: 7.5,
-          cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
-          valign: 'middle',
-        },
-        headStyles: {
-          halign: 'center',
-          valign: 'middle',
-          fontStyle: 'bold',
-          fontSize: 8,
-          fillColor: [26, 58, 42],
-          textColor: [201, 162, 39],
-          cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
-        },
+        headStyles: { fillColor: [26, 58, 42], textColor: [201, 162, 39], fontStyle: 'bold', fontSize: 8, halign: 'center', cellPadding: { top: 4, bottom: 4, left: 4, right: 4 } },
+        bodyStyles: { fontSize: 7.5, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, valign: 'middle' },
+        alternateRowStyles: { fillColor: [240, 247, 242] },
         columnStyles: {
           0: { cellWidth: 30, fontStyle: 'bold', halign: 'center' },
           1: { cellWidth: 38 },
@@ -382,9 +314,7 @@ export default function ReportsPage() {
           4: { cellWidth: 18, halign: 'center' },
           5: { cellWidth: 12, halign: 'center' },
         },
-        alternateRowStyles: { fillColor: [240, 247, 242] },
-        margin: { left: 14, right: 14, top: 4 },
-        pageBreak: 'avoid',
+        margin: { left: 14, right: 14 },
         rowPageBreak: 'avoid',
         showHead: 'everyPage',
       });
