@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -28,7 +27,6 @@ export default function VisitorLogs() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [purposeFilter, setPurposeFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -83,7 +81,6 @@ export default function VisitorLogs() {
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
     return allVisits.filter(v => {
-      const visitType = v.visitorType || 'Student';
       const name = (v.fullName || '').toLowerCase();
       const id = (v.studentId || '').toLowerCase();
       const term = searchTerm.toLowerCase();
@@ -91,10 +88,9 @@ export default function VisitorLogs() {
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
       const visitDate = v.timestamp?.toDate ? v.timestamp.toDate() : new Date();
       const matchesDate = !dateFilter || isSameDay(visitDate, new Date(dateFilter));
-      let matchesType = typeFilter === 'all' ? true : (typeFilter === 'Student' ? visitType === 'Student' : true);
-      return matchesSearch && matchesPurpose && matchesType && matchesDate;
+      return matchesSearch && matchesPurpose && matchesDate;
     });
-  }, [allVisits, searchTerm, purposeFilter, typeFilter, dateFilter]);
+  }, [allVisits, searchTerm, purposeFilter, dateFilter]);
 
   // Clean up states on navigation
   useEffect(() => {
@@ -108,7 +104,7 @@ export default function VisitorLogs() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, purposeFilter, typeFilter, dateFilter]);
+  }, [searchTerm, purposeFilter, dateFilter]);
 
   const totalPages = Math.ceil(filteredVisits.length / itemsPerPage);
   const paginatedVisits = filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -216,7 +212,7 @@ export default function VisitorLogs() {
         </div>
 
         <Card className="p-6 rounded-2xl border border-[#d4e4d8] bg-white ring-1 ring-[#1a3a2a]/5 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
               <Input 
@@ -225,18 +221,6 @@ export default function VisitorLogs() {
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Role Filter</Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="Student">Students</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Purpose</Label>

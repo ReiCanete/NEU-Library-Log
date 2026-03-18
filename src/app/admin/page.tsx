@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -37,7 +36,6 @@ export default function AdminDashboard() {
   // Filters
   const [filterPurpose, setFilterPurpose] = useState('all');
   const [filterCollege, setFilterCollege] = useState('all');
-  const [filterType, setFilterType] = useState('all');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -79,10 +77,8 @@ export default function AdminDashboard() {
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
     return allVisits.filter(visit => {
-      const visitType = visit.visitorType || 'Student';
       const purposeMatch = filterPurpose === 'all' || visit.purpose === filterPurpose;
       const collegeMatch = filterCollege === 'all' || visit.college === filterCollege;
-      let typeMatch = filterType === 'all' || (visitType || 'Student') === filterType;
       
       const visitDate = visit.timestamp?.toDate ? visit.timestamp.toDate() : new Date();
       const dateMatch = isWithinInterval(visitDate, { 
@@ -90,9 +86,9 @@ export default function AdminDashboard() {
         end: endOfDay(new Date(endDate)) 
       });
 
-      return purposeMatch && collegeMatch && typeMatch && dateMatch;
+      return purposeMatch && collegeMatch && dateMatch;
     });
-  }, [allVisits, filterPurpose, filterCollege, filterType, startDate, endDate]);
+  }, [allVisits, filterPurpose, filterCollege, startDate, endDate]);
 
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
@@ -176,7 +172,6 @@ export default function AdminDashboard() {
   const resetFilters = () => {
     setFilterPurpose('all');
     setFilterCollege('all');
-    setFilterType('all');
     setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     setEndDate(format(new Date(), 'yyyy-MM-dd'));
   };
@@ -202,7 +197,7 @@ export default function AdminDashboard() {
 
         {/* Global Filters Row */}
         <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm ring-1 ring-[#1a3a2a]/5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Purpose Filter</Label>
               <select
@@ -223,17 +218,6 @@ export default function AdminDashboard() {
               >
                 <option value="all">All Colleges</option>
                 {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Visitor Type</Label>
-              <select
-                value={filterType}
-                onChange={e => setFilterType(e.target.value)}
-                className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227]/60 transition-all"
-              >
-                <option value="all">All Types</option>
-                <option value="Student">Student</option>
               </select>
             </div>
           </div>
