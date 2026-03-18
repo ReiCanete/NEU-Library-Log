@@ -222,10 +222,40 @@ function KioskEntryContent() {
   const [blockedData, setBlockedData] = useState<{reason?: string} | null>(null);
   const [checkingRedirect, setCheckingRedirect] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [idleWarning, setIdleWarning] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'kiosk') return;
+    let warningTimer: NodeJS.Timeout;
+    let resetTimer: NodeJS.Timeout;
+
+    const resetIdle = () => {
+      setIdleWarning(false);
+      clearTimeout(warningTimer);
+      clearTimeout(resetTimer);
+      // Show warning at 50 seconds
+      warningTimer = setTimeout(() => setIdleWarning(true), 50000);
+      // Hard reset at 60 seconds
+      resetTimer = setTimeout(() => {
+        sessionStorage.clear();
+        window.location.reload();
+      }, 60000);
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, resetIdle));
+    resetIdle();
+
+    return () => {
+      clearTimeout(warningTimer);
+      clearTimeout(resetTimer);
+      events.forEach(e => window.removeEventListener(e, resetIdle));
+    };
+  }, [mode]);
 
   const todayDate = useMemo(() => startOfDay(new Date()), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
@@ -528,6 +558,24 @@ function KioskEntryContent() {
           )}
         </div>
       </div>
+
+      {idleWarning && mode === 'kiosk' && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white/5 backdrop-blur-xl border border-[#c9a227]/30 rounded-3xl p-10 text-center max-w-sm mx-4 shadow-2xl ring-1 ring-[#c9a227]/20">
+            <div className="w-16 h-16 rounded-full bg-[#c9a227]/10 border border-[#c9a227]/30 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">⏱</span>
+            </div>
+            <h2 className="text-xl font-black text-white uppercase tracking-tight mb-2">Still there?</h2>
+            <p className="text-white/50 text-sm font-bold mb-6">Kiosk will reset in a few seconds due to inactivity.</p>
+            <button
+              onClick={() => setIdleWarning(false)}
+              className="w-full h-12 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black rounded-2xl hover:opacity-90 transition-all shadow-lg"
+            >
+              I'm still here
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
