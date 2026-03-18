@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function AnnouncementsPage() {
   const { toast } = useToast();
@@ -208,11 +208,11 @@ export default function AnnouncementsPage() {
               </Button>
             )}
             <AlertDialog>
-              <DialogTrigger asChild>
+              <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50">
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              </DialogTrigger>
+              </AlertDialogTrigger>
               <AlertDialogContent className="rounded-2xl p-6">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
