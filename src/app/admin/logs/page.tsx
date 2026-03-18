@@ -489,7 +489,7 @@ export default function VisitorLogs() {
             <div style={{ padding: '20px' }}>
               {/* Avatar + name */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justify-content: 'center', flexShrink: 0 }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
                     {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
                   </span>
