@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Loader2, BookOpen, ChevronLeft, ChevronRight, RefreshCw, X } from 'luci
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore } from '@/firebase';
-import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs, where, updateDoc, doc } from 'firebase/firestore';
 import { isSameDay, format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +38,12 @@ export default function VisitorLogs() {
   const [blockReason, setBlockReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
 
-  // Switching from useCollection to manual one-time fetch to prevent navigation blocking
+  // Edit states
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<any>(null);
+  const [editPurpose, setEditPurpose] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
   const [allVisits, setAllVisits] = useState<any[]>([]);
   const [blocklist, setBlocklist] = useState<any[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
@@ -95,6 +99,8 @@ export default function VisitorLogs() {
   useEffect(() => {
     setBlockModalOpen(false);
     setBlockTarget(null);
+    setEditModalOpen(false);
+    setEditTarget(null);
     setSidePanelOpen(false);
     setSelectedVisit(null);
   }, [pathname]);
@@ -168,6 +174,21 @@ export default function VisitorLogs() {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
       setIsBlocking(false);
+    }
+  };
+
+  const handleEditVisit = async () => {
+    if (!editTarget || !editPurpose || !db) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'visits', editTarget.id), { purpose: editPurpose });
+      setAllVisits(prev => prev.map(v => v.id === editTarget.id ? { ...v, purpose: editPurpose } : v));
+      toast({ title: "Log Updated", description: "Visit purpose has been updated." });
+      setEditModalOpen(false);
+    } catch (e: any) {
+      toast({ title: "Update Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -290,22 +311,37 @@ export default function VisitorLogs() {
                   </TableCell>
                   <TableCell className="text-[10px] uppercase font-black text-[#4a6741]">{v.purpose}</TableCell>
                   <TableCell className="px-6 text-right">
-                    {isBlocked(v.studentId) ? (
-                      <Badge variant="destructive" className="font-black uppercase text-[9px] px-3 py-1 rounded-full">Blocked</Badge>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-black text-[9px] uppercase tracking-widest"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setBlockTarget(v);
-                          setBlockModalOpen(true);
+                          setEditTarget(v);
+                          setEditPurpose(v.purpose || '');
+                          setEditModalOpen(true);
                         }}
                       >
-                        Block
+                        Edit
                       </Button>
-                    )}
+                      {isBlocked(v.studentId) ? (
+                        <Badge variant="destructive" className="font-black uppercase text-[9px] px-3 py-1 rounded-full">Blocked</Badge>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBlockTarget(v);
+                            setBlockModalOpen(true);
+                          }}
+                        >
+                          Block
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -392,6 +428,32 @@ export default function VisitorLogs() {
               onClick={handleBlockUser}
             >
               {isBlocking ? <Loader2 className="animate-spin h-4 w-4" /> : "Restrict Access"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="rounded-2xl p-10 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Edit Visit Log</DialogTitle>
+            <DialogDescription>Update purpose for <span className="font-black text-[#1a3a2a]">{editTarget?.fullName}</span></DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Visit Purpose</Label>
+            <Select value={editPurpose} onValueChange={setEditPurpose}>
+              <SelectTrigger className="h-11 rounded-xl border-[#d4e4d8]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {['Reading Books','Research / Study','Computer / Internet','Group Discussion','Thesis / Archival','Other Purpose'].map(p => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setEditModalOpen(false)}>Cancel</Button>
+            <Button className="h-12 rounded-xl font-black bg-[#1a3a2a] text-white" disabled={isSaving || !editPurpose} onClick={handleEditVisit}>
+              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

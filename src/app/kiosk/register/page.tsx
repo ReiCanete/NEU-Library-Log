@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock } from 'lucide-react';
 import { logAppError } from '@/lib/errorMessages';
@@ -31,34 +31,7 @@ const COLLEGES = [
   { name: "School of International Relations", programs: ["BA Foreign Service"] }
 ];
 
-const FACULTY_DEPARTMENTS = [
-  'College of Accountancy',
-  'College of Agriculture', 
-  'College of Arts and Sciences',
-  'College of Business Administration',
-  'College of Communication',
-  'College of Informatics and Computing Studies',
-  'College of Criminology',
-  'College of Education',
-  'College of Engineering and Architecture',
-  'College of Medical Technology',
-  'College of Midwifery',
-  'College of Music',
-  'College of Nursing',
-  'College of Physical Therapy',
-  'College of Respiratory Therapy',
-  'School of International Relations',
-  'Office of the President',
-  'Office of the Registrar',
-  'Finance Department',
-  'Human Resources',
-  'IT Department',
-  'Library Department',
-  'Security Office',
-  'Maintenance Department',
-];
-
-const VISITOR_TYPES = ['Student', 'Faculty', 'Administrative Staff', 'Library Staff', 'Guest'];
+const VISITOR_TYPES = ['Student'];
 
 function RegisterForm() {
   const router = useRouter();
@@ -72,7 +45,7 @@ function RegisterForm() {
   const nameFromUrl = searchParams.get('name') || '';
   const isGoogleSignIn = method === 'google';
   
-  const [visitorType, setVisitorType] = useState(searchParams.get('type') || 'Student');
+  const [visitorType] = useState('Student');
   const [firstName, setFirstName] = useState('');
   const [middleInitial, setMiddleInitial] = useState('');
   const [lastName, setLastName] = useState('');
@@ -112,11 +85,6 @@ function RegisterForm() {
 
   const filteredOptions = useMemo(() => {
     const term = search.toLowerCase();
-    if (visitorType === 'Faculty' || visitorType === 'Administrative Staff' || visitorType === 'Library Staff') {
-      return FACULTY_DEPARTMENTS
-        .filter(d => d.toLowerCase().includes(term))
-        .map(d => ({ type: 'item', label: d, college: d }));
-    }
     const results: any[] = [];
     COLLEGES.forEach(college => {
       const matchedPrograms = college.programs.filter(p => 
@@ -130,7 +98,7 @@ function RegisterForm() {
       }
     });
     return results;
-  }, [search, visitorType]);
+  }, [search]);
 
   const handleSubmit = async () => {
     if (!db || submitting) return;
@@ -144,47 +112,67 @@ function RegisterForm() {
     if (!nameRegex.test(firstName.trim())) { setFormError('First name contains invalid characters.'); return; }
     if (!nameRegex.test(lastName.trim())) { setFormError('Last name contains invalid characters.'); return; }
 
-    if (visitorType !== 'Guest' && !studentId.trim()) {
-      setFormError(`Please enter your ${visitorType === 'Student' ? 'Student' : 'Employee'} ID.`);
+    if (!studentId.trim()) {
+      setFormError(`Please enter your Student ID.`);
       return;
     }
 
-    if (visitorType !== 'Guest' && !selectedCollege) {
-      setFormError(`Please select your ${visitorType === 'Student' ? 'College' : 'Department'}.`);
+    if (!selectedCollege) {
+      setFormError(`Please select your College.`);
       return;
     }
 
     setSubmitting(true);
     try {
-      const guestId = `GUEST-${Date.now()}`;
-      const finalStudentId = visitorType === 'Guest' ? guestId : studentId.trim();
+      const finalStudentId = studentId.trim();
+
+      // CHANGE 4: Fix Admin Google overwriting role
+      if (isGoogleSignIn) {
+        const emailSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+        if (!emailSnap.empty && emailSnap.docs[0].data().role === 'admin') {
+          const adminDoc = emailSnap.docs[0].data();
+          sessionStorage.setItem('kiosk_visitor', JSON.stringify({
+            studentId: adminDoc.studentId || email,
+            fullName: adminDoc.fullName || fullName,
+            college: adminDoc.college || '',
+            program: adminDoc.program || '',
+            email: email,
+            loginMethod: 'google',
+            role: 'admin'
+          }));
+          window.location.href = '/kiosk/role-select';
+          return;
+        }
+      }
+
+      const docRef = doc(db, 'users', finalStudentId);
+      const existingSnap = await getDoc(docRef);
+      const existingData = existingSnap.exists() ? existingSnap.data() : null;
+      const safeRole = existingData?.role === 'admin' ? 'admin' : 'visitor';
       
       const userData = {
         studentId: finalStudentId,
         fullName: fullName,
         displayName: fullName,
         college: selectedCollege,
-        program: visitorType === 'Student' ? (selectedProgram || 'N/A') : '',
-        visitorType,
+        program: selectedProgram || 'N/A',
+        visitorType: 'Student',
         email: email || '',
-        role: 'visitor',
+        role: safeRole,
         updatedAt: Timestamp.now()
       };
 
       // Save to Firestore users collection
-      if (visitorType !== 'Guest') {
-        const docRef = doc(db, 'users', finalStudentId);
-        await setDoc(docRef, { ...userData, createdAt: Timestamp.now() }, { merge: true });
-      }
+      await setDoc(docRef, { ...userData, createdAt: Timestamp.now() }, { merge: true });
 
       // Save to session storage for the immediate flow
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({ 
         ...userData, 
-        loginMethod: isGoogleSignIn ? 'google' : (method === 'email' ? 'email' : 'id') 
+        loginMethod: isGoogleSignIn ? 'google' : 'id' 
       }));
 
-      // Navigate based on type
-      router.push(visitorType === 'Guest' ? '/kiosk/welcome' : '/kiosk/purpose');
+      // Navigate
+      router.push('/kiosk/purpose');
     } catch (err) {
       logAppError('Registration', 'SaveUser', err);
       setFormError("Registration failed. Please try again.");
@@ -233,51 +221,23 @@ function RegisterForm() {
             )}
 
             <div className="space-y-4">
-              {/* Visitor Type Selector */}
-              <div className="space-y-2">
-                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">Visitor Type</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {VISITOR_TYPES.map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => {
-                        setVisitorType(type);
-                        setSelectedCollege('');
-                        setSelectedProgram('');
-                        setFormError(null);
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                        visitorType === type
-                          ? 'bg-[#c9a227] text-[#0a2a1a]'
-                          : 'bg-black/40 text-white/50 border border-[#c9a227]/20 hover:border-[#c9a227]/60'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+              {/* Dynamic ID Field */}
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
+                  Student ID
+                </Label>
+                <div className="relative">
+                  <Input 
+                    placeholder="XX-XXXXX-XXX" 
+                    className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : ''}`} 
+                    value={studentId} 
+                    onChange={(e) => !idFromUrl && setStudentId(e.target.value)} 
+                    readOnly={!!idFromUrl} 
+                    required 
+                  />
+                  {idFromUrl && <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#c9a227]/50" />}
                 </div>
               </div>
-
-              {/* Dynamic ID Field */}
-              {visitorType !== 'Guest' && (
-                <div className="space-y-1">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
-                    {visitorType === 'Student' ? 'Student ID' : 'Employee ID'}
-                  </Label>
-                  <div className="relative">
-                    <Input 
-                      placeholder={visitorType === 'Student' ? "XX-XXXXX-XXX" : "EMP-XXX"} 
-                      className={`h-12 text-base font-mono bg-black/40 border-[#c9a227]/20 text-white rounded-xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : ''}`} 
-                      value={studentId} 
-                      onChange={(e) => !idFromUrl && setStudentId(e.target.value)} 
-                      readOnly={!!idFromUrl} 
-                      required 
-                    />
-                    {idFromUrl && <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#c9a227]/50" />}
-                  </div>
-                </div>
-              )}
 
               {/* Name Fields */}
               <div className="space-y-2">
@@ -323,60 +283,58 @@ function RegisterForm() {
               </div>
 
               {/* Dynamic Department/College Field */}
-              {visitorType !== 'Guest' && (
-                <div className="space-y-1 relative">
-                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
-                    {visitorType === 'Student' ? 'College / Program' : 'Department / Office'}
-                  </Label>
-                  <div className="h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-                    <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
-                      {selectedProgram || selectedCollege || "Select..."}
-                    </span>
-                    <ChevronDown className={`h-4 w-4 shrink-0 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                  </div>
-                  {isDropdownOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-                      <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl overflow-hidden" style={{ background: '#071a0f', border: '1px solid #c9a227', boxShadow: '0 25px 50px rgba(0,0,0,0.9)', maxHeight: '240px', overflowY: 'auto', top: '100%' }}>
-                        <div className="sticky top-0 p-2" style={{ background: '#071a0f', borderBottom: '1px solid rgba(201,162,39,0.2)' }}>
-                          <input 
-                            autoFocus 
-                            style={{ background: '#0a2a1a', border: '1px solid rgba(201,162,39,0.3)', color: 'white', padding: '10px 14px', width: '100%', outline: 'none', fontSize: '14px', borderRadius: '8px' }} 
-                            placeholder="Search..." 
-                            value={search} 
-                            onChange={(e) => setSearch(e.target.value)} 
-                            onClick={(e) => e.stopPropagation()} 
-                          />
-                        </div>
-                        <div className="py-2">
-                          {filteredOptions.map((opt: any, i: number) => (
-                            <div key={i}>
-                              {opt.type === 'header' ? (
-                                <div style={{ padding: '8px 16px 4px', color: '#c9a227', fontSize: '11px', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{opt.label}</div>
-                              ) : (
-                                <div 
-                                  style={{ padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '13px' }} 
-                                  className="hover:bg-[#c9a227]/20 transition-colors flex items-center justify-between font-bold" 
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    setSelectedCollege(opt.college); 
-                                    if (visitorType === 'Student') setSelectedProgram(opt.label); 
-                                    setIsDropdownOpen(false); 
-                                    setSearch(''); 
-                                  }}
-                                >
-                                  <span className="truncate">{opt.label}</span>
-                                  {(selectedProgram === opt.label || (visitorType !== 'Student' && selectedCollege === opt.label)) && <Check className="h-4 w-4 text-[#c9a227]" />}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
+              <div className="space-y-1 relative">
+                <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227] ml-1">
+                  College / Program
+                </Label>
+                <div className="h-12 flex items-center justify-between px-4 bg-black/40 border border-[#c9a227]/20 text-white rounded-xl cursor-pointer hover:border-[#c9a227] transition-all" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+                  <span className={`font-bold text-xs truncate ${selectedProgram || selectedCollege ? 'text-white' : 'text-white/20'}`}>
+                    {selectedProgram || selectedCollege || "Select..."}
+                  </span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-[#c9a227] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </div>
-              )}
+                {isDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                    <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl overflow-hidden" style={{ background: '#071a0f', border: '1px solid #c9a227', boxShadow: '0 25px 50px rgba(0,0,0,0.9)', maxHeight: '240px', overflowY: 'auto', top: '100%' }}>
+                      <div className="sticky top-0 p-2" style={{ background: '#071a0f', borderBottom: '1px solid rgba(201,162,39,0.2)' }}>
+                        <input 
+                          autoFocus 
+                          style={{ background: '#0a2a1a', border: '1px solid rgba(201,162,39,0.3)', color: 'white', padding: '10px 14px', width: '100%', outline: 'none', fontSize: '14px', borderRadius: '8px' }} 
+                          placeholder="Search..." 
+                          value={search} 
+                          onChange={(e) => setSearch(e.target.value)} 
+                          onClick={(e) => e.stopPropagation()} 
+                        />
+                      </div>
+                      <div className="py-2">
+                        {filteredOptions.map((opt: any, i: number) => (
+                          <div key={i}>
+                            {opt.type === 'header' ? (
+                              <div style={{ padding: '8px 16px 4px', color: '#c9a227', fontSize: '11px', fontWeight: '800', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{opt.label}</div>
+                            ) : (
+                              <div 
+                                style={{ padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '13px' }} 
+                                className="hover:bg-[#c9a227]/20 transition-colors flex items-center justify-between font-bold" 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setSelectedCollege(opt.college); 
+                                  setSelectedProgram(opt.label); 
+                                  setIsDropdownOpen(false); 
+                                  setSearch(''); 
+                                }}
+                              >
+                                <span className="truncate">{opt.label}</span>
+                                {selectedProgram === opt.label && <Check className="h-4 w-4 text-[#c9a227]" />}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             <Button 
