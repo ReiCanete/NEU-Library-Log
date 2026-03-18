@@ -143,7 +143,7 @@ export default function WelcomePage() {
         </div>
       </div>
       
-      <div className="fixed bottom-0 left-0 w-full h-3 bg-black/40">
+      <div className="fixed bottom-0 left-0 w-full h-3 bg-black/40 z-40">
         <div className="h-full bg-gradient-to-r from-[#c9a227] to-[#a07d1a] transition-all duration-100 ease-linear shadow-[0_0_20px_rgba(201,162,39,0.6)]" style={{ width: `${(countdown/8)*100}%` }} />
       </div>
     </div>

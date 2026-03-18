@@ -37,7 +37,7 @@ export default function RoleSelectPage() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#1a5c2e33_0%,_transparent_60%)] pointer-events-none z-0" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_#c9a22711_0%,_transparent_50%)] pointer-events-none z-0" />
       <AnnouncementToast />
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 pb-12 relative z-10">
         <img src="/neu-library-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-4 shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
         <h1 className="text-4xl font-black text-[#c9a227] text-center drop-shadow-lg uppercase tracking-tight leading-none">NEU LIBRARY</h1>
         <p className="text-[10px] font-black tracking-[0.3em] text-white/30 uppercase mt-1 mb-10">Digital Visitor Log</p>

@@ -474,7 +474,7 @@ function KioskEntryContent() {
         <button suppressHydrationWarning onClick={() => setMode('staff')} className={`px-4 py-1.5 rounded-full text-[11px] transition-all duration-200 ${mode === 'staff' ? 'bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black shadow-md' : 'text-white/50 hover:text-white/80 font-medium'}`}>Staff</button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 pb-12 relative z-10">
         <div className="absolute w-40 h-40 rounded-full bg-[#c9a227]/5 blur-3xl -z-10" />
         <img src="/neu-library-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-3 shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
         <h1 className="text-4xl font-black text-[#c9a227] text-center drop-shadow-lg uppercase tracking-tight leading-none">NEU LIBRARY</h1>

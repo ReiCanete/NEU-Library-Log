@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { usePathname } from 'next/navigation';
 
 export default function VisitorLogs() {
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const db = useFirestore();
   const auth = useAuth();
   const pathname = usePathname();
@@ -77,6 +77,16 @@ export default function VisitorLogs() {
       fetchData();
     }
   }, [db]);
+
+  useEffect(() => {
+    if (!blockModalOpen) return;
+    const dismissToast = () => {
+      const toastEl = document.querySelector('[data-radix-toast-viewport] li');
+      if (toastEl) (toastEl as HTMLElement).click();
+    };
+    document.addEventListener('click', dismissToast, { once: true, capture: true });
+    return () => document.removeEventListener('click', dismissToast, true);
+  }, [blockModalOpen]);
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -161,7 +171,10 @@ export default function VisitorLogs() {
         blockedBy: auth?.currentUser?.email || 'Admin',
         blockedAt: Timestamp.now()
       });
-      toast({ title: "Visitor Restricted", description: `${blockTarget.fullName} has been added to the blocklist.` });
+      const { id } = toast({ title: "Visitor Restricted", description: `${blockTarget.fullName} has been added to the blocklist.`, duration: 999999 });
+      const dismissOnClick = () => dismiss(id);
+      document.addEventListener('click', dismissOnClick, { once: true });
+      
       setBlockModalOpen(false);
       setBlockReason('');
       setBlockTarget(null);
@@ -311,7 +324,9 @@ export default function VisitorLogs() {
                         Edit
                       </Button>
                       {isBlocked(v.studentId) ? (
-                        <Badge variant="destructive" className="font-black uppercase text-[9px] px-3 py-1 rounded-full">Blocked</Badge>
+                        <Badge className="font-black uppercase text-[9px] px-3 py-1 rounded-full bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none">
+                          Blocked
+                        </Badge>
                       ) : (
                         <Button 
                           variant="ghost" 
@@ -474,7 +489,7 @@ export default function VisitorLogs() {
             <div style={{ padding: '20px' }}>
               {/* Avatar + name */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justify-content: 'center', flexShrink: 0 }}>
                   <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
                     {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
                   </span>
@@ -544,18 +559,24 @@ export default function VisitorLogs() {
               </div>
 
               {/* Block button */}
-              <button
-                onClick={() => {
-                  closePanel();
-                  setTimeout(() => {
-                    setBlockTarget(selectedVisit);
-                    setBlockModalOpen(true);
-                  }, 300);
-                }}
-                style={{ width: '100%', padding: '11px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '12px', fontWeight: '500', cursor: 'pointer', fontSize: '13px' }}
-              >
-                Block This Visitor
-              </button>
+              {isBlocked(selectedVisit.studentId) ? (
+                <div style={{ width: '100%', padding: '11px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '13px', textAlign: 'center', cursor: 'not-allowed', userSelect: 'none' }}>
+                  Already Restricted
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    closePanel();
+                    setTimeout(() => {
+                      setBlockTarget(selectedVisit);
+                      setBlockModalOpen(true);
+                    }, 300);
+                  }}
+                  style={{ width: '100%', padding: '11px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '12px', fontWeight: '500', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  Block This Visitor
+                </button>
+              )}
             </div>
           </>
         )}

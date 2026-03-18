@@ -118,13 +118,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <div className="flex h-screen bg-[#f0f4f1] w-full font-body overflow-hidden">
         <Sidebar className="border-r border-[#c9a227]/20 bg-[#0a2a1a] text-white">
-          <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-4">
+          <SidebarHeader className="p-6 border-b border-[#c9a227]/10 flex flex-col items-center gap-3 bg-gradient-to-b from-[#071a0f] to-[#0a2a1a]">
             <img 
-              src="/neu-logo.png" 
+              src="/neu-library-logo.png" 
               alt="NEU Logo" 
               width={56} 
               height={56} 
-              className="rounded-full shadow-lg border-2 border-[#c9a227]/40" 
+              className="rounded-full shadow-lg border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" 
               loading="lazy"
             />
             <div className="text-center w-full">
@@ -143,8 +143,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                       isActive={isActive}
                       className={`h-11 rounded-xl px-4 transition-all ${
                         isActive 
-                          ? 'bg-[#c9a227] text-[#0a2a1a] font-bold shadow-md' 
-                          : 'text-white/60 hover:bg-white/5 hover:text-white'
+                          ? 'bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black shadow-md shadow-[#c9a227]/20' 
+                          : 'text-white/60 hover:bg-white/8 hover:text-white'
                       }`}
                     >
                       <Link href={item.href} className="flex items-center gap-3">

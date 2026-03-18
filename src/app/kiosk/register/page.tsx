@@ -186,7 +186,7 @@ function RegisterForm() {
         </Button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 overflow-y-auto relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 pb-12 overflow-y-auto relative z-10">
         <div className="max-w-[480px] w-full space-y-4">
           <div className="text-center space-y-3">
             <h2 className="text-3xl font-black text-[#c9a227] tracking-tight uppercase leading-none drop-shadow-lg">Profile Setup</h2>

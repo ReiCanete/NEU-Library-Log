@@ -87,7 +87,7 @@ export default function PurposePage() {
         </Button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 pb-12 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
         <div className="max-w-4xl w-full flex flex-col gap-6">
           <div className="space-y-1">
             <h2 className="text-3xl font-black text-[#c9a227] drop-shadow-lg tracking-tight uppercase">Visit Purpose</h2>
