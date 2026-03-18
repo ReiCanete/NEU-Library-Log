@@ -148,6 +148,10 @@ export default function ReportsPage() {
 
       // NEU Logo
       if (logoBase64) {
+        // Draw green filled circle as background behind logo to fix transparency issues
+        doc.setFillColor(26, 58, 42);
+        doc.circle(36, 34, 28, 'F');
+        // Place logo centered over the circle
         doc.addImage(logoBase64, 'PNG', 10, 8, 52, 52);
       }
 
@@ -231,11 +235,14 @@ export default function ReportsPage() {
           1: { halign: 'center' },
         },
         margin: { left: 14, right: 14 },
+        pageBreak: 'avoid',
+        rowPageBreak: 'avoid',
       });
 
       y = (doc as any).lastAutoTable.finalY + 14;
 
       // Section: Purpose Breakdown
+      if (y > 220) { doc.addPage(); y = 20; }
       doc.setFillColor(201, 162, 39);
       doc.rect(14, y, pageW - 28, 7, 'F');
       doc.setTextColor(26, 58, 42);
@@ -271,11 +278,14 @@ export default function ReportsPage() {
           2: { halign: 'center', cellWidth: 22 },
         },
         margin: { left: 14, right: 14 },
+        pageBreak: 'avoid',
+        rowPageBreak: 'avoid',
       });
 
       y = (doc as any).lastAutoTable.finalY + 14;
 
       // Section: College Breakdown
+      if (y > 220) { doc.addPage(); y = 20; }
       doc.setFillColor(26, 58, 42);
       doc.rect(14, y, pageW - 28, 7, 'F');
       doc.setTextColor(201, 162, 39);
@@ -311,6 +321,8 @@ export default function ReportsPage() {
           2: { halign: 'center', cellWidth: 22 },
         },
         margin: { left: 14, right: 14 },
+        pageBreak: 'avoid',
+        rowPageBreak: 'avoid',
       });
 
       // ── PAGE 2: Full Visit Log ────────────────────────────────────────────
@@ -322,7 +334,9 @@ export default function ReportsPage() {
 
       // Small logo on page 2 header
       if (logoBase64) {
-        doc.addImage(logoBase64, 'PNG', 8, 3, 16, 16);
+        doc.setFillColor(26, 58, 42);
+        doc.circle(16, 11, 9, 'F');
+        doc.addImage(logoBase64, 'PNG', 7, 2, 18, 18);
       }
 
       doc.setTextColor(255, 255, 255);
@@ -361,15 +375,18 @@ export default function ReportsPage() {
           cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
         },
         columnStyles: {
-          0: { cellWidth: 28, fontStyle: 'bold', halign: 'center' },
-          1: { cellWidth: 42 },
+          0: { cellWidth: 30, fontStyle: 'bold', halign: 'center' },
+          1: { cellWidth: 38 },
           2: { cellWidth: 50 },
-          3: { cellWidth: 35 },
-          4: { cellWidth: 25, halign: 'center' },
-          5: { cellWidth: 18, halign: 'center' },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 18, halign: 'center' },
+          5: { cellWidth: 12, halign: 'center' },
         },
         alternateRowStyles: { fillColor: [240, 247, 242] },
-        margin: { left: 14, right: 14 },
+        margin: { left: 14, right: 14, top: 4 },
+        pageBreak: 'avoid',
+        rowPageBreak: 'avoid',
+        showHead: 'everyPage',
       });
 
       // ── FOOTER on all pages ───────────────────────────────────────────────
