@@ -649,19 +649,19 @@ export default function VisitorLogs() {
             <div
               style={{
                 position: 'fixed',
-                right: 0,
-                top: '65px',
-                height: 'calc(100vh - 65px)',
+                right: '12px',
+                top: '76px',
+                height: 'calc(100vh - 96px)',
                 width: '380px',
                 background: 'white',
                 zIndex: 50,
-                boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
                 overflowY: 'auto',
-                transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
-                transition: 'transform 0.3s ease',
+                transform: sidePanelOpen ? 'translateX(0)' : 'translateX(calc(100% + 20px))',
+                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 pointerEvents: sidePanelOpen ? 'all' : 'none',
-                borderTopLeftRadius: '16px',
-                borderTop: '1px solid rgba(201,162,39,0.2)',
+                borderRadius: '16px',
+                border: '1px solid rgba(201,162,39,0.2)',
               }}
             >
               {selectedVisit && (
