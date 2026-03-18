@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Megaphone, Plus, Trash2, Edit2, Send, Loader2, AlertCircle, Clock, Cale
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, deleteDoc, doc, Timestamp, updateDoc } from 'firebase/firestore';
 import { format, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function AnnouncementsPage() {
   const { toast } = useToast();
@@ -79,7 +80,6 @@ export default function AnnouncementsPage() {
     }
 
     // Check active limit (max 5)
-    // We only check if we are creating a new one or changing an inactive one to active
     const currentlyActiveCount = active.length;
     if (!editingId && currentlyActiveCount >= 5) {
       setFormError("Maximum of 5 active announcements reached. Please deactivate or delete an existing one.");
@@ -163,11 +163,17 @@ export default function AnnouncementsPage() {
   };
 
   const AnnouncementCard = ({ a, isPast = false }: { a: any, isPast?: boolean }) => (
-    <Card className={`p-6 rounded-2xl border border-[#d4e4d8] shadow-sm transition-all hover:shadow-md ${isPast ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
+    <Card className={isPast 
+      ? "p-6 rounded-2xl border border-[#d4e4d8] shadow-sm transition-all bg-slate-50/80 opacity-60 ring-1 ring-slate-200/50" 
+      : "p-6 rounded-2xl border border-[#d4e4d8] shadow-sm transition-all hover:shadow-md hover:border-[#c9a227]/30 bg-white ring-1 ring-[#1a3a2a]/5"
+    }>
       <div className="flex justify-between items-start gap-4">
         <div className="space-y-3 flex-1">
           <div className="flex items-center gap-2">
-            <Badge className={`${a.priority === 'urgent' ? 'bg-red-600' : 'bg-[#c9a227]'} text-white font-black uppercase text-[10px] px-2.5 py-1 rounded-lg`}>
+            <Badge className={a.priority === 'urgent' 
+              ? "bg-gradient-to-r from-red-600 to-red-700 text-white font-black uppercase text-[10px] px-2.5 py-1 rounded-lg shadow-sm animate-pulse"
+              : "bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-white font-black uppercase text-[10px] px-2.5 py-1 rounded-lg shadow-sm"
+            }>
               {a.priority}
             </Badge>
             {isPast && (
@@ -202,11 +208,11 @@ export default function AnnouncementsPage() {
               </Button>
             )}
             <AlertDialog>
-              <AlertDialogTrigger asChild>
+              <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50">
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              </AlertDialogTrigger>
+              </DialogTrigger>
               <AlertDialogContent className="rounded-2xl p-6">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -228,13 +234,16 @@ export default function AnnouncementsPage() {
     <AdminLayout>
       <div className="space-y-10">
         <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-black text-[#1a3a2a] tracking-tight uppercase">Broadcast Center</h2>
-            <p className="text-xs font-bold text-[#4a6741] uppercase tracking-widest mt-1">Manage institutional alerts</p>
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-10 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+            <div>
+              <h2 className="text-3xl font-black text-[#1a3a2a] tracking-tight uppercase">Broadcast Center</h2>
+              <p className="text-xs font-bold text-[#4a6741] uppercase tracking-widest mt-1">Manage institutional alerts</p>
+            </div>
           </div>
           <Dialog open={showModal} onOpenChange={(open) => { if (!open) resetForm(); setShowModal(open); }}>
             <DialogTrigger asChild>
-              <Button className="h-12 px-6 rounded-xl bg-[#c9a227] text-[#0a2a1a] font-black hover:bg-[#b08d20] shadow-md flex gap-2">
+              <Button className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black hover:opacity-90 shadow-md shadow-[#c9a227]/20 flex gap-2 transition-all">
                 <Plus className="h-5 w-5" /> New Broadcast
               </Button>
             </DialogTrigger>
@@ -328,7 +337,7 @@ export default function AnnouncementsPage() {
               {loading ? (
                 Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)
               ) : active.length === 0 ? (
-                <div className="p-12 border-2 border-dashed border-[#d4e4d8] rounded-[2rem] text-center space-y-3">
+                <div className="p-16 border-2 border-dashed border-[#c8ddd0] rounded-3xl text-center space-y-4 bg-[#f4f8f5]/50">
                   <Megaphone className="h-12 w-12 text-slate-200 mx-auto" />
                   <p className="text-sm font-bold text-slate-400">No active announcements. Click '+ New Broadcast' to create one.</p>
                 </div>

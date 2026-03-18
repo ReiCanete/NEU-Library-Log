@@ -418,15 +418,18 @@ export default function ReportsPage() {
     <AdminLayout>
       <div className="space-y-8">
         <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-4xl font-black text-[#1a3a2a] tracking-tight">System Reporting</h2>
-            <p className="text-xs font-bold text-[#4a6741] uppercase tracking-[0.2em] mt-1">Official Database Archive</p>
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-12 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+            <div>
+              <h2 className="text-4xl font-black text-[#1a3a2a] tracking-tight">System Reporting</h2>
+              <p className="text-xs font-bold text-[#4a6741] uppercase tracking-[0.2em] mt-1">Official Database Archive</p>
+            </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={exportCSV} disabled={filteredData.length === 0 || isExportingCSV} className="h-12 px-6 rounded-xl border-[#d4e4d8] text-[#1a3a2a] font-bold flex gap-2">
+            <Button variant="outline" onClick={exportCSV} disabled={filteredData.length === 0 || isExportingCSV} className="h-11 px-5 rounded-xl border border-[#c8ddd0] bg-white text-[#1a3a2a] font-bold flex gap-2 hover:bg-[#f4f8f5] hover:border-[#1a3a2a]/30 transition-all shadow-sm">
               <Share2 className="h-4 w-4" /> Export CSV
             </Button>
-            <Button onClick={generatePDF} disabled={isGenerating || !stats} className="bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] px-8 h-12 rounded-xl font-black flex gap-2 shadow-lg">
+            <Button onClick={generatePDF} disabled={isGenerating || !stats} className="bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] px-8 h-11 rounded-xl font-black flex gap-2 shadow-lg shadow-[#c9a227]/20 hover:opacity-90 transition-all">
               {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Download className="h-5 w-5" />}
               Generate PDF Report
             </Button>
@@ -435,23 +438,23 @@ export default function ReportsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6">
-            <Card className="rounded-2xl border-[#d4e4d8] shadow-sm bg-white p-6">
+            <Card className="rounded-2xl border border-[#d4e4d8] shadow-sm bg-white p-6 ring-1 ring-[#1a3a2a]/5">
               <h3 className="text-xs font-black text-[#4a6741] uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Calendar className="h-4 w-4" /> Filter Selection
               </h3>
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Start Date</Label>
-                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-12 bg-[#f0f4f1] border-none rounded-xl font-bold" />
+                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-12 bg-[#f4f8f5] border-none rounded-xl font-bold focus:ring-2 focus:ring-[#c9a227]/30" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">End Date</Label>
-                  <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-12 bg-[#f0f4f1] border-none rounded-xl font-bold" />
+                  <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-12 bg-[#f4f8f5] border-none rounded-xl font-bold focus:ring-2 focus:ring-[#c9a227]/30" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Purpose</Label>
                   <select value={filterPurpose} onChange={e => setFilterPurpose(e.target.value)}
-                    className="w-full h-12 bg-[#f0f4f1] border-none rounded-xl px-4 text-xs font-bold text-[#1a3a2a]">
+                    className="w-full h-12 bg-[#f4f8f5] border-none rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:ring-2 focus:ring-[#c9a227]/30">
                     <option value="all">All Purposes</option>
                     {PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
@@ -459,7 +462,7 @@ export default function ReportsPage() {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">College</Label>
                   <select value={filterCollege} onChange={e => setFilterCollege(e.target.value)}
-                    className="w-full h-12 bg-[#f0f4f1] border-none rounded-xl px-4 text-xs font-bold text-[#1a3a2a]">
+                    className="w-full h-12 bg-[#f4f8f5] border-none rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:ring-2 focus:ring-[#c9a227]/30">
                     <option value="all">All Colleges</option>
                     {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -471,7 +474,7 @@ export default function ReportsPage() {
               </div>
             </Card>
 
-            <Card className="rounded-2xl border-[#d4e4d8] bg-[#f0f4f1]/50 p-6">
+            <Card className="rounded-2xl border border-[#d4e4d8] bg-gradient-to-br from-[#f4f8f5] to-white p-6 ring-1 ring-[#1a3a2a]/5">
               <h3 className="text-xs font-black text-[#4a6741] uppercase tracking-widest mb-4">Quick Stats</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -495,8 +498,8 @@ export default function ReportsPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <Card className="rounded-[2rem] border-[#d4e4d8] shadow-2xl bg-white overflow-hidden min-h-[500px]">
-              <div className="bg-[#1a3a2a] p-4 flex items-center gap-3">
+            <Card className="rounded-2xl border border-[#d4e4d8] shadow-sm bg-white overflow-hidden min-h-[500px] ring-1 ring-[#1a3a2a]/5">
+              <div className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a] p-4 flex items-center gap-3">
                 <Eye className="h-4 w-4 text-[#c9a227]" />
                 <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Live Report Preview</span>
               </div>

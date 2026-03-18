@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Loader2, BookOpen, ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore } from '@/firebase';
@@ -90,7 +91,7 @@ export default function VisitorLogs() {
       const matchesPurpose = purposeFilter === 'all' || v.purpose === purposeFilter;
       const visitDate = v.timestamp?.toDate ? v.timestamp.toDate() : new Date();
       const matchesDate = !dateFilter || isSameDay(visitDate, new Date(dateFilter));
-      let matchesType = typeFilter === 'all' ? true : (typeFilter === 'employee' ? ['Faculty', 'Administrative Staff', 'Library Staff'].includes(visitType) : visitType === typeFilter);
+      let matchesType = typeFilter === 'all' ? true : (typeFilter === 'Student' ? visitType === 'Student' : true);
       return matchesSearch && matchesPurpose && matchesType && matchesDate;
     });
   }, [allVisits, searchTerm, purposeFilter, typeFilter, dateFilter]);
@@ -196,22 +197,25 @@ export default function VisitorLogs() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-black text-[#1a3a2a] uppercase tracking-tight">Visitor Logs</h2>
-            <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Institutional Activity Archive</p>
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-10 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+            <div>
+              <h2 className="text-3xl font-black text-[#1a3a2a] uppercase tracking-tight">Visitor Logs</h2>
+              <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Institutional Activity Archive</p>
+            </div>
           </div>
           <Button 
             variant="outline" 
             onClick={() => fetchData(true)} 
             disabled={visitsLoading}
-            className="h-10 px-4 rounded-xl border-[#d4e4d8] text-[#1a3a2a] font-bold flex gap-2"
+            className="h-10 px-5 rounded-xl border border-[#c8ddd0] bg-white text-[#1a3a2a] font-bold flex gap-2 hover:bg-[#f4f8f5] hover:border-[#1a3a2a]/30 transition-all shadow-sm"
           >
             {visitsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh
           </Button>
         </div>
 
-        <Card className="p-6 rounded-2xl border-[#d4e4d8] bg-white border-t-2 border-t-[#c9a227] shadow-sm">
+        <Card className="p-6 rounded-2xl border border-[#d4e4d8] bg-white ring-1 ring-[#1a3a2a]/5 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
@@ -231,9 +235,6 @@ export default function VisitorLogs() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="Student">Students</SelectItem>
-                  <SelectItem value="Faculty">Faculty</SelectItem>
-                  <SelectItem value="employee">All Staff</SelectItem>
-                  <SelectItem value="Guest">Guests</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -265,9 +266,9 @@ export default function VisitorLogs() {
           </div>
         </Card>
 
-        <Card className="rounded-2xl border-[#d4e4d8] overflow-hidden shadow-sm bg-white">
+        <Card className="rounded-2xl border border-[#d4e4d8] overflow-hidden shadow-sm bg-white ring-1 ring-[#1a3a2a]/5">
           <Table>
-            <TableHeader className="bg-[#1a3a2a]">
+            <TableHeader className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a]">
               <TableRow className="hover:bg-transparent border-none">
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest px-6 h-12">ID</TableHead>
                 <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Full Name</TableHead>
@@ -315,7 +316,7 @@ export default function VisitorLogs() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-black text-[9px] uppercase tracking-widest"
+                        className="h-8 text-[#1a3a2a] hover:text-white hover:bg-[#1a3a2a] font-black text-[9px] uppercase tracking-widest border border-[#d4e4d8] rounded-lg px-3 transition-all mr-1"
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditTarget(v);
@@ -331,7 +332,7 @@ export default function VisitorLogs() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest"
+                          className="h-8 text-red-600 hover:text-white hover:bg-red-600 font-black text-[9px] uppercase tracking-widest border border-red-100 rounded-lg px-3 transition-all"
                           onClick={(e) => {
                             e.stopPropagation();
                             setBlockTarget(v);
@@ -479,7 +480,7 @@ export default function VisitorLogs() {
         {selectedVisit && (
           <>
             {/* Header */}
-            <div style={{ background: '#1a3a2a', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+            <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
               <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '16px', margin: 0 }}>Visitor Details</h2>
               <button onClick={closePanel} style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                 <X size={18} />

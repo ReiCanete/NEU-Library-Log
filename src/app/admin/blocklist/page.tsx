@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Search, Trash2, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth } from '@/firebase';
@@ -96,13 +96,16 @@ export default function BlocklistManagement() {
     <AdminLayout>
       <div className="space-y-12">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <h2 className="text-4xl font-black text-[#1a3a2a] tracking-tight">Access Restrictions</h2>
-            <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Managed proactive prohibited list</p>
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-12 rounded-full bg-gradient-to-b from-red-400 to-[#1a3a2a]" />
+            <div>
+              <h2 className="text-4xl font-black text-[#1a3a2a] tracking-tight">Access Restrictions</h2>
+              <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Managed proactive prohibited list</p>
+            </div>
           </div>
           <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
             <DialogTrigger asChild>
-              <Button className="h-14 px-8 rounded-2xl bg-[#9b1c1c] text-white font-black hover:bg-red-900 shadow-xl shadow-red-200 flex gap-3 transition-all">
+              <Button className="h-12 px-6 rounded-xl bg-gradient-to-r from-[#9b1c1c] to-[#7f1d1d] text-white font-black hover:opacity-90 shadow-lg shadow-red-200/50 flex gap-2 transition-all">
                 <ShieldAlert className="h-5 w-5" /> Manually Block ID
               </Button>
             </DialogTrigger>
@@ -135,7 +138,7 @@ export default function BlocklistManagement() {
           </Dialog>
         </div>
 
-        <Card className="rounded-[3rem] shadow-2xl border border-[#d4e4d8] bg-white overflow-hidden">
+        <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] bg-white overflow-hidden ring-1 ring-[#1a3a2a]/5">
           <CardHeader className="p-10 border-b border-[#f0f4f1]">
             <div className="flex flex-col md:flex-row justify-between gap-6 items-end">
               <div className="flex-1 w-full space-y-2">
@@ -155,13 +158,13 @@ export default function BlocklistManagement() {
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-[#f0f4f1]">
+              <TableHeader className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a]">
                 <TableRow className="border-none">
-                  <TableHead className="px-10 h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">ID / Email</TableHead>
-                  <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Full Name</TableHead>
-                  <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Reason</TableHead>
-                  <TableHead className="h-14 font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Date</TableHead>
-                  <TableHead className="px-10 h-14 text-right font-black text-[#4a6741] uppercase tracking-widest text-[9px]">Action</TableHead>
+                  <TableHead className="px-6 h-12 font-black text-[#c9a227]/90 uppercase tracking-widest text-[9px]">ID / Email</TableHead>
+                  <TableHead className="px-6 h-12 font-black text-[#c9a227]/90 uppercase tracking-widest text-[9px]">Full Name</TableHead>
+                  <TableHead className="px-6 h-12 font-black text-[#c9a227]/90 uppercase tracking-widest text-[9px]">Reason</TableHead>
+                  <TableHead className="px-6 h-12 font-black text-[#c9a227]/90 uppercase tracking-widest text-[9px]">Date</TableHead>
+                  <TableHead className="px-6 h-12 text-right font-black text-[#c9a227]/90 uppercase tracking-widest text-[9px]">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -190,7 +193,7 @@ export default function BlocklistManagement() {
                       {format(b.blockedAt.toDate(), 'PPP')}
                     </TableCell>
                     <TableCell className="px-10 text-right">
-                      <Button variant="outline" size="sm" disabled={isProcessing} className="h-10 px-8 rounded-full font-black text-[9px] uppercase border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm" onClick={() => handleUnblockUser(b.id, b.fullName)}>
+                      <Button variant="outline" size="sm" disabled={isProcessing} className="h-9 px-6 rounded-xl font-black text-[9px] uppercase border border-emerald-200 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-transparent transition-all shadow-sm" onClick={() => handleUnblockUser(b.id, b.fullName)}>
                         Restore Access
                       </Button>
                     </TableCell>

@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, Filter, X, Users } from 'lucide-react';
+import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, X, Users } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, getDoc, doc, setDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
       const visitType = visit.visitorType || 'Student';
       const purposeMatch = filterPurpose === 'all' || visit.purpose === filterPurpose;
       const collegeMatch = filterCollege === 'all' || visit.college === filterCollege;
-      let typeMatch = filterType === 'all' || visitType === filterType;
+      let typeMatch = filterType === 'all' || (visitType || 'Student') === filterType;
       
       const visitDate = visit.timestamp?.toDate ? visit.timestamp.toDate() : new Date();
       const dateMatch = isWithinInterval(visitDate, { 
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="space-y-8">
-        <div className="bg-[#1a3a2a] rounded-2xl p-6 flex items-center justify-between shadow-xl border-l-4 border-[#c9a227]">
+        <div className="bg-gradient-to-r from-[#0d2b1a] via-[#1a3a2a] to-[#0d2b1a] rounded-2xl p-6 flex items-center justify-between shadow-xl border border-[#c9a227]/20 ring-1 ring-[#c9a227]/10">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-[#c9a227]/20 rounded-xl flex items-center justify-center"><Sparkles className="w-7 h-7 text-[#c9a227]" /></div>
             <div>
@@ -139,18 +139,20 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-black text-white uppercase tracking-tight">System Dashboard</h2>
             </div>
           </div>
-          <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm transition-all font-black uppercase tracking-widest"><RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync</button>
+          <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm transition-all font-black uppercase tracking-widest border border-white/10 hover:border-white/20">
+            <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync
+          </button>
         </div>
 
         {/* Global Filters Row */}
-        <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm">
+        <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm ring-1 ring-[#1a3a2a]/5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Purpose Filter</Label>
               <select
                 value={filterPurpose}
                 onChange={e => setFilterPurpose(e.target.value)}
-                className="w-full h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+                className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227]/60 transition-all"
               >
                 <option value="all">All Purposes</option>
                 {Object.keys(PURPOSE_COLORS).map(p => <option key={p} value={p}>{p}</option>)}
@@ -161,7 +163,7 @@ export default function AdminDashboard() {
               <select
                 value={filterCollege}
                 onChange={e => setFilterCollege(e.target.value)}
-                className="w-full h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+                className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227]/60 transition-all"
               >
                 <option value="all">All Colleges</option>
                 {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -172,7 +174,7 @@ export default function AdminDashboard() {
               <select
                 value={filterType}
                 onChange={e => setFilterType(e.target.value)}
-                className="w-full h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-1 focus:ring-[#c9a227]"
+                className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227]/60 transition-all"
               >
                 <option value="all">All Types</option>
                 <option value="Student">Student</option>
@@ -185,10 +187,10 @@ export default function AdminDashboard() {
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Date Range</Label>
               <div className="flex items-center gap-3">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                  className="flex-1 h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-[11px] font-bold text-[#1a3a2a]" />
+                  className="flex-1 h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-[11px] font-bold text-[#1a3a2a]" />
                 <span className="text-slate-300">to</span>
                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                  className="flex-1 h-11 bg-[#f8fafc] border border-[#d4e4d8] rounded-xl px-4 text-[11px] font-bold text-[#1a3a2a]" />
+                  className="flex-1 h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-[11px] font-bold text-[#1a3a2a]" />
               </div>
             </div>
             <div className="flex gap-2">
@@ -202,11 +204,11 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: 'Visits (Filtered)', value: filteredVisits.length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-            { label: 'Monthly Volume', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100' }
+            { label: 'Visits (Filtered)', value: filteredVisits.length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50', shadow: 'shadow-emerald-100' },
+            { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50', shadow: 'shadow-amber-100' },
+            { label: 'Monthly Volume', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100', shadow: 'shadow-slate-100' }
           ].map((s, i) => (
-            <Card key={i} className="border border-[#d4e4d8] border-t-2 border-t-[#c9a227] shadow-sm rounded-2xl bg-white p-6">
+            <Card key={i} className={`border border-[#d4e4d8] shadow-sm rounded-2xl bg-white p-6 hover:shadow-md transition-shadow ${s.shadow}`}>
               <div className="flex items-center justify-between">
                 <div><p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</p><h3 className="text-4xl font-black text-[#1a3a2a] mt-2 tabular-nums">{visitsLoading ? <Skeleton className="h-10 w-20" /> : s.value}</h3></div>
                 <div className={`p-4 rounded-xl ${s.bg}`}><s.icon className={`h-6 w-6 ${s.color}`} /></div>
@@ -215,7 +217,7 @@ export default function AdminDashboard() {
           ))}
 
           {/* Daily Capacity Card */}
-          <div className="bg-white rounded-2xl border border-[#d4e4d8] border-t-2 border-t-purple-500 p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-[#d4e4d8] border-t-4 border-t-purple-400 p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">Daily Capacity</p>
@@ -288,12 +290,18 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] border-t-2 border-t-[#c9a227] bg-white p-8">
-            <h3 className="text-lg font-black text-[#1a3a2a] mb-6 uppercase tracking-tight">Visit Activity</h3>
+          <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] bg-white p-8 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+              <h3 className="text-lg font-black text-[#1a3a2a] uppercase tracking-tight">Visit Activity</h3>
+            </div>
             <div className="h-[300px]"><ResponsiveContainer><PieChart><Pie data={chartData} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">{chartData.map((e, i) => <Cell key={i} fill={PURPOSE_COLORS[e.name] || CHART_COLORS[i % CHART_COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></div>
           </Card>
-          <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] border-t-2 border-t-[#c9a227] bg-white p-8">
-            <h3 className="text-lg font-black text-[#1a3a2a] mb-6 uppercase tracking-tight">Top Colleges</h3>
+          <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] bg-white p-8 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+              <h3 className="text-lg font-black text-[#1a3a2a] uppercase tracking-tight">Top Colleges</h3>
+            </div>
             <div className="h-[300px]"><ResponsiveContainer><BarChart data={chartData.slice(0, 5)} layout="vertical"><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fontWeight: 'bold' }} /><Tooltip /><Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24}>{chartData.map((e, i) => <Cell key={i} fill={i === 0 ? '#1a3a2a' : '#c9a227'} />)}</Bar></BarChart></ResponsiveContainer></div>
           </Card>
         </div>
