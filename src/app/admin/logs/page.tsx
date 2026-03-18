@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Loader2, ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, RefreshCw, X, Share2, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore } from '@/firebase';
-import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, Timestamp, limit, getDocs, where, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { isSameDay, format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,26 @@ export default function VisitorLogs() {
   const [visitHistory, setVisitHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Registered Users Tab State
+  const [activeTab, setActiveTab] = useState<'logs' | 'users'>('logs');
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userCollegeFilter, setUserCollegeFilter] = useState('all');
+  const [userProgramFilter, setUserProgramFilter] = useState('all');
+  const [editUserModal, setEditUserModal] = useState(false);
+  const [editUserTarget, setEditUserTarget] = useState<any>(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserCollege, setEditUserCollege] = useState('');
+  const [editUserProgram, setEditUserProgram] = useState('');
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<any>(null);
+  const [deleteUserModal, setDeleteUserModal] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [isExportingUsers, setIsExportingUsers] = useState(false);
+  const [usersCurrentPage, setUsersCurrentPage] = useState(1);
+  const usersPerPage = 10;
+
   const fetchData = async (isRefresh = false) => {
     if (!db) return;
     try {
@@ -79,6 +99,17 @@ export default function VisitorLogs() {
   }, [db]);
 
   useEffect(() => {
+    if (activeTab !== 'users' || !db) return;
+    setUsersLoading(true);
+    getDocs(query(collection(db, 'users'), orderBy('fullName', 'asc')))
+      .then(snap => {
+        setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      })
+      .catch(() => toast({ title: "Failed to load users", variant: "destructive" }))
+      .finally(() => setUsersLoading(false));
+  }, [activeTab, db]);
+
+  useEffect(() => {
     if (!blockModalOpen) return;
     const dismissToast = () => {
       const toastEl = document.querySelector('[data-radix-toast-viewport] li');
@@ -101,6 +132,52 @@ export default function VisitorLogs() {
       return matchesSearch && matchesPurpose && matchesDate;
     });
   }, [allVisits, searchTerm, purposeFilter, dateFilter]);
+
+  const NEU_COLLEGES = [
+    'College of Accountancy','College of Agriculture','College of Arts and Sciences',
+    'College of Business Administration','College of Communication',
+    'College of Informatics and Computing Studies','College of Criminology',
+    'College of Education','College of Engineering and Architecture',
+    'College of Medical Technology','College of Midwifery','College of Music',
+    'College of Nursing','College of Physical Therapy','College of Respiratory Therapy',
+    'School of International Relations'
+  ];
+
+  const filteredUsers = useMemo(() => {
+    const term = userSearch.toLowerCase();
+    return allUsers.filter(u => {
+      const matchSearch =
+        (u.fullName || '').toLowerCase().includes(term) ||
+        (u.studentId || '').toLowerCase().includes(term) ||
+        (u.email || '').toLowerCase().includes(term);
+      const matchCollege = userCollegeFilter === 'all' || u.college === userCollegeFilter;
+      const matchProgram = userProgramFilter === 'all' || u.program === userProgramFilter;
+      return matchSearch && matchCollege && matchProgram;
+    });
+  }, [allUsers, userSearch, userCollegeFilter, userProgramFilter]);
+
+  const availablePrograms = useMemo(() => {
+    if (userCollegeFilter === 'all') return [];
+    return allUsers
+      .filter(u => u.college === userCollegeFilter)
+      .map(u => u.program)
+      .filter((p, i, arr) => p && arr.indexOf(p) === i)
+      .sort();
+  }, [userCollegeFilter, allUsers]);
+
+  const visitCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    allVisits.forEach(v => {
+      if (v.studentId) map[v.studentId] = (map[v.studentId] || 0) + 1;
+    });
+    return map;
+  }, [allVisits]);
+
+  const usersTotalPages = Math.ceil(filteredUsers.length / usersPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    (usersCurrentPage - 1) * usersPerPage,
+    usersCurrentPage * usersPerPage
+  );
 
   // Clean up states on navigation
   useEffect(() => {
@@ -202,6 +279,70 @@ export default function VisitorLogs() {
     }
   };
 
+  const handleEditUser = async () => {
+    if (!editUserTarget || !db) return;
+    setIsSavingUser(true);
+    try {
+      await updateDoc(doc(db, 'users', editUserTarget.id), {
+        fullName: editUserName,
+        displayName: editUserName,
+        college: editUserCollege,
+        program: editUserProgram,
+      });
+      setAllUsers(prev => prev.map(u =>
+        u.id === editUserTarget.id
+          ? { ...u, fullName: editUserName, displayName: editUserName, college: editUserCollege, program: editUserProgram }
+          : u
+      ));
+      toast({ title: "Profile Updated", description: `${editUserName}'s profile has been updated.` });
+      setEditUserModal(false);
+    } catch (e: any) {
+      toast({ title: "Update Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserTarget || !db) return;
+    setIsDeletingUser(true);
+    try {
+      await deleteDoc(doc(db, 'users', deleteUserTarget.id));
+      setAllUsers(prev => prev.filter(u => u.id !== deleteUserTarget.id));
+      toast({ title: "User Removed", description: `${deleteUserTarget.fullName} has been deleted from the registry.` });
+      setDeleteUserModal(false);
+      setDeleteUserTarget(null);
+    } catch (e: any) {
+      toast({ title: "Delete Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
+  const exportUsersCSV = () => {
+    if (filteredUsers.length === 0) return;
+    setIsExportingUsers(true);
+    try {
+      const headers = "Student ID,Full Name,College,Program,Email,Login Method,Total Visits\n";
+      const rows = filteredUsers.map(u =>
+        `${u.studentId},"${u.fullName || ''}","${u.college || ''}","${u.program || ''}","${u.email || ''}","${u.loginMethod || 'id'}",${visitCountMap[u.studentId] || 0}`
+      ).join("\n");
+      const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `NEU-Library-Users-${format(new Date(), 'yyyyMMdd')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast({ title: "CSV Exported", description: `${filteredUsers.length} user records downloaded.` });
+    } catch {
+      toast({ title: "Export Failed", variant: "destructive" });
+    } finally {
+      setIsExportingUsers(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -224,361 +365,547 @@ export default function VisitorLogs() {
           </Button>
         </div>
 
-        <Card className="p-6 rounded-2xl border border-[#d4e4d8] bg-white ring-1 ring-[#1a3a2a]/5 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
-              <Input 
-                placeholder="Search name/ID..." 
-                className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Purpose</Label>
-              <Select value={purposeFilter} onValueChange={setPurposeFilter}>
-                <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Purposes</SelectItem>
-                  <SelectItem value="Reading Books">Reading Books</SelectItem>
-                  <SelectItem value="Research / Study">Research / Study</SelectItem>
-                  <SelectItem value="Computer / Internet">Computer / Internet</SelectItem>
-                  <SelectItem value="Group Discussion">Group Discussion</SelectItem>
-                  <SelectItem value="Thesis / Archival">Thesis / Archival</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Visit Date</Label>
-              <Input 
-                type="date" 
-                className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
-                value={dateFilter} 
-                onChange={(e) => setDateFilter(e.target.value)} 
-              />
-            </div>
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1 bg-[#f0f4f1] rounded-2xl p-1 w-fit border border-[#d4e4d8]">
+            {(['logs', 'users'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                  activeTab === tab
+                    ? 'bg-white text-[#1a3a2a] shadow-sm border border-[#d4e4d8]'
+                    : 'text-[#4a6741] hover:text-[#1a3a2a]'
+                }`}
+              >
+                {tab === 'logs' ? 'Activity Log' : `Registered Users${allUsers.length ? ` (${allUsers.length})` : ''}`}
+              </button>
+            ))}
           </div>
-        </Card>
+          {activeTab === 'users' && (
+            <Button
+              variant="outline"
+              onClick={exportUsersCSV}
+              disabled={filteredUsers.length === 0 || isExportingUsers}
+              className="h-9 px-4 rounded-xl border-[#c8ddd0] bg-white text-[#1a3a2a] font-bold flex gap-2 hover:bg-[#f4f8f5] text-xs shadow-sm"
+            >
+              {isExportingUsers ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+              Export CSV
+            </Button>
+          )}
+        </div>
 
-        <Card className="rounded-2xl border border-[#d4e4d8] overflow-hidden shadow-sm bg-white ring-1 ring-[#1a3a2a]/5">
-          <Table>
-            <TableHeader className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a]">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest px-6 h-12">ID</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Full Name</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">College</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Role</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Purpose</TableHead>
-                <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12 text-right px-6">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visitsLoading ? (
-                Array.from({ length: 10 }).map((_, i) => (
-                  <TableRow key={i}><TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
-                ))
-              ) : paginatedVisits.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
-                </TableRow>
-              ) : paginatedVisits.map(v => (
-                <TableRow 
-                  key={v.id} 
-                  onClick={() => handleRowClick(v)}
-                  className={`cursor-pointer transition-colors border-b-[#f0f4f1] ${
-                    selectedVisit?.id === v.id && sidePanelOpen
-                      ? 'bg-[#f0f7f2] border-l-2 border-l-[#c9a227]'
-                      : 'hover:bg-[#f0f4f1]/40'
-                  }`}
-                >
-                  <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
-                  <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
-                  <TableCell className="text-xs font-bold text-slate-600">{v.college || '—'}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`font-black uppercase text-[9px] tracking-widest border-none ${
-                      v.visitorType === 'Student' ? 'bg-blue-50 text-blue-700' :
-                      v.visitorType === 'Faculty' ? 'bg-purple-50 text-purple-700' :
-                      v.visitorType === 'Guest' ? 'bg-slate-50 text-slate-700' :
-                      'bg-green-50 text-green-700'
-                    }`}>
-                      {v.visitorType || 'Student'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[10px] uppercase font-black text-[#4a6741]">{v.purpose}</TableCell>
-                  <TableCell className="px-6 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-[#1a3a2a] hover:text-white hover:bg-[#1a3a2a] font-black text-[9px] uppercase tracking-widest border border-[#d4e4d8] rounded-lg px-3 transition-all mr-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditTarget(v);
-                          setEditPurpose(v.purpose || '');
-                          setEditModalOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      {isBlocked(v.studentId) ? (
-                        <Badge className="font-black uppercase text-[9px] px-3 py-1 rounded-full bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none">
-                          Blocked
+        {activeTab === 'logs' && (
+          <>
+            <Card className="p-6 rounded-2xl border border-[#d4e4d8] bg-white ring-1 ring-[#1a3a2a]/5 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
+                  <Input 
+                    placeholder="Search name/ID..." 
+                    className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Purpose</Label>
+                  <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+                    <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Purposes</SelectItem>
+                      <SelectItem value="Reading Books">Reading Books</SelectItem>
+                      <SelectItem value="Research / Study">Research / Study</SelectItem>
+                      <SelectItem value="Computer / Internet">Computer / Internet</SelectItem>
+                      <SelectItem value="Group Discussion">Group Discussion</SelectItem>
+                      <SelectItem value="Thesis / Archival">Thesis / Archival</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Visit Date</Label>
+                  <Input 
+                    type="date" 
+                    className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" 
+                    value={dateFilter} 
+                    onChange={(e) => setDateFilter(e.target.value)} 
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="rounded-2xl border border-[#d4e4d8] overflow-hidden shadow-sm bg-white ring-1 ring-[#1a3a2a]/5">
+              <Table>
+                <TableHeader className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a]">
+                  <TableRow className="hover:bg-transparent border-none">
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-widest px-6 h-12">ID</TableHead>
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Full Name</TableHead>
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">College</TableHead>
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Role</TableHead>
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12">Purpose</TableHead>
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-12 text-right px-6">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visitsLoading ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <TableRow key={i}><TableCell colSpan={6} className="px-6 py-4"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
+                    ))
+                  ) : paginatedVisits.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No records matching filters found.</TableCell>
+                    </TableRow>
+                  ) : paginatedVisits.map(v => (
+                    <TableRow 
+                      key={v.id} 
+                      onClick={() => handleRowClick(v)}
+                      className={`cursor-pointer transition-colors border-b-[#f0f4f1] ${
+                        selectedVisit?.id === v.id && sidePanelOpen
+                          ? 'bg-[#f0f7f2] border-l-2 border-l-[#c9a227]'
+                          : 'hover:bg-[#f0f4f1]/40'
+                      }`}
+                    >
+                      <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{v.studentId}</TableCell>
+                      <TableCell className="font-black text-[#1a3a2a] text-sm">{v.fullName}</TableCell>
+                      <TableCell className="text-xs font-bold text-slate-600">{v.college || '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`font-black uppercase text-[9px] tracking-widest border-none ${
+                          v.visitorType === 'Student' ? 'bg-blue-50 text-blue-700' :
+                          v.visitorType === 'Faculty' ? 'bg-purple-50 text-purple-700' :
+                          v.visitorType === 'Guest' ? 'bg-slate-50 text-slate-700' :
+                          'bg-green-50 text-green-700'
+                        }`}>
+                          {v.visitorType || 'Student'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-[10px] uppercase font-black text-[#4a6741]">{v.purpose}</TableCell>
+                      <TableCell className="px-6 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-[#1a3a2a] hover:text-white hover:bg-[#1a3a2a] font-black text-[9px] uppercase tracking-widest border border-[#d4e4d8] rounded-lg px-3 transition-all mr-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditTarget(v);
+                              setEditPurpose(v.purpose || '');
+                              setEditModalOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          {isBlocked(v.studentId) ? (
+                            <Badge className="font-black uppercase text-[9px] px-3 py-1 rounded-full bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed select-none">
+                              Blocked
+                            </Badge>
+                          ) : (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 text-red-600 hover:text-white hover:bg-red-600 font-black text-[9px] uppercase tracking-widest border border-red-100 rounded-lg px-3 transition-all"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBlockTarget(v);
+                                setBlockModalOpen(true);
+                              }}
+                            >
+                              Block
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {!visitsLoading && totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-[#f0f4f1]">
+                  <div className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredVisits.length)} of {filteredVisits.length} logs
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg border-[#d4e4d8]"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                          return (
+                            <Button
+                              key={page}
+                              variant={currentPage === page ? 'default' : 'outline'}
+                              size="sm"
+                              className={`h-8 w-8 rounded-lg text-[10px] font-black ${
+                                currentPage === page ? 'bg-[#1a3a2a] text-white' : 'border-[#d4e4d8] text-[#1a3a2a]'
+                              }`}
+                              onClick={() => setCurrentPage(page)}
+                            >
+                              {page}
+                            </Button>
+                          );
+                        }
+                        if (page === currentPage - 2 || page === currentPage + 2) {
+                          return <span key={page} className="text-slate-300 px-1">...</span>;
+                        }
+                        return null;
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg border-[#d4e4d8]"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            <Dialog open={blockModalOpen} onOpenChange={setBlockModalOpen}>
+              <DialogContent className="rounded-2xl p-10 max-w-md">
+                <DialogHeader className="space-y-2">
+                  <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Restrict Visitor</DialogTitle>
+                  <DialogDescription className="text-sm text-[#4a6741] font-bold">Block access for <span className="text-red-600 font-black">{blockTarget?.fullName}</span>?</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Reason for Block</Label>
+                    <Textarea 
+                      placeholder="Details of violation..." 
+                      className="rounded-xl bg-[#f8fafc] min-h-[100px] p-4 font-bold border-[#d4e4d8] text-sm" 
+                      value={blockReason} 
+                      onChange={(e) => setBlockReason(e.target.value)} 
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="gap-3">
+                  <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setBlockModalOpen(false)}>Cancel</Button>
+                  <Button 
+                    className="h-12 rounded-xl font-black bg-red-600 text-white hover:bg-red-700" 
+                    disabled={isBlocking || !blockReason.trim()} 
+                    onClick={handleBlockUser}
+                  >
+                    {isBlocking ? <Loader2 className="animate-spin h-4 w-4" /> : "Restrict Access"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+              <DialogContent className="rounded-2xl p-10 max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Edit Visit Log</DialogTitle>
+                  <DialogDescription>Update purpose for <span className="font-black text-[#1a3a2a]">{editTarget?.fullName}</span></DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-3">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Visit Purpose</Label>
+                  <Select value={editPurpose} onValueChange={setEditPurpose}>
+                    <SelectTrigger className="h-11 rounded-xl border-[#d4e4d8]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['Reading Books','Research / Study','Computer / Internet','Group Discussion','Thesis / Archival','Other Purpose'].map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter className="gap-3">
+                  <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setEditModalOpen(false)}>Cancel</Button>
+                  <Button className="h-12 rounded-xl font-black bg-[#1a3a2a] text-white" disabled={isSaving || !editPurpose} onClick={handleEditVisit}>
+                    {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : "Save Changes"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Side panel - no overlay, just the drawer itself */}
+            <div
+              style={{
+                position: 'fixed',
+                right: 0,
+                top: 0,
+                height: '100%',
+                width: '380px',
+                background: 'white',
+                zIndex: 50,
+                boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+                overflowY: 'auto',
+                transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
+                transition: 'transform 0.3s ease',
+                pointerEvents: sidePanelOpen ? 'all' : 'none',
+              }}
+            >
+              {selectedVisit && (
+                <>
+                  {/* Header */}
+                  <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+                    <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '16px', margin: 0 }}>Visitor Details</h2>
+                    <button onClick={closePanel} style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div style={{ padding: '20px' }}>
+                    {/* Avatar + name */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                      <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
+                          {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 style={{ fontWeight: 'bold', color: '#1a3a2a', fontSize: '18px', margin: 0 }}>{selectedVisit.fullName}</h3>
+                        <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>{selectedVisit.studentId}</p>
+                      </div>
+                    </div>
+
+                    {/* This visit */}
+                    <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+                      <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '8px' }}>This Visit</p>
+                      <p style={{ fontWeight: '600', color: '#1a3a2a', margin: '0 0 4px', fontSize: '14px' }}>{selectedVisit.purpose}</p>
+                      <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                        {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                      <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>
+                        {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+
+                    {/* Profile */}
+                    <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+                      <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '10px' }}>Profile</p>
+                      {[
+                        { label: 'Visitor Type', value: selectedVisit.visitorType || 'Student' },
+                        { label: 'College', value: selectedVisit.college || '—' },
+                        { label: 'Program', value: selectedVisit.program || '—' },
+                        { label: 'Email', value: selectedVisit.email || '—' },
+                        { label: 'Login Method', value: selectedVisit.loginMethod || '—' },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '7px' }}>
+                          <span style={{ fontSize: '13px', color: '#6b7280', flexShrink: 0 }}>{label}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Visit history */}
+                    <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+                      <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '10px' }}>
+                        Visit History
+                      </p>
+                      {historyLoading ? (
+                        <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading...</p>
+                      ) : visitHistory.length === 0 ? (
+                        <p style={{ fontSize: '13px', color: '#9ca3af' }}>No visit history found.</p>
                       ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 text-red-600 hover:text-white hover:bg-red-600 font-black text-[9px] uppercase tracking-widest border border-red-100 rounded-lg px-3 transition-all"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setBlockTarget(v);
-                            setBlockModalOpen(true);
-                          }}
-                        >
-                          Block
-                        </Button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 4px' }}>{visitHistory.length} total visit{visitHistory.length !== 1 ? 's' : ''}</p>
+                          {visitHistory.map((v: any) => (
+                            <div key={v.id} style={{ background: 'white', borderRadius: '8px', padding: '8px 10px', border: v.id === selectedVisit.id ? '1px solid #c9a227' : '1px solid #d4e4d8' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '500', color: '#1a3a2a' }}>{v.purpose}</span>
+                                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                                  {v.timestamp?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              </div>
+                              {v.id === selectedVisit.id && (
+                                <span style={{ fontSize: '11px', color: '#c9a227', fontWeight: '600' }}>Current visit</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
 
-          {!visitsLoading && totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#f0f4f1]">
-              <div className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredVisits.length)} of {filteredVisits.length} logs
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg border-[#d4e4d8]"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => prev - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
-                      return (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? 'default' : 'outline'}
-                          size="sm"
-                          className={`h-8 w-8 rounded-lg text-[10px] font-black ${
-                            currentPage === page ? 'bg-[#1a3a2a] text-white' : 'border-[#d4e4d8] text-[#1a3a2a]'
-                          }`}
-                          onClick={() => setCurrentPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    }
-                    if (page === currentPage - 2 || page === currentPage + 2) {
-                      return <span key={page} className="text-slate-300 px-1">...</span>;
-                    }
-                    return null;
-                  })}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg border-[#d4e4d8]"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <Dialog open={blockModalOpen} onOpenChange={setBlockModalOpen}>
-        <DialogContent className="rounded-2xl p-10 max-w-md">
-          <DialogHeader className="space-y-2">
-            <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Restrict Visitor</DialogTitle>
-            <DialogDescription className="text-sm text-[#4a6741] font-bold">Block access for <span className="text-red-600 font-black">{blockTarget?.fullName}</span>?</DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Reason for Block</Label>
-              <Textarea 
-                placeholder="Details of violation..." 
-                className="rounded-xl bg-[#f8fafc] min-h-[100px] p-4 font-bold border-[#d4e4d8] text-sm" 
-                value={blockReason} 
-                onChange={(e) => setBlockReason(e.target.value)} 
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-3">
-            <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setBlockModalOpen(false)}>Cancel</Button>
-            <Button 
-              className="h-12 rounded-xl font-black bg-red-600 text-white hover:bg-red-700" 
-              disabled={isBlocking || !blockReason.trim()} 
-              onClick={handleBlockUser}
-            >
-              {isBlocking ? <Loader2 className="animate-spin h-4 w-4" /> : "Restrict Access"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="rounded-2xl p-10 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-[#1a3a2a]">Edit Visit Log</DialogTitle>
-            <DialogDescription>Update purpose for <span className="font-black text-[#1a3a2a]">{editTarget?.fullName}</span></DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-3">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Visit Purpose</Label>
-            <Select value={editPurpose} onValueChange={setEditPurpose}>
-              <SelectTrigger className="h-11 rounded-xl border-[#d4e4d8]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {['Reading Books','Research / Study','Computer / Internet','Group Discussion','Thesis / Archival','Other Purpose'].map(p => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter className="gap-3">
-            <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setEditModalOpen(false)}>Cancel</Button>
-            <Button className="h-12 rounded-xl font-black bg-[#1a3a2a] text-white" disabled={isSaving || !editPurpose} onClick={handleEditVisit}>
-              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Side panel - no overlay, just the drawer itself */}
-      <div
-        style={{
-          position: 'fixed',
-          right: 0,
-          top: 0,
-          height: '100%',
-          width: '380px',
-          background: 'white',
-          zIndex: 50,
-          boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-          overflowY: 'auto',
-          transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.3s ease',
-          pointerEvents: sidePanelOpen ? 'all' : 'none',
-        }}
-      >
-        {selectedVisit && (
-          <>
-            {/* Header */}
-            <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
-              <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '16px', margin: 0 }}>Visitor Details</h2>
-              <button onClick={closePanel} style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '20px' }}>
-              {/* Avatar + name */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
-                    {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
-                </div>
-                <div>
-                  <h3 style={{ fontWeight: 'bold', color: '#1a3a2a', fontSize: '18px', margin: 0 }}>{selectedVisit.fullName}</h3>
-                  <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>{selectedVisit.studentId}</p>
-                </div>
-              </div>
-
-              {/* This visit */}
-              <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
-                <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '8px' }}>This Visit</p>
-                <p style={{ fontWeight: '600', color: '#1a3a2a', margin: '0 0 4px', fontSize: '14px' }}>{selectedVisit.purpose}</p>
-                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                  {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-                <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>
-                  {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-
-              {/* Profile */}
-              <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
-                <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '10px' }}>Profile</p>
-                {[
-                  { label: 'Visitor Type', value: selectedVisit.visitorType || 'Student' },
-                  { label: 'College', value: selectedVisit.college || '—' },
-                  { label: 'Program', value: selectedVisit.program || '—' },
-                  { label: 'Email', value: selectedVisit.email || '—' },
-                  { label: 'Login Method', value: selectedVisit.loginMethod || '—' },
-                ].map(({ label, value }) => (
-                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '7px' }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280', flexShrink: 0 }}>{label}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Visit history */}
-              <div style={{ background: '#f0f7f2', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
-                <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '10px' }}>
-                  Visit History
-                </p>
-                {historyLoading ? (
-                  <p style={{ fontSize: '13px', color: '#9ca3af' }}>Loading...</p>
-                ) : visitHistory.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: '#9ca3af' }}>No visit history found.</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 4px' }}>{visitHistory.length} total visit{visitHistory.length !== 1 ? 's' : ''}</p>
-                    {visitHistory.map((v: any) => (
-                      <div key={v.id} style={{ background: 'white', borderRadius: '8px', padding: '8px 10px', border: v.id === selectedVisit.id ? '1px solid #c9a227' : '1px solid #d4e4d8' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '500', color: '#1a3a2a' }}>{v.purpose}</span>
-                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                            {v.timestamp?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                        </div>
-                        {v.id === selectedVisit.id && (
-                          <span style={{ fontSize: '11px', color: '#c9a227', fontWeight: '600' }}>Current visit</span>
-                        )}
+                    {/* Block button */}
+                    {isBlocked(selectedVisit.studentId) ? (
+                      <div style={{ width: '100%', padding: '11px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '13px', textAlign: 'center', cursor: 'not-allowed', userSelect: 'none' }}>
+                        Already Restricted
                       </div>
-                    ))}
+                    ) : (
+                      <button
+                        onClick={() => {
+                          closePanel();
+                          setTimeout(() => {
+                            setBlockTarget(selectedVisit);
+                            setBlockModalOpen(true);
+                          }, 300);
+                        }}
+                        style={{ width: '100%', padding: '11px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '12px', fontWeight: '500', cursor: 'pointer', fontSize: '13px' }}
+                      >
+                        Block This Visitor
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {/* Block button */}
-              {isBlocked(selectedVisit.studentId) ? (
-                <div style={{ width: '100%', padding: '11px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '13px', textAlign: 'center', cursor: 'not-allowed', userSelect: 'none' }}>
-                  Already Restricted
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    closePanel();
-                    setTimeout(() => {
-                      setBlockTarget(selectedVisit);
-                      setBlockModalOpen(true);
-                    }, 300);
-                  }}
-                  style={{ width: '100%', padding: '11px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '12px', fontWeight: '500', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  Block This Visitor
-                </button>
+                </>
               )}
             </div>
           </>
+        )}
+
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            <Card className="p-5 rounded-2xl border border-[#d4e4d8] bg-white ring-1 ring-[#1a3a2a]/5 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Search</Label>
+                  <Input placeholder="Name, ID or email..." className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold" value={userSearch} onChange={e => { setUserSearch(e.target.value); setUsersCurrentPage(1); }} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">College</Label>
+                  <Select value={userCollegeFilter} onValueChange={v => { setUserCollegeFilter(v); setUserProgramFilter('all'); setUsersCurrentPage(1); }}>
+                    <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Colleges</SelectItem>
+                      {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase tracking-widest text-[#4a6741]">Program</Label>
+                  <Select value={userProgramFilter} onValueChange={v => { setUserProgramFilter(v); setUsersCurrentPage(1); }} disabled={userCollegeFilter === 'all'}>
+                    <SelectTrigger className="bg-[#f8fafc] h-10 border-[#d4e4d8] text-xs font-bold"><SelectValue placeholder="All Programs" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Programs</SelectItem>
+                      {availablePrograms.map((p: string) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="rounded-2xl border border-[#d4e4d8] overflow-hidden shadow-sm bg-white ring-1 ring-[#1a3a2a]/5">
+              <Table>
+                <TableHeader className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a]">
+                  <TableRow className="hover:bg-transparent border-none">
+                    <TableHead className="text-[#c9a227]/90 font-black uppercase text-[10px] tracking-widest px-6 h-12">Student ID</TableHead>
+                    <TableHead className="text-[#c9a227]/90 font-black uppercase text-[10px] tracking-widest h-12">Full Name</TableHead>
+                    <TableHead className="text-[#c9a227]/90 font-black uppercase text-[10px] tracking-widest h-12">College</TableHead>
+                    <TableHead className="text-[#c9a227]/90 font-black uppercase text-[10px] tracking-widest h-12">Program</TableHead>
+                    <TableHead className="text-[#c9a227]/90 font-black uppercase text-[10px] tracking-widest h-12 text-center">Visits</TableHead>
+                    <TableHead className="text-[#c9a227]/90 font-black uppercase text-[10px] tracking-widest h-12 text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {usersLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}><TableCell colSpan={6} className="px-6 py-3"><Skeleton className="h-10 w-full rounded-xl" /></TableCell></TableRow>
+                    ))
+                  ) : paginatedUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-40 text-center font-bold text-slate-400">No registered users found.</TableCell>
+                    </TableRow>
+                  ) : paginatedUsers.map(u => (
+                    <TableRow key={u.id} className="hover:bg-[#f0f4f1]/40 border-b border-[#f0f4f1] transition-colors">
+                      <TableCell className="px-6 font-mono text-[11px] font-bold text-slate-500">{u.studentId}</TableCell>
+                      <TableCell className="font-black text-[#1a3a2a] text-sm">{u.fullName}</TableCell>
+                      <TableCell className="text-xs font-bold text-slate-600 max-w-[180px] truncate">{u.college || '—'}</TableCell>
+                      <TableCell className="text-xs font-bold text-slate-500 max-w-[160px] truncate">{u.program || '—'}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-xl text-xs font-black ${
+                          (visitCountMap[u.studentId] || 0) > 0
+                            ? 'bg-[#c9a227]/10 text-[#1a3a2a]'
+                            : 'bg-slate-100 text-slate-400'
+                        }`}>
+                          {visitCountMap[u.studentId] || 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-6 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm"
+                            className="h-8 text-[#1a3a2a] hover:text-white hover:bg-[#1a3a2a] font-black text-[9px] uppercase tracking-widest border border-[#d4e4d8] rounded-lg px-3 transition-all"
+                            onClick={() => { setEditUserTarget(u); setEditUserName(u.fullName || ''); setEditUserCollege(u.college || ''); setEditUserProgram(u.program || ''); setEditUserModal(true); }}
+                          >Edit</Button>
+                          <Button variant="ghost" size="sm"
+                            className="h-8 text-red-500 hover:text-white hover:bg-red-600 font-black text-[9px] uppercase tracking-widest border border-red-100 rounded-lg px-3 transition-all"
+                            onClick={() => { setDeleteUserTarget(u); setDeleteUserModal(true); }}
+                          >Delete</Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {!usersLoading && usersTotalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-[#f0f4f1]">
+                  <span className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">
+                    Showing {((usersCurrentPage-1)*usersPerPage)+1} to {Math.min(usersCurrentPage*usersPerPage, filteredUsers.length)} of {filteredUsers.length} users
+                  </span>
+                  <div className="flex gap-1">
+                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#d4e4d8]" disabled={usersCurrentPage===1} onClick={() => setUsersCurrentPage(p => p-1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#d4e4d8]" disabled={usersCurrentPage===usersTotalPages} onClick={() => setUsersCurrentPage(p => p+1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            <Dialog open={editUserModal} onOpenChange={setEditUserModal}>
+              <DialogContent className="rounded-2xl p-8 max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-black text-[#1a3a2a]">Edit Profile</DialogTitle>
+                  <DialogDescription>Updating record for <span className="font-black text-[#1a3a2a]">{editUserTarget?.studentId}</span></DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Full Name</Label>
+                    <Input value={editUserName} onChange={e => setEditUserName(e.target.value)} className="h-11 rounded-xl border-[#d4e4d8] bg-[#f8fafc] font-bold" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">College</Label>
+                    <Select value={editUserCollege} onValueChange={setEditUserCollege}>
+                      <SelectTrigger className="h-11 rounded-xl border-[#d4e4d8] bg-[#f8fafc] font-bold"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-[#1a3a2a]">Program</Label>
+                    <Input value={editUserProgram} onChange={e => setEditUserProgram(e.target.value)} className="h-11 rounded-xl border-[#d4e4d8] bg-[#f8fafc] font-bold" placeholder="e.g. BS Information Technology" />
+                  </div>
+                </div>
+                <DialogFooter className="gap-3">
+                  <Button variant="outline" className="h-11 rounded-xl font-bold" onClick={() => setEditUserModal(false)}>Cancel</Button>
+                  <Button className="h-11 rounded-xl font-black bg-[#1a3a2a] text-white" disabled={isSavingUser || !editUserName.trim()} onClick={handleEditUser}>
+                    {isSavingUser ? <Loader2 className="animate-spin h-4 w-4" /> : "Save Changes"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={deleteUserModal} onOpenChange={setDeleteUserModal}>
+              <DialogContent className="rounded-2xl p-8 max-w-sm">
+                <DialogHeader className="text-center space-y-3">
+                  <div className="mx-auto bg-red-50 h-14 w-14 rounded-full flex items-center justify-center">
+                    <UserX className="h-6 w-6 text-red-500" />
+                  </div>
+                  <DialogTitle className="text-xl font-black text-[#1a3a2a]">Delete User?</DialogTitle>
+                  <DialogDescription>
+                    This will permanently remove <span className="font-black text-red-600">{deleteUserTarget?.fullName}</span> from the registry.
+                    Their visit history will remain in the logs.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-3 mt-4">
+                  <Button variant="outline" className="h-11 rounded-xl font-bold flex-1" onClick={() => setDeleteUserModal(false)}>Cancel</Button>
+                  <Button className="h-11 rounded-xl font-black bg-red-600 text-white hover:bg-red-700 flex-1" disabled={isDeletingUser} onClick={handleDeleteUser}>
+                    {isDeletingUser ? <Loader2 className="animate-spin h-4 w-4" /> : "Delete"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
     </AdminLayout>
