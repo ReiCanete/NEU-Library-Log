@@ -635,7 +635,7 @@ export default function VisitorLogs() {
               <div
                 style={{
                   position: 'fixed',
-                  top: '64px',
+                  top: '65px',
                   left: 0,
                   right: 0,
                   bottom: 0,
@@ -650,18 +650,18 @@ export default function VisitorLogs() {
               style={{
                 position: 'fixed',
                 right: 0,
-                top: '64px',
-                height: 'calc(100% - 64px)',
+                top: '65px',
+                height: 'calc(100vh - 65px)',
                 width: '380px',
                 background: 'white',
                 zIndex: 50,
-                boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+                boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',
                 overflowY: 'auto',
                 transform: sidePanelOpen ? 'translateX(0)' : 'translateX(100%)',
                 transition: 'transform 0.3s ease',
                 pointerEvents: sidePanelOpen ? 'all' : 'none',
-                borderTop: '1px solid rgba(201,162,39,0.15)',
                 borderTopLeftRadius: '16px',
+                borderTop: '1px solid rgba(201,162,39,0.2)',
               }}
             >
               {selectedVisit && (
