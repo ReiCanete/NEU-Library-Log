@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, X, Users } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, getDoc, doc, setDoc } from 'firebase/firestore';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
+import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { format, startOfDay, subDays, isWithinInterval, endOfDay, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -101,6 +101,62 @@ export default function AdminDashboard() {
       week: filteredVisits.filter(v => (v.timestamp?.toDate?.() || new Date()) >= subDays(new Date(), 7)).length,
       month: filteredVisits.filter(v => isWithinInterval(v.timestamp?.toDate?.() || new Date(), { start: startOfMonth(today), end: endOfMonth(today) })).length
     };
+  }, [filteredVisits]);
+
+  const avgDaily = useMemo(() => {
+    if (!filteredVisits.length) return 0;
+    const days = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1);
+    return Math.round(filteredVisits.length / days);
+  }, [filteredVisits, startDate, endDate]);
+
+  const mostActiveHour = useMemo(() => {
+    if (!filteredVisits.length) return 'N/A';
+    const hours: Record<number, number> = {};
+    filteredVisits.forEach(v => {
+      const h = v.timestamp?.toDate?.()?.getHours?.() ?? -1;
+      if (h >= 0) hours[h] = (hours[h] || 0) + 1;
+    });
+    const peak = Object.entries(hours).sort((a, b) => b[1] - a[1])[0];
+    if (!peak) return 'N/A';
+    const h = parseInt(peak[0]);
+    const label = h === 0 ? '12AM' : h < 12 ? `${h}AM` : h === 12 ? '12PM' : `${h - 12}PM`;
+    return label;
+  }, [filteredVisits]);
+
+  const dailyTrendData = useMemo(() => {
+    if (!filteredVisits.length) return [];
+    const counts: Record<string, number> = {};
+    filteredVisits.forEach(v => {
+      const d = v.timestamp?.toDate?.();
+      if (d) {
+        const key = format(d, 'MMM dd');
+        counts[key] = (counts[key] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+      .slice(-14)
+      .map(([date, count]) => ({ date, count }));
+  }, [filteredVisits]);
+
+  const topPurposes = useMemo(() => {
+    return Object.entries(
+      filteredVisits.reduce((acc: Record<string, number>, v) => {
+        const k = v.purpose || 'Other Purpose';
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {})
+    ).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  }, [filteredVisits]);
+
+  const collegeRankData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredVisits.forEach(v => {
+      if (v.college) counts[v.college] = (counts[v.college] || 0) + 1;
+    });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const max = sorted[0]?.[1] || 1;
+    return sorted.map(([name, count]) => ({ name, count, pct: Math.round((count / filteredVisits.length) * 100), bar: Math.round((count / max) * 100) }));
   }, [filteredVisits]);
 
   const chartData = useMemo(() => {
@@ -202,108 +258,146 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { label: 'Visits (Filtered)', value: filteredVisits.length, icon: Clock, color: 'text-emerald-600', bg: 'bg-emerald-50', shadow: 'shadow-emerald-100' },
-            { label: 'Weekly Traffic', value: stats.week, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50', shadow: 'shadow-amber-100' },
-            { label: 'Monthly Volume', value: stats.month, icon: TrendingUp, color: 'text-[#1a3a2a]', bg: 'bg-slate-100', shadow: 'shadow-slate-100' }
-          ].map((s, i) => (
-            <Card key={i} className={`border border-[#d4e4d8] shadow-sm rounded-2xl bg-white p-6 hover:shadow-md transition-shadow ${s.shadow}`}>
-              <div className="flex items-center justify-between">
-                <div><p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</p><h3 className="text-4xl font-black text-[#1a3a2a] mt-2 tabular-nums">{visitsLoading ? <Skeleton className="h-10 w-20" /> : s.value}</h3></div>
-                <div className={`p-4 rounded-xl ${s.bg}`}><s.icon className={`h-6 w-6 ${s.color}`} /></div>
+        {/* Wide Summary Banner */}
+        <div className="bg-white rounded-2xl border border-[#d4e4d8] shadow-sm ring-1 ring-[#1a3a2a]/5 overflow-hidden">
+          <div className="bg-gradient-to-r from-[#0d2b1a] to-[#1a3a2a] px-6 py-3 flex items-center justify-between">
+            <span className="text-[10px] font-black text-[#c9a227] uppercase tracking-[0.25em]">Period Summary</span>
+            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{startDate} → {endDate}</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-[#f0f4f1]">
+            {[
+              { label: 'Total Visits', value: visitsLoading ? '—' : filteredVisits.length, sub: 'filtered period', color: 'text-[#1a3a2a]' },
+              { label: 'This Week', value: visitsLoading ? '—' : stats.week, sub: 'last 7 days', color: 'text-amber-600' },
+              { label: 'This Month', value: visitsLoading ? '—' : stats.month, sub: 'calendar month', color: 'text-emerald-600' },
+              { label: 'Avg / Day', value: visitsLoading ? '—' : avgDaily, sub: 'daily average', color: 'text-blue-600' },
+              { label: 'Peak Hour', value: visitsLoading ? '—' : mostActiveHour, sub: 'most active', color: 'text-purple-600' },
+            ].map((s, i) => (
+              <div key={i} className="px-6 py-5 flex flex-col gap-1">
+                <p className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest">{s.label}</p>
+                <p className={`text-3xl font-black tabular-nums ${s.color}`}>{s.value}</p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{s.sub}</p>
               </div>
-            </Card>
-          ))}
-
-          {/* Daily Capacity Card */}
-          <div className="bg-white rounded-2xl border border-[#d4e4d8] border-t-4 border-t-purple-400 p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest">Daily Capacity</p>
-                <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-tight">Kiosk Entry limit</p>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600" />
-              </div>
-            </div>
-
-            {editingCapacity ? (
-              <div className="mt-2">
-                <input
-                  type="number"
-                  value={capacityInput}
-                  onChange={e => setCapacityInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSaveCapacity()}
-                  className="w-full h-10 border border-[#d4e4d8] rounded-lg px-3 text-sm font-bold text-[#1a3a2a] focus:outline-none focus:border-[#1a3a2a] mb-2"
-                  min="1"
-                  autoFocus
+            ))}
+          </div>
+          <div className="px-6 py-3 border-t border-[#f0f4f1] flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <span className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest whitespace-nowrap">Daily Capacity</span>
+              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 ${
+                    stats.today / capacity > 0.9 ? 'bg-gradient-to-r from-red-400 to-red-600' :
+                    stats.today / capacity > 0.7 ? 'bg-gradient-to-r from-amber-400 to-amber-600' :
+                    'bg-gradient-to-r from-emerald-400 to-emerald-600'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.round((stats.today / capacity) * 100))}%` }}
                 />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveCapacity}
-                    disabled={savingCapacity}
-                    className="flex-1 h-9 bg-[#1a3a2a] text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#0a2a1a] transition-colors disabled:opacity-50"
-                  >
-                    {savingCapacity ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingCapacity(false);
-                      setCapacityInput(String(capacity));
-                    }}
-                    className="flex-1 h-9 bg-[#f8fafc] border border-[#d4e4d8] text-[#4a6741] text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#f0f4f1] transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
+              </div>
+              <span className="text-[9px] font-black text-[#1a3a2a] tabular-nums whitespace-nowrap">{stats.today} / {capacity}</span>
+            </div>
+            {editingCapacity ? (
+              <div className="flex items-center gap-2">
+                <input type="number" value={capacityInput} onChange={e => setCapacityInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveCapacity()} className="w-20 h-8 border border-[#d4e4d8] rounded-lg px-2 text-sm font-bold text-[#1a3a2a] focus:outline-none" min="1" autoFocus />
+                <button onClick={handleSaveCapacity} disabled={savingCapacity} className="h-8 px-3 bg-[#1a3a2a] text-white text-[9px] font-black uppercase rounded-lg">{savingCapacity ? '...' : 'Save'}</button>
+                <button onClick={() => { setEditingCapacity(false); setCapacityInput(String(capacity)); }} className="h-8 px-3 bg-slate-100 text-slate-600 text-[9px] font-black uppercase rounded-lg">Cancel</button>
               </div>
             ) : (
-              <div className="mt-2">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-4xl font-black text-[#1a3a2a] tabular-nums">{capacity}</p>
-                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tight">
-                      {stats.today} recorded today ({Math.round((stats.today / capacity) * 100)}%)
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setEditingCapacity(true)}
-                    className="text-[9px] font-black uppercase tracking-widest text-[#4a6741] border border-[#d4e4d8] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f1] transition-all"
-                  >
-                    Edit
-                  </button>
-                </div>
-                {/* Usage bar */}
-                <div className="w-full bg-slate-100 rounded-full h-1.5 mt-3">
-                  <div
-                    className={`h-1.5 rounded-full transition-all duration-1000 ${
-                      stats.today / capacity > 0.9 ? 'bg-red-500' :
-                      stats.today / capacity > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(100, Math.round((stats.today / capacity) * 100))}%` }}
-                  />
-                </div>
-              </div>
+              <button onClick={() => setEditingCapacity(true)} className="text-[9px] font-black uppercase tracking-widest text-[#4a6741] border border-[#d4e4d8] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f1] transition-all whitespace-nowrap">Edit Limit</button>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] bg-white p-8 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
-              <h3 className="text-lg font-black text-[#1a3a2a] uppercase tracking-tight">Visit Activity</h3>
+        {/* SECTION A: Top 3 Purpose stat cards + donut chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1 h-5 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+              <h3 className="text-xs font-black text-[#1a3a2a] uppercase tracking-widest">Top Purposes</h3>
             </div>
-            <div className="h-[300px]"><ResponsiveContainer><PieChart><Pie data={chartData} innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">{chartData.map((e, i) => <Cell key={i} fill={PURPOSE_COLORS[e.name] || CHART_COLORS[i % CHART_COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></div>
-          </Card>
-          <Card className="rounded-2xl shadow-sm border border-[#d4e4d8] bg-white p-8 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
-              <h3 className="text-lg font-black text-[#1a3a2a] uppercase tracking-tight">Top Colleges</h3>
+            {topPurposes.map(([name, count], i) => (
+              <div key={name} className="bg-white rounded-2xl border border-[#d4e4d8] p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow ring-1 ring-[#1a3a2a]/5">
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${i === 0 ? 'bg-[#c9a227]/15 text-[#c9a227]' : i === 1 ? 'bg-[#1a3a2a]/10 text-[#1a3a2a]' : 'bg-slate-100 text-slate-500'}`}>
+                    {i + 1}
+                  </div>
+                  <p className="text-sm font-black text-[#1a3a2a]">{name}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-black text-[#1a3a2a] tabular-nums">{count}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">{filteredVisits.length ? Math.round((count / filteredVisits.length) * 100) : 0}%</p>
+                </div>
+              </div>
+            ))}
+            {topPurposes.length === 0 && <p className="text-xs text-slate-400 font-bold text-center py-8">No data in selected range</p>}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm ring-1 ring-[#1a3a2a]/5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+              <h3 className="text-xs font-black text-[#1a3a2a] uppercase tracking-widest">Purpose Distribution</h3>
             </div>
-            <div className="h-[300px]"><ResponsiveContainer><BarChart data={chartData.slice(0, 5)} layout="vertical"><XAxis type="number" hide /><YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fontWeight: 'bold' }} /><Tooltip /><Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={24}>{chartData.map((e, i) => <Cell key={i} fill={i === 0 ? '#1a3a2a' : '#c9a227'} />)}</Bar></BarChart></ResponsiveContainer></div>
-          </Card>
+            <div className="h-[280px]">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={chartData} innerRadius={65} outerRadius={105} paddingAngle={3} dataKey="value" stroke="none">
+                    {chartData.map((e, i) => <Cell key={i} fill={PURPOSE_COLORS[e.name] || CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: any) => [`${v} visits`, '']} />
+                  <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{fontSize:'10px',fontWeight:'bold',color:'#1a3a2a'}}>{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION B: College leaderboard + daily trend line */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm ring-1 ring-[#1a3a2a]/5">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-1 h-5 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+              <h3 className="text-xs font-black text-[#1a3a2a] uppercase tracking-widest">College Leaderboard</h3>
+            </div>
+            <div className="space-y-3">
+              {collegeRankData.map((c, i) => (
+                <div key={c.name} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-slate-400 w-4 tabular-nums">{i + 1}</span>
+                      <span className="text-[11px] font-bold text-[#1a3a2a] truncate max-w-[200px]">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-[#1a3a2a] tabular-nums">{c.count}</span>
+                      <span className="text-[9px] font-bold text-slate-400 w-8 text-right">{c.pct}%</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${c.bar}%`, background: i === 0 ? 'linear-gradient(to right, #c9a227, #a07d1a)' : 'linear-gradient(to right, #1a3a2a, #2d6a4f)' }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {collegeRankData.length === 0 && <p className="text-xs text-slate-400 font-bold text-center py-8">No college data in selected range</p>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-[#d4e4d8] p-6 shadow-sm ring-1 ring-[#1a3a2a]/5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-5 rounded-full bg-gradient-to-b from-[#c9a227] to-[#1a3a2a]" />
+              <h3 className="text-xs font-black text-[#1a3a2a] uppercase tracking-widest">Daily Trend</h3>
+            </div>
+            <div className="h-[260px]">
+              <ResponsiveContainer>
+                <LineChart data={dailyTrendData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f1" />
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fontWeight: 'bold', fill: '#4a6741' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: '#4a6741' }} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #d4e4d8', fontSize: '11px', fontWeight: 'bold' }} formatter={(v: any) => [`${v} visits`, 'Count']} />
+                  <Line type="monotone" dataKey="count" stroke="#c9a227" strokeWidth={2.5} dot={{ fill: '#1a3a2a', r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: '#c9a227' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       </div>
     </AdminLayout>
