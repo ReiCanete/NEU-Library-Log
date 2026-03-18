@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, X, Users } from 'lucide-react';
+import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, X } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, getDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { format, startOfDay, subDays, isWithinInterval, endOfDay, isSameDay, startOfMonth, endOfMonth } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,12 +27,6 @@ export default function AdminDashboard() {
   const db = useFirestore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Capacity Management States
-  const [capacity, setCapacity] = useState(200);
-  const [capacityInput, setCapacityInput] = useState('200');
-  const [editingCapacity, setEditingCapacity] = useState(false);
-  const [savingCapacity, setSavingCapacity] = useState(false);
-
   // Filters
   const [filterPurpose, setFilterPurpose] = useState('all');
   const [filterCollege, setFilterCollege] = useState('all');
@@ -41,38 +35,6 @@ export default function AdminDashboard() {
 
   const visitsQuery = useMemo(() => db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null, [db]);
   const { data: allVisits, loading: visitsLoading } = useCollection(visitsQuery);
-
-  useEffect(() => {
-    // Fetch capacity setting on mount
-    if (db) {
-      getDoc(doc(db, 'settings', 'library')).then(snap => {
-        if (snap.exists()) {
-          const cap = snap.data().dailyCapacity;
-          if (cap) {
-            setCapacity(cap);
-            setCapacityInput(String(cap));
-          }
-        }
-      }).catch(() => {});
-    }
-  }, [db]);
-
-  const handleSaveCapacity = async () => {
-    const val = parseInt(capacityInput);
-    if (isNaN(val) || val < 1 || !db) return;
-    setSavingCapacity(true);
-    try {
-      await setDoc(doc(db, 'settings', 'library'), { dailyCapacity: val }, { merge: true });
-      setCapacity(val);
-      setEditingCapacity(false);
-      toast({ title: "Settings Updated", description: "Daily library capacity has been modified." });
-    } catch (e) {
-      console.error('Failed to save capacity:', e);
-      toast({ title: "Update Failed", description: "Could not save capacity setting.", variant: "destructive" });
-    } finally {
-      setSavingCapacity(false);
-    }
-  };
 
   const filteredVisits = useMemo(() => {
     if (!allVisits) return [];
@@ -262,31 +224,6 @@ export default function AdminDashboard() {
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{s.sub}</p>
               </div>
             ))}
-          </div>
-          <div className="px-6 py-3 border-t border-[#f0f4f1] flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <span className="text-[9px] font-black text-[#4a6741] uppercase tracking-widest whitespace-nowrap">Daily Capacity</span>
-              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ${
-                    stats.today / capacity > 0.9 ? 'bg-gradient-to-r from-red-400 to-red-600' :
-                    stats.today / capacity > 0.7 ? 'bg-gradient-to-r from-amber-400 to-amber-600' :
-                    'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                  }`}
-                  style={{ width: `${Math.min(100, Math.round((stats.today / capacity) * 100))}%` }}
-                />
-              </div>
-              <span className="text-[9px] font-black text-[#1a3a2a] tabular-nums whitespace-nowrap">{stats.today} / {capacity}</span>
-            </div>
-            {editingCapacity ? (
-              <div className="flex items-center gap-2">
-                <input type="number" value={capacityInput} onChange={e => setCapacityInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveCapacity()} className="w-20 h-8 border border-[#d4e4d8] rounded-lg px-2 text-sm font-bold text-[#1a3a2a] focus:outline-none" min="1" autoFocus />
-                <button onClick={handleSaveCapacity} disabled={savingCapacity} className="h-8 px-3 bg-[#1a3a2a] text-white text-[9px] font-black uppercase rounded-lg">{savingCapacity ? '...' : 'Save'}</button>
-                <button onClick={() => { setEditingCapacity(false); setCapacityInput(String(capacity)); }} className="h-8 px-3 bg-slate-100 text-slate-600 text-[9px] font-black uppercase rounded-lg">Cancel</button>
-              </div>
-            ) : (
-              <button onClick={() => setEditingCapacity(true)} className="text-[9px] font-black uppercase tracking-widest text-[#4a6741] border border-[#d4e4d8] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f1] transition-all whitespace-nowrap">Edit Limit</button>
-            )}
           </div>
         </div>
 
