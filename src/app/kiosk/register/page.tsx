@@ -69,14 +69,35 @@ function RegisterForm() {
     if (!nameFromUrl) return;
     const raw = nameFromUrl.trim();
 
-    // Helper: capitalize first letter of each word properly
     const capitalize = (str: string) =>
-      str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+      str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 
-    // Google sometimes returns "firstname.lastname" (dot-separated, lowercase)
-    // or "First Last" (space-separated, proper case)
-    if (raw.includes('.')) {
-      // Dot-separated format: firstname.lastname or firstname.mi.lastname
+    // FORMAT 1: "Lastname, Firstname MI" — comma-separated surname first
+    // e.g. "Cañete, angel rei c" or "Santos, Maria A"
+    if (raw.includes(',')) {
+      const [lastPart, firstPart] = raw.split(',').map(s => s.trim());
+      setLastName(capitalize(lastPart));
+      if (firstPart) {
+        const firstParts = firstPart.trim().split(' ').filter(Boolean);
+        if (firstParts.length >= 2) {
+          // Last word might be middle initial
+          const lastWord = firstParts[firstParts.length - 1];
+          if (lastWord.length <= 2) {
+            setFirstName(capitalize(firstParts.slice(0, -1).join(' ')));
+            setMiddleInitial(lastWord.charAt(0).toUpperCase());
+          } else {
+            setFirstName(capitalize(firstParts.join(' ')));
+          }
+        } else {
+          setFirstName(capitalize(firstPart.trim()));
+        }
+      }
+      return;
+    }
+
+    // FORMAT 2: "angelrei.canete" — dot-separated email prefix, lowercase
+    // e.g. "angelrei.canete" or "angel.rei.canete"
+    if (raw.includes('.') && raw === raw.toLowerCase()) {
       const parts = raw.split('.');
       if (parts.length >= 2) {
         setFirstName(capitalize(parts[0]));
@@ -87,18 +108,29 @@ function RegisterForm() {
       } else {
         setFirstName(capitalize(raw));
       }
-    } else {
-      // Space-separated format
-      const parts = raw.split(' ').filter(Boolean);
-      if (parts.length >= 2) {
-        setFirstName(capitalize(parts[0]));
-        setLastName(capitalize(parts[parts.length - 1]));
-        if (parts.length === 3) {
-          setMiddleInitial(parts[1].charAt(0).toUpperCase());
+      return;
+    }
+
+    // FORMAT 3: "Angel Rei Canete" — space-separated proper case
+    // e.g. "Angel Rei Canete" or "Maria Santos"
+    const parts = raw.split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      setLastName(capitalize(parts[parts.length - 1]));
+      if (parts.length === 3) {
+        const mid = parts[1];
+        if (mid.length <= 2) {
+          setFirstName(capitalize(parts[0]));
+          setMiddleInitial(mid.charAt(0).toUpperCase());
+        } else {
+          setFirstName(capitalize(parts.slice(0, -1).join(' ')));
         }
+      } else if (parts.length === 2) {
+        setFirstName(capitalize(parts[0]));
       } else {
-        setFirstName(capitalize(raw));
+        setFirstName(capitalize(parts.slice(0, -1).join(' ')));
       }
+    } else {
+      setFirstName(capitalize(raw));
     }
   }, [nameFromUrl]);
 
