@@ -8,37 +8,35 @@
 ![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-black?style=flat-square&logo=vercel)
 
 - **Live URL:** [neu-library-log-nine.vercel.app](https://neu-library-log-nine.vercel.app)
-- **GitHub Repository:** [github.com/supra-sauce/NEU-Library-Log](https://github.com/supra-sauce/NEU-Library-Log)
+- **GitHub Repository:** [github.com/ReiCanete/NEU-Library-Log](https://github.com/ReiCanete/NEU-Library-Log)
 
 ---
 
 ## 📖 Overview
 
-The **NEU Library Log** is a professional digital visitor management system designed specifically for the Nueva Era University Library. Its primary purpose is to replace outdated, manual paper-based entry logs with a high-performance digital kiosk. It provides real-time analytics for library staff and a seamless, modern entry experience for students and visitors.
+The **NEU Library Log** is a professional digital visitor management system designed for the Nueva Era University Library. It replaces traditional paper-based logs with a high-performance digital kiosk, providing real-time analytics for library staff and a seamless entry experience for students.
 
 ---
 
 ## ✨ Features
 
-### Kiosk (Visitor-Facing)
-- **School ID Entry:** Optimized for manual typing or physical RFID scanner input.
-- **Institutional Email Sign-in:** Secure verification for `@neu.edu.ph` accounts.
-- **First-time Registration:** One-time profile setup with college and degree program selection.
-- **Visit Purpose selection:** Six distinct activity categories for accurate analytics.
-- **Welcome Display:** Confirmation screen with an 8-second auto-reset timer.
-- **Real-time Broadcasts:** Instant display of administrative announcements and urgent alerts.
-- **Capacity Counter:** Live monitoring of current library occupancy against daily limits.
-- **Access Enforcement:** Automatic blocking of restricted individuals via a managed blocklist.
+### 🖥️ Kiosk (Visitor-Facing)
+- **Smart ID Entry:** Optimized for manual input with automatic dash formatting (`XX-XXXXX-XXX`).
+- **Institutional Authentication:** Secure sign-in via Google restricted to `@neu.edu.ph` domains.
+- **Visitor Registration:** First-time registration with name validation and automatic word capitalization.
+- **Visit Purpose Selection:** Large, touch-friendly cards for selecting library activities.
+- **Welcome Display:** Personalized entry confirmation with an 8-second auto-reset timer.
+- **Broadcast System:** Floating announcement toasts (Gold for notices, pulsing Red for urgent alerts).
+- **Session Protection:** Automatic 3-minute idle timeout to protect visitor privacy.
+- **Admin Role Select:** Staff signing in at the kiosk can choose between logging a visit or entering the portal.
 
-### Admin Panel (Staff-Facing)
-- **Secure Portal:** Private authentication for authorized library staff.
-- **Live Dashboard:** Real-time visualization of daily, weekly, and monthly traffic.
-- **Visual Analytics:** Donut charts for visit purposes and bar charts for college demographics.
-- **Visitor History:** Searchable activity logs with deep filtering by college, program, and date.
-- **Access Restrictions:** Managed blocklist with reason tracking and instant status toggles.
-- **Broadcast Center:** Command center for posting scheduled or urgent kiosk announcements.
-- **System Reports:** Official PDF and CSV export engines with institutional branding.
-- **Threshold Management:** Real-time configuration of the library's daily capacity limit.
+### 🛡️ Admin Panel (Staff-Facing)
+- **Live Dashboard:** Real-time metrics banner, top visit purposes, and visitor trend visualizations.
+- **Visitor Logs:** Searchable activity history with a detailed side panel for visitor profiles and history.
+- **Registry Management:** Full list of registered users with options to edit or remove profiles.
+- **Proactive Security:** Managed blocklist to immediately restrict access to specific IDs.
+- **System Reporting:** Official PDF and CSV export engines featuring institutional NEU branding.
+- **Broadcast Center:** Command center for posting scheduled or urgent library announcements.
 
 ---
 
@@ -49,89 +47,28 @@ The **NEU Library Log** is a professional digital visitor management system desi
 | **Framework** | Next.js 15 (App Router) |
 | **Language** | TypeScript |
 | **Styling** | Tailwind CSS & ShadCN UI |
-| **Database** | Firebase Firestore (Real-time) |
-| **Authentication** | Firebase Auth (Email/Password + Google OAuth) |
+| **Database** | Firebase Firestore (Spark/Free Tier) |
+| **Authentication** | Firebase Auth (Google OAuth @neu.edu.ph) |
 | **Charts** | Recharts |
 | **PDF Export** | jsPDF & autoTable |
 | **Deployment** | Vercel |
 
 ---
 
-## 📂 Project Structure
-
-```text
-src/
-├── app/
-│   ├── page.tsx              # Kiosk entry screen (ID/Email entry)
-│   ├── layout.tsx            # Root layout & providers
-│   ├── kiosk/
-│   │   ├── register/         # One-time visitor registration
-│   │   ├── purpose/          # Visit purpose selection
-│   │   └── welcome/          # Entry confirmation screen
-│   └── admin/
-│       ├── login/            # Staff authentication
-│       ├── page.tsx          # Dashboard & real-time metrics
-│       ├── logs/             # Advanced visitor activity archives
-│       ├── blocklist/        # Proactive access management
-│       ├── announcements/    # Broadcast & alert management
-│       └── reports/          # Official system reporting
-├── firebase/
-│   ├── config.ts             # SDK initialization (Singleton pattern)
-│   ├── provider.tsx          # React Context providers
-│   └── firestore/            # Real-time data hooks
-├── components/               # Isolated UI components (ShadCN)
-└── lib/                      # Validation, utilities, and constants
-```
-
----
-
-## 🗄 Firestore Collections
+## 📂 Firestore Collections
 
 ### `users`
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `studentId` | string | Unique student or visitor ID |
-| `fullName` | string | Full legal name of the visitor |
-| `college` | string | Affiliated college name |
-| `program` | string | Specific degree program |
-| `email` | string | Verified institutional email |
-| `role` | string | 'visitor' (default) or 'admin' |
-| `createdAt` | timestamp | Initial registration date |
+- Stores visitor profiles (Student ID, Full Name, College, Program, Email, Role).
+- Roles are restricted to `visitor` and `admin`.
 
 ### `visits`
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `studentId` | string | Visitor's ID number |
-| `fullName` | string | Visitor's full name |
-| `college` | string | College at time of visit |
-| `program` | string | Program at time of visit |
-| `purpose` | string | Purpose of the visit |
-| `loginMethod` | string | 'id', 'google', or 'email' |
-| `timestamp` | timestamp | Visit entry date and time |
+- Real-time log of every entry (Student ID, Full Name, Purpose, Login Method, Timestamp).
 
 ### `blocklist`
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `studentId` | string | Blocked student's ID number |
-| `fullName` | string | Name for administrative reference |
-| `reason` | string | Context for the access restriction |
-| `blockedBy` | string | Email of the issuing administrator |
-| `blockedAt` | timestamp | Date the restriction was issued |
+- Records of restricted individuals (Student ID, Reason, Admin who blocked, Timestamp).
 
 ### `announcements`
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `message` | string | Text displayed on the kiosk banner |
-| `priority` | string | 'normal' (Gold) or 'urgent' (Pulsing Red) |
-| `isActive` | boolean | Toggle for manual overrides |
-| `startDate` | timestamp | Scheduled start of display |
-| `endDate` | timestamp | Scheduled expiration of message |
-| `createdBy` | string | Email of the administrator |
-
-### `settings`
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `dailyCapacity` | number | Global kiosk entry threshold (Default: 200) |
+- Broadcast messages (Content, Priority, Active Status, Date Range).
 
 ---
 
@@ -139,7 +76,7 @@ src/
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/supra-sauce/NEU-Library-Log.git
+   git clone https://github.com/ReiCanete/NEU-Library-Log.git
    cd NEU-Library-Log
    ```
 
@@ -149,7 +86,7 @@ src/
    ```
 
 3. **Environment Configuration:**
-   Create a `.env.local` file in the root directory and populate it with your Firebase configuration:
+   Create a `.env.local` file in the root directory:
    ```env
    NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
@@ -166,68 +103,30 @@ src/
 
 ---
 
-## 🔐 Firebase Configuration
+## 📸 Screenshots
 
-### Authentication
-- Enable **Google** and **Email/Password** providers in the Firebase Console.
-- Add `neu-library-log-nine.vercel.app` to the **Authorized Domains** list.
+### Kiosk Workflow
+| | |
+|:---:|:---:|
+| ![Kiosk Home](screenshots/kiosk-home.png) <br> *Kiosk Entry* | ![Kiosk Register](screenshots/kiosk-register.png) <br> *Visitor Registration* |
+| ![Kiosk Purpose](screenshots/kiosk-purpose.png) <br> *Purpose Selection* | ![Kiosk Welcome](screenshots/kiosk-welcome.png) <br> *Entry Successful* |
 
-### Firestore Security Rules
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isAdmin() {
-      return request.auth != null;
-    }
-    match /visits/{visitId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
-    }
-    match /users/{userId} {
-      allow read: if true;
-      allow create: if true; 
-      allow update: if isAdmin() || request.auth.uid == userId; 
-    }
-    match /blocklist/{blockId} {
-      allow read: if true; 
-      allow write: if isAdmin();
-    }
-    match /announcements/{announcementId} {
-      allow read: if true; 
-      allow write: if isAdmin();
-    }
-    match /settings/{settingId} {
-      allow read: if true; 
-      allow write: if isAdmin();
-    }
-  }
-}
-```
-
-### Admin Account Creation
-1. Create a user via **Firebase Console > Authentication**.
-2. Manually create a document in the `users` collection in Firestore.
-3. Use the student's email as the Document ID.
-4. Set the `role` field to `"admin"`.
-
----
-
-## 🖥️ Deployment
-
-1. Push your code to a GitHub repository.
-2. Connect the repository to **Vercel**.
-3. Add all `NEXT_PUBLIC_` environment variables to the Vercel project settings.
-4. Deploy. The application is configured for automatic CI/CD on every push to the `main` branch.
+### Administrative Portal
+| | |
+|:---:|:---:|
+| ![Admin Login](screenshots/admin-login-kiosk.png) <br> *Staff Sign-in* | ![Dashboard 1](screenshots/admin-dashboard-1.png) <br> *Live Analytics* |
+| ![Dashboard 2](screenshots/admin-dashboard-2.png) <br> *Purpose Distribution* | ![Dashboard 3](screenshots/admin-dashboard-3.png) <br> *Daily Trends* |
+| ![Visitor Logs](screenshots/admin-logs.png) <br> *Activity Logs* | ![User Registry](screenshots/admin-logs-users.png) <br> *Registered Users* |
+| ![Blocklist](screenshots/admin-blocklist.png) <br> *Access Restrictions* | ![Announcements](screenshots/admin-announcements.png) <br> *Broadcast Center* |
+| ![Reports 1](screenshots/admin-reports-1.png) <br> *Report Generation* | ![Reports 2](screenshots/admin-reports-2.png) <br> *PDF Preview* |
 
 ---
 
 ## ⚠️ Known Limitations
-- **RFID Support:** Requires a standard USB HID keyboard-emulating reader.
-- **OAuth Redirects:** Google Sign-in functionality is optimized for the production URL and may require domain whitelisting for local testing.
-- **Admin Setup:** Admin roles must be assigned manually via the Firestore database for security.
+- **Mobile Compatibility:** The system is optimized for kiosk displays and desktop admin use; responsiveness for mobile devices is not yet fully verified.
+- **Admin Access:** Administrative roles must be manually assigned within the Firestore `users` collection by setting the `role` field to `"admin"`.
 
 ---
 
 ## 🎓 Credits
-Developed for **Nueva Era University Library** as a modern digital entry solution. Built with excellence using Next.js and Firebase.
+Developed for the **Nueva Era University Library** as a modern digital entry solution. Built with excellence using Next.js and Firebase.
