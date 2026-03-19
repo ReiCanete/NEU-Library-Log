@@ -1,13 +1,13 @@
 'use client';
 /**
- * @fileOverview A professional announcement system for the kiosk.
- * - Normal: Scrolling top ticker.
- * - Urgent: Sequential modals with auto-dismiss and visible progress.
+ * @fileOverview A professional floating announcement system for the kiosk.
+ * Displays up to 2 active announcements in the top-right corner.
  */
 
 import { useEffect, useState, memo } from 'react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase/config';
+import { X } from 'lucide-react';
 
 interface Announcement {
   id: string;
@@ -20,128 +20,81 @@ interface Announcement {
 
 function AnnouncementToast() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [sessionDismissed, setSessionDismissed] = useState<string[]>([]);
-  const [activeUrgent, setActiveUrgent] = useState<Announcement | null>(null);
-  const [countdown, setCountdown] = useState(5);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    // Load already dismissed urgent IDs from sessionStorage
-    const stored = sessionStorage.getItem('kiosk_dismissed_urgent');
-    if (stored) setSessionDismissed(JSON.parse(stored));
-
     if (!db) return;
-    const unsubscribe = onSnapshot(
-      query(collection(db, 'announcements'), where('isActive', '==', true)),
-      (snap) => {
-        const now = new Date();
-        const active = snap.docs
-          .map(d => ({ id: d.id, ...d.data() } as Announcement))
-          .filter(a => {
-            const start = a.startDate?.toDate?.() || new Date(0);
-            const end = a.endDate?.toDate?.() || new Date('2099-01-01');
-            return now >= start && now <= end;
-          });
-        setAnnouncements(active);
-      }
-    );
+
+    const q = query(collection(db, 'announcements'), where('isActive', '==', true));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const now = new Date();
+      const active = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Announcement))
+        .filter(a => {
+          const start = a.startDate?.toDate?.() || new Date(0);
+          const end = a.endDate?.toDate?.() || new Date('2099-01-01');
+          return now >= start && now <= end;
+        })
+        .sort((a, b) => {
+          // Urgent priority first
+          if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
+          if (a.priority !== 'urgent' && b.priority === 'urgent') return 1;
+          return 0;
+        });
+      setAnnouncements(active);
+    });
+
     return () => unsubscribe();
   }, []);
 
-  const normal = announcements.filter(a => a.priority === 'normal');
-  const urgent = announcements.filter(a => a.priority === 'urgent' && !sessionDismissed.includes(a.id));
-
-  // Handle sequential urgent modals
-  useEffect(() => {
-    if (urgent.length > 0 && !activeUrgent) {
-      setActiveUrgent(urgent[0]);
-      setCountdown(5);
-    }
-  }, [urgent, activeUrgent]);
-
-  // Modal countdown timer
-  useEffect(() => {
-    if (!activeUrgent) return;
-    
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 0.1) {
-          handleDismiss(activeUrgent.id);
-          return 0;
-        }
-        return prev - 0.1;
-      });
-    }, 100);
-
-    return () => clearInterval(timer);
-  }, [activeUrgent]);
-
   const handleDismiss = (id: string) => {
-    const updated = [...sessionDismissed, id];
-    setSessionDismissed(updated);
-    sessionStorage.setItem('kiosk_dismissed_urgent', JSON.stringify(updated));
-    setActiveUrgent(null);
+    setDismissedIds(prev => [...prev, id]);
   };
 
-  const tickerText = normal.map(a => a.message).join(' · ');
+  const visible = announcements
+    .filter(a => !dismissedIds.includes(a.id))
+    .slice(0, 2);
+
+  if (visible.length === 0) return null;
 
   return (
-    <>
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          display: inline-block;
-          white-space: nowrap;
-          animation: marquee 30s linear infinite;
-        }
-      `}</style>
+    <div
+      style={{ position: 'fixed', top: '56px', right: '16px', zIndex: 48 }}
+      className="flex flex-col gap-2 pointer-events-none"
+    >
+      {visible.map((a) => (
+        <div
+          key={a.id}
+          className={`
+            relative backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl w-[280px] pointer-events-auto
+            animate-in slide-in-from-right fade-in duration-300
+            ${a.priority === 'urgent'
+              ? 'bg-red-900/90 border border-red-500/50 text-white animate-pulse'
+              : 'bg-[#1a3a2a] border border-[#c9a227]/30 text-[#c9a227]'
+            }
+          `}
+        >
+          <button
+            onClick={() => handleDismiss(a.id)}
+            className="absolute top-2.5 right-2.5 opacity-40 hover:opacity-100 transition-opacity"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
 
-      {/* Normal Scrolling Ticker */}
-      {normal.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-8 bg-[#1a3a2a] border-b border-[#c9a227]/30 flex items-center overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 bg-[#1a3a2a] z-10 px-3 flex items-center border-r border-[#c9a227]/20">
-            <span className="text-xs">📢</span>
-          </div>
-          <div className="flex-1 overflow-hidden relative h-full flex items-center">
-            <div className="animate-marquee text-[#c9a227] text-[11px] font-black uppercase tracking-widest pl-4">
-              {tickerText}
+          <div className="flex flex-col gap-1 pr-5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-black uppercase tracking-widest">
+                {a.priority === 'urgent' ? '⚠ URGENT' : '📢 NOTICE'}
+              </span>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Urgent Modal Overlay */}
-      {activeUrgent && (
-        <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-[#071a0f] border border-red-500/40 rounded-[2.5rem] p-10 max-w-md w-full text-center shadow-2xl space-y-8 relative overflow-hidden ring-1 ring-red-500/20">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] animate-pulse shadow-lg shadow-red-600/20">
-              <span>⚠</span> URGENT
-            </div>
-            
-            <h2 className="text-white text-3xl font-black leading-tight tracking-tight drop-shadow-lg">
-              {activeUrgent.message}
-            </h2>
-
-            <button 
-              onClick={() => handleDismiss(activeUrgent.id)}
-              className="w-full h-16 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black rounded-[1.5rem] hover:opacity-90 transition-all shadow-xl shadow-[#c9a227]/20 text-sm uppercase tracking-[0.2em] active:scale-95"
-            >
-              I Understand
-            </button>
-
-            {/* Visual Countdown Bar */}
-            <div className="absolute bottom-0 left-0 h-2 bg-red-600/10 w-full">
-              <div 
-                className="h-full bg-red-600 transition-all duration-100 ease-linear shadow-[0_0_15px_rgba(220,38,38,0.5)]" 
-                style={{ width: `${(countdown / 5) * 100}%` }}
-              />
-            </div>
+            <p className="text-[12px] font-bold line-clamp-2 leading-tight">
+              {a.message}
+            </p>
           </div>
         </div>
-      )}
-    </>
+      ))}
+    </div>
   );
 }
 
