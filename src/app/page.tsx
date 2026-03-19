@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
@@ -54,7 +53,7 @@ const KioskIdForm = memo(({ onSubmit, todayCount, countLoading }: { onSubmit: (i
           Entry Count
         </span>
         {countLoading ? (
-          <span className="w-4 h-4 border border-white/30 border-t-white/80 rounded-full animate-spin inline-block" />
+          <span className="w-3.5 h-3.5 border border-white/30 border-t-white/70 rounded-full animate-spin inline-block" />
         ) : (
           <span className="text-[11px] font-black text-white/80 uppercase tabular-nums bg-white/5 px-2.5 py-0.5 rounded-full">{todayCount} today</span>
         )}

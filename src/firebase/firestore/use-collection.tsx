@@ -6,7 +6,7 @@ import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
 
 export function useCollection<T = DocumentData>(query: Query<T> | null) {
-  const [data, setData] = useState<(T & { id: string })[] | null>(null);
+  const [data, setData] = useState<(T & { id: string })[] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
