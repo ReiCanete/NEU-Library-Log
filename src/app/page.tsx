@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, ShieldX, Mail, CreditCard, Lock, ShieldCheck } from 'lucide-react';
-import { useFirestore, useAuth } from '@/firebase';
+import { useFirestore, useCollection, useAuth } from '@/firebase';
 import { collection, query, where, limit, getDocs, doc, setDoc, orderBy } from 'firebase/firestore';
 import { startOfDay, isSameDay } from 'date-fns';
 import { validateStudentId } from '@/lib/validation';
@@ -11,7 +11,7 @@ import { getErrorMessage, logAppError } from '@/lib/errorMessages';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
-import { signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, Timestamp } from 'firebase/auth';
 
 const KioskIdForm = memo(({ onSubmit, todayCount, countLoading }: { onSubmit: (id: string, type: string) => Promise<void>, todayCount: number, countLoading: boolean }) => {
   const [schoolId, setSchoolId] = useState('');
@@ -148,24 +148,13 @@ function KioskEntryContent() {
     };
   }, [mode, router]);
 
-  const [currentCount, setCurrentCount] = useState(0);
-  const [countLoading, setCountLoading] = useState(true);
-
-  useEffect(() => {
-    if (!db) return;
-    setCountLoading(true);
-    getDocs(query(collection(db, 'visits'), orderBy('timestamp', 'desc')))
-      .then(snap => {
-        const today = new Date();
-        const count = snap.docs.filter(d => {
-          const ts = d.data().timestamp?.toDate?.();
-          return ts && isSameDay(ts, today);
-        }).length;
-        setCurrentCount(count);
-      })
-      .catch(() => setCurrentCount(0))
-      .finally(() => setCountLoading(false));
-  }, [db]);
+  const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), orderBy('timestamp', 'desc')) : null), [db]);
+  const { data: allVisitsData, loading: countLoading } = useCollection(visitsQuery);
+  const currentCount = useMemo(() => {
+    if (!allVisitsData) return 0;
+    const today = startOfDay(new Date());
+    return allVisitsData.filter(v => isSameDay(v.timestamp?.toDate?.() || new Date(), today)).length;
+  }, [allVisitsData]);
 
   const handleIdSubmit = useCallback(async (cleanId: string, visitorType: string) => {
     if (!db) return;
