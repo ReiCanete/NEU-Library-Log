@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, ShieldX, Mail, CreditCard, Lock, ShieldCheck } from 'lucide-react';
 import { useFirestore, useCollection, useAuth } from '@/firebase';
-import { collection, query, where, limit, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { startOfDay } from 'date-fns';
 import { validateStudentId } from '@/lib/validation';
 import { getErrorMessage, logAppError } from '@/lib/errorMessages';
@@ -257,7 +257,7 @@ function KioskEntryContent() {
     };
   }, [mode]);
 
-  const todayDate = useMemo(() => startOfDay(new Date()), []);
+  const todayDate = useMemo(() => Timestamp.fromDate(startOfDay(new Date())), []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
   const { data: todayVisits } = useCollection(visitsQuery);
 
