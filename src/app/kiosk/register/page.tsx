@@ -102,12 +102,11 @@ function RegisterForm() {
     if (!db || submitting) return;
     setFormError(null);
 
-    if (!firstName.trim()) { setFormError('Please enter your first name.'); return; }
-    if (!lastName.trim()) { setFormError('Please enter your last name.'); return; }
-    
-    const nameRegex = /^[a-zA-ZÀ-ÿ\s'\-\.]+$/;
-    if (!nameRegex.test(firstName.trim())) { setFormError('First name contains invalid characters.'); return; }
-    if (!nameRegex.test(lastName.trim())) { setFormError('Last name contains invalid characters.'); return; }
+    const nameRegex = /^[a-zA-Z\s.]+$/;
+    if (firstName.trim().length < 2 || lastName.trim().length < 2 || !nameRegex.test(firstName.trim()) || !nameRegex.test(lastName.trim())) {
+      setFormError("Please enter a valid full name (letters only).");
+      return;
+    }
 
     if (!studentId.trim()) {
       setFormError(`Please enter your Student ID.`);
@@ -171,6 +170,12 @@ function RegisterForm() {
       setFormError("Registration failed. Please try again.");
       setSubmitting(false);
     }
+  };
+
+  const handleNameInput = (val: string) => {
+    return val
+      .replace(/[^a-zA-Z\s.]/g, '')
+      .replace(/\b\w/g, c => c.toUpperCase());
   };
 
   if (loading) return null;
@@ -241,7 +246,7 @@ function RegisterForm() {
                       placeholder="First name" 
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
                       value={firstName} 
-                      onChange={(e) => setFirstName(e.target.value)} 
+                      onChange={(e) => setFirstName(handleNameInput(e.target.value))} 
                     />
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">First</p>
                   </div>
@@ -263,7 +268,7 @@ function RegisterForm() {
                       placeholder="Last name" 
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
                       value={lastName} 
-                      onChange={(e) => setLastName(e.target.value)} 
+                      onChange={(e) => setLastName(handleNameInput(e.target.value))} 
                     />
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">Last</p>
                   </div>

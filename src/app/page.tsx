@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
@@ -131,11 +130,11 @@ function KioskEntryContent() {
       setIdleWarning(false);
       clearTimeout(warningTimer);
       clearTimeout(resetTimer);
-      warningTimer = setTimeout(() => setIdleWarning(true), 50000);
+      warningTimer = setTimeout(() => setIdleWarning(true), 170000);
       resetTimer = setTimeout(() => {
         sessionStorage.clear();
         router.push('/');
-      }, 60000);
+      }, 180000);
     };
 
     const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];

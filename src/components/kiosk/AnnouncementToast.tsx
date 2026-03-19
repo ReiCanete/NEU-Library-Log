@@ -1,7 +1,8 @@
 'use client';
 /**
- * @fileOverview A professional static bottom bar for kiosk announcements.
- * - Displays up to 2 active announcements in a persistent bar.
+ * @fileOverview A professional announcement system for the kiosk.
+ * - Normal: Scrolling top ticker.
+ * - Urgent: Sequential modals with auto-dismiss and visible progress.
  */
 
 import { useEffect, useState, memo } from 'react';
@@ -18,10 +19,16 @@ interface Announcement {
 }
 
 function AnnouncementToast() {
-  const [rawAnnouncements, setRawAnnouncements] = useState<Announcement[]>([]);
-  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [sessionDismissed, setSessionDismissed] = useState<string[]>([]);
+  const [activeUrgent, setActiveUrgent] = useState<Announcement | null>(null);
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
+    // Load already dismissed urgent IDs from sessionStorage
+    const stored = sessionStorage.getItem('kiosk_dismissed_urgent');
+    if (stored) setSessionDismissed(JSON.parse(stored));
+
     if (!db) return;
     const unsubscribe = onSnapshot(
       query(collection(db, 'announcements'), where('isActive', '==', true)),
@@ -34,57 +41,107 @@ function AnnouncementToast() {
             const end = a.endDate?.toDate?.() || new Date('2099-01-01');
             return now >= start && now <= end;
           });
-        setRawAnnouncements(active);
+        setAnnouncements(active);
       }
     );
     return () => unsubscribe();
   }, []);
 
-  const announcements = rawAnnouncements?.filter((a: any) => !dismissed.includes(a.id));
+  const normal = announcements.filter(a => a.priority === 'normal');
+  const urgent = announcements.filter(a => a.priority === 'urgent' && !sessionDismissed.includes(a.id));
 
-  if (!announcements || announcements.length === 0) return null;
+  // Handle sequential urgent modals
+  useEffect(() => {
+    if (urgent.length > 0 && !activeUrgent) {
+      setActiveUrgent(urgent[0]);
+      setCountdown(5);
+    }
+  }, [urgent, activeUrgent]);
 
-  // Show max 2, urgent first
-  const sorted = [...announcements].sort((a, b) => {
-    if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
-    if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
-    return 0;
-  });
-  const visible = sorted.slice(0, 2);
+  // Modal countdown timer
+  useEffect(() => {
+    if (!activeUrgent) return;
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 0.1) {
+          handleDismiss(activeUrgent.id);
+          return 0;
+        }
+        return prev - 0.1;
+      });
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [activeUrgent]);
+
+  const handleDismiss = (id: string) => {
+    const updated = [...sessionDismissed, id];
+    setSessionDismissed(updated);
+    sessionStorage.setItem('kiosk_dismissed_urgent', JSON.stringify(updated));
+    setActiveUrgent(null);
+  };
+
+  const tickerText = normal.map(a => a.message).join(' · ');
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col gap-0 shadow-[0_-4px_20px_rgba(0,0,0,0.25)]">
-      {visible.map((a: any, i: number) => (
-        <div
-          key={a.id}
-          className={`w-full flex items-center justify-between gap-4 px-6 py-3 text-sm font-bold
-            ${a.priority === 'urgent'
-              ? 'bg-red-600 text-white animate-pulse'
-              : 'bg-[#c9a227] text-[#0a2a1a]'
-            }`}
-          style={{ borderTop: i === 0 ? '1px solid rgba(255,255,255,0.15)' : 'none' }}
-        >
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0
-              ${a.priority === 'urgent'
-                ? 'bg-white/20 text-white'
-                : 'bg-[#0a2a1a]/20 text-[#0a2a1a]'
-              }`}>
-              {a.priority === 'urgent' ? '⚠ URGENT' : '📢 NOTICE'}
-            </span>
-            <p className="truncate text-[13px]">{a.message}</p>
+    <>
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          display: inline-block;
+          white-space: nowrap;
+          animation: marquee 30s linear infinite;
+        }
+      `}</style>
+
+      {/* Normal Scrolling Ticker */}
+      {normal.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-8 bg-[#1a3a2a] border-b border-[#c9a227]/30 flex items-center overflow-hidden">
+          <div className="absolute left-0 top-0 bottom-0 bg-[#1a3a2a] z-10 px-3 flex items-center border-r border-[#c9a227]/20">
+            <span className="text-xs">📢</span>
           </div>
-          <button
-            onClick={() => setDismissed(prev => [...prev, a.id])}
-            className={`shrink-0 text-[18px] leading-none font-black opacity-60 hover:opacity-100 transition-opacity
-              ${a.priority === 'urgent' ? 'text-white' : 'text-[#0a2a1a]'}`}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
+          <div className="flex-1 overflow-hidden relative h-full flex items-center">
+            <div className="animate-marquee text-[#c9a227] text-[11px] font-black uppercase tracking-widest pl-4">
+              {tickerText}
+            </div>
+          </div>
         </div>
-      ))}
-    </div>
+      )}
+
+      {/* Urgent Modal Overlay */}
+      {activeUrgent && (
+        <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-[#071a0f] border border-red-500/40 rounded-[2.5rem] p-10 max-w-md w-full text-center shadow-2xl space-y-8 relative overflow-hidden ring-1 ring-red-500/20">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] animate-pulse shadow-lg shadow-red-600/20">
+              <span>⚠</span> URGENT
+            </div>
+            
+            <h2 className="text-white text-3xl font-black leading-tight tracking-tight drop-shadow-lg">
+              {activeUrgent.message}
+            </h2>
+
+            <button 
+              onClick={() => handleDismiss(activeUrgent.id)}
+              className="w-full h-16 bg-gradient-to-r from-[#c9a227] to-[#a07d1a] text-[#0a2a1a] font-black rounded-[1.5rem] hover:opacity-90 transition-all shadow-xl shadow-[#c9a227]/20 text-sm uppercase tracking-[0.2em] active:scale-95"
+            >
+              I Understand
+            </button>
+
+            {/* Visual Countdown Bar */}
+            <div className="absolute bottom-0 left-0 h-2 bg-red-600/10 w-full">
+              <div 
+                className="h-full bg-red-600 transition-all duration-100 ease-linear shadow-[0_0_15px_rgba(220,38,38,0.5)]" 
+                style={{ width: `${(countdown / 5) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
