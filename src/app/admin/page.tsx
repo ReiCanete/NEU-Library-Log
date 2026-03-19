@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, X } from 'lucide-react';
+import { Calendar, TrendingUp, RefreshCcw, Sparkles, Clock, X, Share2 } from 'lucide-react';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -131,6 +131,30 @@ export default function AdminDashboard() {
     setTimeout(() => { setIsRefreshing(false); toast({ title: "Live Sync", description: "Metrics updated." }); }, 800);
   };
 
+  const exportTodayCSV = () => {
+    const today = startOfDay(new Date());
+    const todayVisits = filteredVisits.filter(v => isSameDay(v.timestamp?.toDate?.() || new Date(), today));
+    if (todayVisits.length === 0) {
+      toast({ title: "No visits today", description: "There are no visits logged today." });
+      return;
+    }
+    const headers = "Student ID,Full Name,College,Program,Purpose,Time\n";
+    const rows = todayVisits.map(v => {
+      const t = v.timestamp?.toDate?.();
+      const time = t ? t.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) : '—';
+      return `${v.studentId},"${v.fullName || ''}","${v.college || ''}","${v.program || ''}","${v.purpose || ''}","${time}"`;
+    }).join("\n");
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `NEU-Library-Today-${format(new Date(), 'yyyyMMdd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: "Exported", description: `${todayVisits.length} visits for today downloaded.` });
+  };
+
   const resetFilters = () => {
     setFilterPurpose('all');
     setFilterCollege('all');
@@ -152,9 +176,14 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-black text-white uppercase tracking-tight">System Dashboard</h2>
             </div>
           </div>
-          <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm transition-all font-black uppercase tracking-widest border border-white/10 hover:border-white/20">
-            <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync
-          </button>
+          <div className="flex gap-2">
+            <button onClick={exportTodayCSV} disabled={visitsLoading} className="flex items-center gap-2 bg-[#c9a227]/20 hover:bg-[#c9a227]/30 text-[#c9a227] px-5 py-2.5 rounded-xl text-sm transition-all font-black uppercase tracking-widest border border-[#c9a227]/30 hover:border-[#c9a227]/50">
+              <Share2 className="w-4 h-4" /> Export Today
+            </button>
+            <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm transition-all font-black uppercase tracking-widest border border-white/10 hover:border-white/20">
+              <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Sync
+            </button>
+          </div>
         </div>
 
         {/* Global Filters Row */}

@@ -706,7 +706,7 @@ export default function VisitorLogs() {
               {selectedVisit && (
                 <>
                   {/* Header */}
-                  <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 11 }}>
+                  <div style={{ background: 'linear-gradient(135deg, #0d2b1a 0%, #1a3a2a 100%)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyBetween: 'space-between', position: 'sticky', top: 0, zIndex: 11 }}>
                     <h2 style={{ color: 'white', fontWeight: 'bold', fontSize: '16px', margin: 0 }}>Visitor Details</h2>
                     <button onClick={closePanel} style={{ color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                       <X size={18} />
@@ -716,7 +716,7 @@ export default function VisitorLogs() {
                   <div style={{ padding: '20px' }}>
                     {/* Avatar + name */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                      <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
                         <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
                           {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
                         </span>
@@ -732,10 +732,10 @@ export default function VisitorLogs() {
                       <p style={{ fontSize: '11px', color: '#4a6741', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600', marginBottom: '8px' }}>This Visit</p>
                       <p style={{ fontWeight: '600', color: '#1a3a2a', margin: '0 0 4px', fontSize: '14px' }}>{selectedVisit.purpose}</p>
                       <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                        {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        {selectedVisit.timestamp?.toDate?.()?.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' })}
                       </p>
                       <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0' }}>
-                        {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        {selectedVisit.timestamp?.toDate?.()?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' })}
                       </p>
                     </div>
 
@@ -749,7 +749,7 @@ export default function VisitorLogs() {
                         { label: 'Email', value: selectedVisit.email || '—' },
                         { label: 'Login Method', value: selectedVisit.loginMethod || '—' },
                       ].map(({ label, value }) => (
-                        <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '7px' }}>
+                        <div key={label} style={{ display: 'flex', justifyBetween: 'space-between', gap: '12px', marginBottom: '7px' }}>
                           <span style={{ fontSize: '13px', color: '#6b7280', flexShrink: 0 }}>{label}</span>
                           <span style={{ fontSize: '13px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{value}</span>
                         </div>
@@ -770,10 +770,10 @@ export default function VisitorLogs() {
                           <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 4px' }}>{visitHistory.length} total visit{visitHistory.length !== 1 ? 's' : ''}</p>
                           {visitHistory.map((v: any) => (
                             <div key={v.id} style={{ background: 'white', borderRadius: '8px', padding: '8px 10px', border: v.id === selectedVisit.id ? '1px solid #c9a227' : '1px solid #d4e4d8' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', justifyBetween: 'space-between', itemsCenter: 'center' }}>
                                 <span style={{ fontSize: '12px', fontWeight: '500', color: '#1a3a2a' }}>{v.purpose}</span>
                                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                                  {v.timestamp?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  {v.timestamp?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
                                 </span>
                               </div>
                               {v.id === selectedVisit.id && (
