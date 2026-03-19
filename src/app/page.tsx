@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
 import { signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
-const KioskIdForm = memo(({ onSubmit, todayCount }: { onSubmit: (id: string, type: string) => Promise<void>, todayCount: number }) => {
+const KioskIdForm = memo(({ onSubmit, todayCount, countLoading }: { onSubmit: (id: string, type: string) => Promise<void>, todayCount: number, countLoading: boolean }) => {
   const [schoolId, setSchoolId] = useState('');
   const [visitorType] = useState('Student');
   const [loading, setLoading] = useState(false);
@@ -53,7 +53,11 @@ const KioskIdForm = memo(({ onSubmit, todayCount }: { onSubmit: (id: string, typ
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
           Entry Count
         </span>
-        <span className="text-[11px] font-black text-white/80 uppercase tabular-nums bg-white/5 px-2.5 py-0.5 rounded-full">{todayCount} today</span>
+        {countLoading ? (
+          <span className="w-4 h-4 border border-white/30 border-t-white/80 rounded-full animate-spin inline-block" />
+        ) : (
+          <span className="text-[11px] font-black text-white/80 uppercase tabular-nums bg-white/5 px-2.5 py-0.5 rounded-full">{todayCount} today</span>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="mb-2">
@@ -269,9 +273,9 @@ function KioskEntryContent() {
     return Timestamp.fromDate(startUTC);
   }, []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
-  const { data: todayVisits } = useCollection(visitsQuery);
+  const { data: todayVisits, loading: countLoading } = useCollection(visitsQuery);
 
-  const currentCount = todayVisits?.length || 0;
+  const currentCount = todayVisits?.length ?? 0;
 
   const handleIdSubmit = useCallback(async (cleanId: string, visitorType: string) => {
     if (!db) return;
@@ -530,7 +534,7 @@ function KioskEntryContent() {
           <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl ring-1 ring-[#c9a227]/10">
             {mode === 'kiosk' ? (
               <>
-                <KioskIdForm onSubmit={handleIdSubmit} todayCount={currentCount} />
+                <KioskIdForm onSubmit={handleIdSubmit} todayCount={currentCount} countLoading={countLoading} />
                 <div className="flex items-center gap-3 my-3">
                   <div className="flex-1 h-px bg-white/10" />
                   <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">or</span>
