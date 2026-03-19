@@ -58,43 +58,54 @@ function AnnouncementToast() {
   if (visible.length === 0) return null;
 
   return (
-    <div
-      style={{ position: 'fixed', top: '56px', right: '16px', zIndex: 48 }}
-      className="flex flex-col gap-2 pointer-events-none"
-    >
-      {visible.map((a) => (
-        <div
-          key={a.id}
-          className={`
-            relative backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl w-[280px] pointer-events-auto
-            animate-in slide-in-from-right fade-in duration-300
-            ${a.priority === 'urgent'
-              ? 'bg-red-900/90 border border-red-500/50 text-white animate-pulse'
-              : 'bg-[#1a3a2a] border border-[#c9a227]/30 text-[#c9a227]'
-            }
-          `}
-        >
-          <button
-            onClick={() => handleDismiss(a.id)}
-            className="absolute top-2.5 right-2.5 opacity-40 hover:opacity-100 transition-opacity"
-            aria-label="Dismiss"
+    <>
+      <style>{`
+        @keyframes urgentGlow {
+          0%, 100% { box-shadow: 0 0 8px 2px rgba(239,68,68,0.3), 0 4px 24px rgba(0,0,0,0.4); }
+          50% { box-shadow: 0 0 20px 6px rgba(239,68,68,0.6), 0 4px 24px rgba(0,0,0,0.4); }
+        }
+        .urgent-glow {
+          animation: urgentGlow 2.5s ease-in-out infinite;
+        }
+      `}</style>
+      <div
+        style={{ position: 'fixed', top: '56px', right: '16px', zIndex: 48 }}
+        className="flex flex-col gap-2 pointer-events-none"
+      >
+        {visible.map((a) => (
+          <div
+            key={a.id}
+            className={`
+              relative backdrop-blur-md rounded-2xl px-4 py-3 shadow-2xl w-[280px] pointer-events-auto
+              animate-in slide-in-from-right fade-in duration-300
+              ${a.priority === 'urgent'
+                ? 'bg-red-900/90 border border-red-500/50 text-white urgent-glow'
+                : 'bg-[#1a3a2a] border border-[#c9a227]/30 text-[#c9a227]'
+              }
+            `}
           >
-            <X className="h-3.5 w-3.5" />
-          </button>
+            <button
+              onClick={() => handleDismiss(a.id)}
+              className="absolute top-2.5 right-2.5 opacity-40 hover:opacity-100 transition-opacity"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
 
-          <div className="flex flex-col gap-1 pr-5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-black uppercase tracking-widest">
-                {a.priority === 'urgent' ? '⚠ URGENT' : '📢 NOTICE'}
-              </span>
+            <div className="flex flex-col gap-1 pr-5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-black uppercase tracking-widest">
+                  {a.priority === 'urgent' ? '⚠ URGENT' : '📢 NOTICE'}
+                </span>
+              </div>
+              <p className="text-[12px] font-bold line-clamp-2 leading-tight">
+                {a.message}
+              </p>
             </div>
-            <p className="text-[12px] font-bold line-clamp-2 leading-tight">
-              {a.message}
-            </p>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 
