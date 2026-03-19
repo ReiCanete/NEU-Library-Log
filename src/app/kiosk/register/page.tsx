@@ -25,6 +25,7 @@ const COLLEGES = [
   { name: "College of Medical Technology", programs: ["BS Medical Technology"] },
   { name: "College of Midwifery", programs: ["Diploma in Midwifery"] },
   { name: "College of Music", programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"] },
+  { name: "College of Music", programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"] },
   { name: "College of Nursing", programs: ["BS Nursing"] },
   { name: "College of Physical Therapy", programs: ["BS Physical Therapy"] },
   { name: "College of Respiratory Therapy", programs: ["BS Respiratory Therapy"] },
@@ -326,6 +327,10 @@ function RegisterForm() {
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
                       value={firstName} 
                       onChange={(e) => setFirstName(handleNameInput(e.target.value))} 
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">First</p>
                   </div>
@@ -339,6 +344,10 @@ function RegisterForm() {
                         const val = e.target.value.replace(/[^a-zA-ZÀ-ÿñÑ]/g, '');
                         if (val.length <= 2) setMiddleInitial(val.toUpperCase());
                       }}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">Middle Initial (optional)</p>
                   </div>
@@ -348,6 +357,10 @@ function RegisterForm() {
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
                       value={lastName} 
                       onChange={(e) => setLastName(handleNameInput(e.target.value))} 
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">Last</p>
                   </div>
