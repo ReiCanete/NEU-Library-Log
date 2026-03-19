@@ -257,7 +257,16 @@ function KioskEntryContent() {
     };
   }, [mode]);
 
-  const todayDate = useMemo(() => Timestamp.fromDate(startOfDay(new Date())), []);
+  const todayDate = useMemo(() => {
+    const now = new Date();
+    const startUTC = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0, 0, 0, 0
+    ));
+    return Timestamp.fromDate(startUTC);
+  }, []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
   const { data: todayVisits } = useCollection(visitsQuery);
 
