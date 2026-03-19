@@ -25,14 +25,11 @@ const COLLEGES = [
   { name: "College of Medical Technology", programs: ["BS Medical Technology"] },
   { name: "College of Midwifery", programs: ["Diploma in Midwifery"] },
   { name: "College of Music", programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"] },
-  { name: "College of Music", programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"] },
   { name: "College of Nursing", programs: ["BS Nursing"] },
   { name: "College of Physical Therapy", programs: ["BS Physical Therapy"] },
   { name: "College of Respiratory Therapy", programs: ["BS Respiratory Therapy"] },
   { name: "School of International Relations", programs: ["BA Foreign Service"] }
 ];
-
-const VISITOR_TYPES = ['Student'];
 
 function RegisterForm() {
   const router = useRouter();
@@ -45,6 +42,7 @@ function RegisterForm() {
   const emailFromUrl = searchParams.get('email') || '';
   const nameFromUrl = searchParams.get('name') || '';
   const isGoogleSignIn = method === 'google';
+  const nameAutoCapitalize = isGoogleSignIn ? 'none' : 'words';
   
   const [visitorType] = useState('Student');
   const [firstName, setFirstName] = useState('');
@@ -233,12 +231,6 @@ function RegisterForm() {
     }
   };
 
-  const handleNameInput = (val: string) => {
-    return val
-      .replace(/[^a-zA-ZÀ-ÿñÑ\s'\-\.]/g, '')
-      .replace(/\b\w/g, c => c.toUpperCase());
-  };
-
   if (loading) return null;
 
   return (
@@ -321,7 +313,7 @@ function RegisterForm() {
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 w-full"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      autoCapitalize="none"
+                      autoCapitalize={nameAutoCapitalize}
                       autoCorrect="off"
                       autoComplete="off"
                       spellCheck={false}
@@ -339,7 +331,7 @@ function RegisterForm() {
                         const val = e.target.value.replace(/[^a-zA-ZÀ-ÿñÑ]/g, '');
                         if (val.length <= 2) setMiddleInitial(val.toUpperCase());
                       }}
-                      autoCapitalize="none"
+                      autoCapitalize={nameAutoCapitalize}
                       autoCorrect="off"
                       autoComplete="off"
                       spellCheck={false}
@@ -353,7 +345,7 @@ function RegisterForm() {
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 w-full"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      autoCapitalize="none"
+                      autoCapitalize={nameAutoCapitalize}
                       autoCorrect="off"
                       autoComplete="off"
                       spellCheck={false}
