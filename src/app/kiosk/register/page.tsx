@@ -76,7 +76,6 @@ function RegisterForm() {
         return w.charAt(0).toUpperCase() + w.slice(1);
       }).join(' ');
 
-    // FORMAT 1: "Lastname, Firstname MI" — comma separated
     if (raw.includes(',')) {
       const [lastPart, firstPart] = raw.split(',').map(s => s.trim());
       setLastName(lastPart);
@@ -97,7 +96,6 @@ function RegisterForm() {
       return;
     }
 
-    // FORMAT 2: "angelrei.canete" — dot-separated email prefix, lowercase
     if (raw.includes('.') && raw === raw.toLowerCase()) {
       const parts = raw.split('.');
       if (parts.length >= 2) {
@@ -112,16 +110,12 @@ function RegisterForm() {
       return;
     }
 
-    // FORMAT 3: Standard Google Name "Rei Angelo C. Cañete"
     const parts = raw.split(' ').filter(Boolean);
     if (parts.length >= 2) {
-      // Last word is always the last name
       setLastName(parts[parts.length - 1]);
       
-      // Look for a middle initial (e.g. "C." or "C")
       let miIndex = -1;
       for (let i = 0; i < parts.length - 1; i++) {
-        // Match "C." (2 chars ending in dot) or single char "C"
         if (parts[i].length === 1 || (parts[i].length === 2 && parts[i].endsWith('.'))) {
           miIndex = i;
           break;
@@ -132,7 +126,6 @@ function RegisterForm() {
         setFirstName(parts.slice(0, miIndex).join(' '));
         setMiddleInitial(parts[miIndex].replace('.', '').toUpperCase());
       } else {
-        // Fallback: everything except the last word is the first name
         setFirstName(parts.slice(0, -1).join(' '));
       }
     } else {
@@ -322,12 +315,13 @@ function RegisterForm() {
                 <Label className="text-[9px] font-black uppercase tracking-widest text-[#c9a227]/70 ml-1">Full Name</Label>
                 <div className="flex gap-2">
                   <div className="flex-1 space-y-1">
-                    <Input 
-                      placeholder="First name" 
-                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
-                      value={firstName} 
-                      onChange={(e) => setFirstName(handleNameInput(e.target.value))} 
-                      autoCapitalize="off"
+                    <input
+                      type="text"
+                      placeholder="First name"
+                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 w-full"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      autoCapitalize="none"
                       autoCorrect="off"
                       autoComplete="off"
                       spellCheck={false}
@@ -335,16 +329,17 @@ function RegisterForm() {
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">First</p>
                   </div>
                   <div className="w-[64px] space-y-1">
-                    <Input 
-                      placeholder="MI" 
-                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20 text-center" 
-                      value={middleInitial} 
+                    <input
+                      type="text"
+                      placeholder="MI"
+                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 text-center w-full"
+                      value={middleInitial}
                       maxLength={2}
                       onChange={(e) => {
                         const val = e.target.value.replace(/[^a-zA-ZÀ-ÿñÑ]/g, '');
                         if (val.length <= 2) setMiddleInitial(val.toUpperCase());
                       }}
-                      autoCapitalize="off"
+                      autoCapitalize="none"
                       autoCorrect="off"
                       autoComplete="off"
                       spellCheck={false}
@@ -352,12 +347,13 @@ function RegisterForm() {
                     <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">Middle Initial (optional)</p>
                   </div>
                   <div className="flex-1 space-y-1">
-                    <Input 
-                      placeholder="Last name" 
-                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20" 
-                      value={lastName} 
-                      onChange={(e) => setLastName(handleNameInput(e.target.value))} 
-                      autoCapitalize="off"
+                    <input
+                      type="text"
+                      placeholder="Last name"
+                      className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 w-full"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      autoCapitalize="none"
                       autoCorrect="off"
                       autoComplete="off"
                       spellCheck={false}
