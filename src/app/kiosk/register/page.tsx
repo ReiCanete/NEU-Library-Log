@@ -75,31 +75,28 @@ function RegisterForm() {
         return w.charAt(0).toUpperCase() + w.slice(1);
       }).join(' ');
 
-    // FORMAT 1: "Lastname, Firstname MI" — comma-separated surname first
-    // e.g. "Cañete, angel rei c" or "Santos, Maria A"
+    // FORMAT 1: "Lastname, Firstname MI" — comma separated
     if (raw.includes(',')) {
       const [lastPart, firstPart] = raw.split(',').map(s => s.trim());
-      setLastName(capitalize(lastPart));
+      setLastName(lastPart);
       if (firstPart) {
-        const firstParts = firstPart.trim().split(' ').filter(Boolean);
-        if (firstParts.length >= 2) {
-          // Last word might be middle initial
-          const lastWord = firstParts[firstParts.length - 1];
+        const parts = firstPart.split(' ').filter(Boolean);
+        if (parts.length >= 2) {
+          const lastWord = parts[parts.length - 1];
           if (lastWord.length <= 2) {
-            setFirstName(capitalize(firstParts.slice(0, -1).join(' ')));
-            setMiddleInitial(lastWord.charAt(0).toUpperCase());
+            setFirstName(parts.slice(0, -1).join(' '));
+            setMiddleInitial(lastWord.replace('.', '').toUpperCase());
           } else {
-            setFirstName(capitalize(firstParts.join(' ')));
+            setFirstName(parts.join(' '));
           }
         } else {
-          setFirstName(capitalize(firstPart.trim()));
+          setFirstName(firstPart);
         }
       }
       return;
     }
 
     // FORMAT 2: "angelrei.canete" — dot-separated email prefix, lowercase
-    // e.g. "angelrei.canete" or "angel.rei.canete"
     if (raw.includes('.') && raw === raw.toLowerCase()) {
       const parts = raw.split('.');
       if (parts.length >= 2) {
@@ -114,26 +111,31 @@ function RegisterForm() {
       return;
     }
 
-    // FORMAT 3: "Angel Rei Canete" — space-separated proper case
-    // e.g. "Angel Rei Canete" or "Maria Santos"
+    // FORMAT 3: Standard Google Name "Rei Angelo C. Cañete"
     const parts = raw.split(' ').filter(Boolean);
     if (parts.length >= 2) {
-      setLastName(capitalize(parts[parts.length - 1]));
-      if (parts.length === 3) {
-        const mid = parts[1];
-        if (mid.length <= 2) {
-          setFirstName(capitalize(parts[0]));
-          setMiddleInitial(mid.charAt(0).toUpperCase());
-        } else {
-          setFirstName(capitalize(parts.slice(0, -1).join(' ')));
+      // Last word is always the last name
+      setLastName(parts[parts.length - 1]);
+      
+      // Look for a middle initial (e.g. "C." or "C")
+      let miIndex = -1;
+      for (let i = 0; i < parts.length - 1; i++) {
+        // Match "C." (2 chars ending in dot) or single char "C"
+        if (parts[i].length === 1 || (parts[i].length === 2 && parts[i].endsWith('.'))) {
+          miIndex = i;
+          break;
         }
-      } else if (parts.length === 2) {
-        setFirstName(capitalize(parts[0]));
+      }
+
+      if (miIndex !== -1) {
+        setFirstName(parts.slice(0, miIndex).join(' '));
+        setMiddleInitial(parts[miIndex].replace('.', '').toUpperCase());
       } else {
-        setFirstName(capitalize(parts.slice(0, -1).join(' ')));
+        // Fallback: everything except the last word is the first name
+        setFirstName(parts.slice(0, -1).join(' '));
       }
     } else {
-      setFirstName(capitalize(raw));
+      setFirstName(raw);
     }
   }, [nameFromUrl]);
 

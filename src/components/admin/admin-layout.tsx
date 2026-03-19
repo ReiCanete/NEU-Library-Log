@@ -194,7 +194,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
               <div className="h-10 w-10 rounded-xl bg-[#0a2a1a] border-2 border-[#c9a227]/30 flex items-center justify-center text-[#c9a227] font-black text-sm">
-                {(adminProfile?.fullName || 'A').charAt(0)}
+                {(() => {
+                  const name = adminProfile?.fullName || adminProfile?.displayName || 'A';
+                  const parts = name.trim().split(' ').filter(Boolean);
+                  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+                  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+                })()}
               </div>
             </div>
           </header>
