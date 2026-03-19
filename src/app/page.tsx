@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
@@ -67,8 +68,17 @@ const KioskIdForm = memo(({ onSubmit, todayCount, countLoading }: { onSubmit: (i
           <input
             ref={inputRef}
             type="text"
+            inputMode="numeric"
+            maxLength={13}
             value={schoolId}
-            onChange={e => { setSchoolId(e.target.value); setError(null); }}
+            onChange={e => {
+              const digits = e.target.value.replace(/\D/g, '');
+              let formatted = digits;
+              if (digits.length > 2) formatted = digits.slice(0, 2) + '-' + digits.slice(2);
+              if (digits.length > 7) formatted = digits.slice(0, 2) + '-' + digits.slice(2, 7) + '-' + digits.slice(7, 10);
+              setSchoolId(formatted);
+              setError(null);
+            }}
             placeholder="e.g. 25-12946-343"
             suppressHydrationWarning
             className={`w-full h-12 bg-white/5 border rounded-2xl px-4 text-white placeholder-white/20 focus:outline-none text-sm font-bold transition-all ${error ? 'border-red-500' : 'border-white/10 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30'}`}
