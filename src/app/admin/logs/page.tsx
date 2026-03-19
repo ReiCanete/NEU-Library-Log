@@ -717,8 +717,12 @@ export default function VisitorLogs() {
                     {/* Avatar + name */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                       <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
-                        <span style={{ color: '#c9a227', fontSize: '22px', fontWeight: 'bold' }}>
-                          {selectedVisit.fullName?.charAt(0)?.toUpperCase() || '?'}
+                        <span style={{ color: '#c9a227', fontSize: '16px', fontWeight: 'bold', letterSpacing: '1px' }}>
+                          {(() => {
+                            const parts = (selectedVisit.fullName || '').trim().split(' ').filter(Boolean);
+                            if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+                            return parts[0].charAt(0).toUpperCase() + parts[parts.length - 1].charAt(0).toUpperCase();
+                          })()}
                         </span>
                       </div>
                       <div>

@@ -70,7 +70,10 @@ function RegisterForm() {
     const raw = nameFromUrl.trim();
 
     const capitalize = (str: string) =>
-      str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      str.split(' ').map(w => {
+        if (!w) return w;
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join(' ');
 
     // FORMAT 1: "Lastname, Firstname MI" — comma-separated surname first
     // e.g. "Cañete, angel rei c" or "Santos, Maria A"
