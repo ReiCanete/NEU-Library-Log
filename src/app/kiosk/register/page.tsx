@@ -66,13 +66,38 @@ function RegisterForm() {
   }, [db]);
 
   useEffect(() => {
-    if (nameFromUrl) {
-      const parts = nameFromUrl.trim().split(' ');
+    if (!nameFromUrl) return;
+    const raw = nameFromUrl.trim();
+
+    // Helper: capitalize first letter of each word properly
+    const capitalize = (str: string) =>
+      str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+
+    // Google sometimes returns "firstname.lastname" (dot-separated, lowercase)
+    // or "First Last" (space-separated, proper case)
+    if (raw.includes('.')) {
+      // Dot-separated format: firstname.lastname or firstname.mi.lastname
+      const parts = raw.split('.');
       if (parts.length >= 2) {
-        setFirstName(parts[0]);
-        setLastName(parts[parts.length - 1]);
+        setFirstName(capitalize(parts[0]));
+        setLastName(capitalize(parts[parts.length - 1]));
+        if (parts.length === 3) {
+          setMiddleInitial(parts[1].charAt(0).toUpperCase());
+        }
       } else {
-        setFirstName(nameFromUrl);
+        setFirstName(capitalize(raw));
+      }
+    } else {
+      // Space-separated format
+      const parts = raw.split(' ').filter(Boolean);
+      if (parts.length >= 2) {
+        setFirstName(capitalize(parts[0]));
+        setLastName(capitalize(parts[parts.length - 1]));
+        if (parts.length === 3) {
+          setMiddleInitial(parts[1].charAt(0).toUpperCase());
+        }
+      } else {
+        setFirstName(capitalize(raw));
       }
     }
   }, [nameFromUrl]);
@@ -102,14 +127,19 @@ function RegisterForm() {
     if (!db || submitting) return;
     setFormError(null);
 
-    const nameRegex = /^[a-zA-Z\s.]+$/;
+    const nameRegex = /^[a-zA-ZÀ-ÿñÑ\s'\-\.]+$/;
     if (firstName.trim().length < 2 || lastName.trim().length < 2 || !nameRegex.test(firstName.trim()) || !nameRegex.test(lastName.trim())) {
       setFormError("Please enter a valid full name (letters only).");
       return;
     }
 
     if (!studentId.trim()) {
-      setFormError(`Please enter your Student ID.`);
+      setFormError('Please enter your Student ID.');
+      return;
+    }
+    const idRegex = /^\d{2}-\d{5}-\d{3}$/;
+    if (!idRegex.test(studentId.trim())) {
+      setFormError('Invalid ID format. Must be XX-XXXXX-XXX (e.g. 25-12946-343).');
       return;
     }
 
@@ -174,7 +204,7 @@ function RegisterForm() {
 
   const handleNameInput = (val: string) => {
     return val
-      .replace(/[^a-zA-Z\s.]/g, '')
+      .replace(/[^a-zA-ZÀ-ÿñÑ\s'\-\.]/g, '')
       .replace(/\b\w/g, c => c.toUpperCase());
   };
 
@@ -230,7 +260,19 @@ function RegisterForm() {
                     placeholder="XX-XXXXX-XXX" 
                     className={`h-12 text-sm font-bold bg-white/5 border text-white rounded-2xl px-4 ${idFromUrl ? 'border-[#c9a227]/50 opacity-70 cursor-not-allowed' : 'border-white/10 focus:border-[#c9a227]/60 focus:ring-1 focus:ring-[#c9a227]/30 placeholder:text-white/20'}`} 
                     value={studentId} 
-                    onChange={(e) => !idFromUrl && setStudentId(e.target.value)} 
+                    onChange={(e) => {
+                      if (idFromUrl) return;
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      let formatted = '';
+                      if (raw.length <= 2) {
+                        formatted = raw;
+                      } else if (raw.length <= 7) {
+                        formatted = raw.slice(0, 2) + '-' + raw.slice(2);
+                      } else {
+                        formatted = raw.slice(0, 2) + '-' + raw.slice(2, 7) + '-' + raw.slice(7, 10);
+                      }
+                      setStudentId(formatted);
+                    }}
                     readOnly={!!idFromUrl} 
                     required 
                   />
@@ -257,7 +299,7 @@ function RegisterForm() {
                       value={middleInitial} 
                       maxLength={2}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ]/g, '');
+                        const val = e.target.value.replace(/[^a-zA-ZÀ-ÿñÑ]/g, '');
                         if (val.length <= 2) setMiddleInitial(val.toUpperCase());
                       }}
                     />
