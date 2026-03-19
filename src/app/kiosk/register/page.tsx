@@ -152,6 +152,14 @@ function RegisterForm() {
     return results;
   }, [search]);
 
+  const capitalizeWords = (value: string): string => {
+    if (isGoogleSignIn) return value;
+    return value
+      .split(' ')
+      .map(word => word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word)
+      .join(' ');
+  };
+
   const handleSubmit = async () => {
     if (!db || submitting) return;
     setFormError(null);
@@ -312,7 +320,7 @@ function RegisterForm() {
                       placeholder="First name"
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 w-full"
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={(e) => setFirstName(capitalizeWords(e.target.value))}
                       autoCapitalize={nameAutoCapitalize}
                       autoCorrect="off"
                       autoComplete="off"
@@ -344,7 +352,7 @@ function RegisterForm() {
                       placeholder="Last name"
                       className="h-12 text-sm font-bold bg-white/5 border border-white/10 text-white rounded-2xl px-4 focus:border-[#c9a227]/60 focus:outline-none placeholder:text-white/20 w-full"
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={(e) => setLastName(capitalizeWords(e.target.value))}
                       autoCapitalize={nameAutoCapitalize}
                       autoCorrect="off"
                       autoComplete="off"
