@@ -751,7 +751,7 @@ export default function VisitorLogs() {
                       ].map(({ label, value }) => (
                         <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '7px' }}>
                           <span style={{ fontSize: '13px', color: '#6b7280', flexShrink: 0 }}>{label}</span>
-                          <span style={{ fontSize: '13px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '500', color: '#1a3a2a', textAlign: 'right', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{value}</span>
                         </div>
                       ))}
                     </div>

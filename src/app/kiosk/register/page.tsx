@@ -261,7 +261,7 @@ function RegisterForm() {
                         if (val.length <= 2) setMiddleInitial(val.toUpperCase());
                       }}
                     />
-                    <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">M.I.</p>
+                    <p className="text-white/30 text-[8px] font-black uppercase text-center tracking-tighter">Middle Initial (optional)</p>
                   </div>
                   <div className="flex-1 space-y-1">
                     <Input 

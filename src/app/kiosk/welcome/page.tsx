@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'navigation';
 import { CheckCircle2, Clock, Calendar, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -76,10 +76,10 @@ export default function WelcomePage() {
             <svg className="w-full h-full -rotate-90">
               <circle className="text-white/10" strokeWidth="8" stroke="currentColor" fill="transparent" r={radius} cx="50" cy="50" />
               <circle 
-                className="text-[#c9a227] transition-all duration-1000 ease-linear animate-draw" 
+                className="text-[#c9a227] transition-all duration-1000 ease-linear" 
                 strokeWidth="8" 
                 strokeDasharray={circumference} 
-                strokeDashoffset={circumference} 
+                strokeDashoffset={offset} 
                 strokeLinecap="round" 
                 stroke="currentColor" 
                 fill="transparent" 
