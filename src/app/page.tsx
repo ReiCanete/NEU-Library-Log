@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
@@ -242,7 +243,7 @@ function KioskEntryContent() {
       // Hard reset at 60 seconds
       resetTimer = setTimeout(() => {
         sessionStorage.clear();
-        window.location.reload();
+        router.push('/');
       }, 60000);
     };
 
@@ -255,7 +256,7 @@ function KioskEntryContent() {
       clearTimeout(resetTimer);
       events.forEach(e => window.removeEventListener(e, resetIdle));
     };
-  }, [mode]);
+  }, [mode, router]);
 
   const todayDate = useMemo(() => {
     const now = new Date();
