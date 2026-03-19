@@ -485,12 +485,14 @@ function KioskEntryContent() {
     }
   }, [auth, db, router]);
 
-  if (!mounted) return null;
+  if (!mounted) return (
+    <div className="h-screen bg-[#071a0f]" />
+  );
 
   if (checkingRedirect) {
     return (
       <div className="fixed inset-0 bg-[#0a2a1a] flex flex-col items-center justify-center z-[1000]">
-        <img src="/neu-library-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-4 animate-pulse shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
+        <img src="/neu-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-4 animate-pulse shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
         <div className="w-8 h-8 border-2 border-[#c9a227]/30 border-t-[#c9a227] rounded-full animate-spin mb-3" />
         <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Verifying your account...</p>
       </div>
@@ -539,7 +541,7 @@ function KioskEntryContent() {
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 pb-12 relative z-10">
         <div className="absolute w-40 h-40 rounded-full bg-[#c9a227]/5 blur-3xl -z-10" />
-        <img src="/neu-library-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-3 shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
+        <img src="/neu-logo.png" alt="NEU Logo" className="w-20 h-20 rounded-full mb-3 shadow-2xl border-2 border-[#c9a227]/40 ring-4 ring-[#c9a227]/10" />
         <h1 className="text-4xl font-black text-[#c9a227] text-center drop-shadow-lg uppercase tracking-tight leading-none">NEU LIBRARY</h1>
         <p className="text-[10px] font-black tracking-[0.3em] text-white/30 uppercase mt-1.5 mb-5">Digital Visitor Log</p>
 
