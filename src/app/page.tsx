@@ -272,9 +272,23 @@ function KioskEntryContent() {
     return Timestamp.fromDate(startUTC);
   }, []);
   const visitsQuery = useMemo(() => (db ? query(collection(db, 'visits'), where('timestamp', '>=', todayDate)) : null), [db, todayDate]);
+  
   const { data: todayVisits, loading: countLoading } = useCollection(visitsQuery);
 
-  const currentCount = todayVisits?.length ?? 0;
+  const todayKey = `neu_entry_count_${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })}`;
+
+  const [currentCount, setCurrentCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return parseInt(localStorage.getItem(todayKey) || '0', 10);
+  });
+
+  useEffect(() => {
+    if (!countLoading && todayVisits !== undefined) {
+      const count = todayVisits?.length ?? 0;
+      setCurrentCount(count);
+      localStorage.setItem(todayKey, String(count));
+    }
+  }, [todayVisits, countLoading, todayKey]);
 
   const handleIdSubmit = useCallback(async (cleanId: string, visitorType: string) => {
     if (!db) return;
