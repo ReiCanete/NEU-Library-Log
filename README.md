@@ -1,6 +1,6 @@
 # NEU Library Log
 
-**Digital Entry Management System for Nueva Era University Library**
+**Digital Entry Management System for New Era University Library**
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
 ![Firebase](https://img.shields.io/badge/Firebase-v11-orange?style=flat-square&logo=firebase)
@@ -14,7 +14,7 @@
 
 ## 📖 Overview
 
-The **NEU Library Log** is a professional digital visitor management system designed for the Nueva Era University Library. It replaces traditional paper-based logs with a high-performance digital kiosk, providing real-time analytics for library staff and a seamless entry experience for students.
+The **NEU Library Log** is a professional digital visitor management system designed for the New Era University Library. It replaces traditional paper-based logs with a high-performance digital kiosk, providing real-time analytics for library staff and a seamless entry experience for students.
 
 ---
 
@@ -129,4 +129,4 @@ The **NEU Library Log** is a professional digital visitor management system desi
 ---
 
 ## 🎓 Credits
-Developed for the **Nueva Era University Library** as a modern digital entry solution. Built with excellence using Next.js and Firebase.
+Developed for the **New Era University Library** as a modern digital entry solution. Built with excellence using Next.js and Firebase.
