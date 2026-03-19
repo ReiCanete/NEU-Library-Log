@@ -26,7 +26,7 @@ export default function WelcomePage() {
       fullName: visitor.fullName || 'Visitor',
       college: visitor.college || '',
       program: visitor.program || '',
-      visitorType: visitor.visitorType || 'Student',
+      visitorType: visitor.role === 'admin' ? 'Admin' : (visitor.visitorType || 'Student'),
       studentId: visitor.studentId || '',
       loginMethod: visitor.loginMethod || 'id'
     });
