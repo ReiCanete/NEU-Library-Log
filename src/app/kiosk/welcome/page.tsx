@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'navigation';
+import { useRouter } from 'next/navigation';
 import { CheckCircle2, Clock, Calendar, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
