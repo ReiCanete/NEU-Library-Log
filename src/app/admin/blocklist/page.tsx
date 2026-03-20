@@ -36,27 +36,34 @@ export default function BlocklistManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Auto-fill lookup
+  // Smart auto-fill name lookup
   useEffect(() => {
-    if (!db || !newBlockId.trim()) { 
-      setNewBlockName(''); 
-      return; 
+    if (!db || !newBlockId.trim()) {
+      setNewBlockName('');
+      return;
     }
-    const lookup = async () => {
-      const field = blockInputType === 'id' ? 'studentId' : 'email';
+
+    const fullId = blockInputType === 'email'
+      ? `${newBlockId.trim().toLowerCase()}@neu.edu.ph`
+      : newBlockId.trim().toLowerCase();
+
+    const timer = setTimeout(async () => {
       try {
+        const field = blockInputType === 'id' ? 'studentId' : 'email';
         const snap = await getDocs(
-          query(collection(db, 'users'), where(field, '==', newBlockId.trim().toLowerCase()))
+          query(collection(db, 'users'), where(field, '==', fullId))
         );
         if (!snap.empty) {
           const userData = snap.docs[0].data();
           setNewBlockName(userData.fullName || userData.displayName || '');
+        } else {
+          setNewBlockName('');
         }
       } catch (err) {
         console.error("Auto-fill lookup failed:", err);
       }
-    };
-    const timer = setTimeout(lookup, 500);
+    }, 500);
+
     return () => clearTimeout(timer);
   }, [newBlockId, blockInputType, db]);
 
@@ -97,16 +104,34 @@ export default function BlocklistManagement() {
 
   const handleManualBlock = async () => {
     if (!newBlockId || !newBlockReason || !db) return;
-    const normalizedBlockId = newBlockId.trim().toLowerCase();
     setIsProcessing(true);
     try {
+      const fullId = blockInputType === 'email'
+        ? `${newBlockId.trim().toLowerCase()}@neu.edu.ph`
+        : newBlockId.trim().toLowerCase();
+
+      let resolvedName = newBlockName.trim();
+      
+      // Secondary check to resolve name if not already filled or typed
+      if (!resolvedName) {
+        const field = blockInputType === 'id' ? 'studentId' : 'email';
+        const snap = await getDocs(
+          query(collection(db, 'users'), where(field, '==', fullId))
+        );
+        if (!snap.empty) {
+          const userData = snap.docs[0].data();
+          resolvedName = userData.fullName || userData.displayName || '';
+        }
+      }
+
       await addDoc(collection(db, 'blocklist'), {
-        studentId: normalizedBlockId,
-        fullName: newBlockName.trim() || 'Unknown',
-        reason: newBlockReason,
+        studentId: fullId,
+        fullName: resolvedName || fullId,
+        reason: newBlockReason.trim(),
         blockedBy: auth.currentUser?.email || 'Staff',
         blockedAt: Timestamp.now()
       });
+
       toast({ title: "Success", description: "ID added to blocklist." });
       resetModal();
       setShowAddModal(false);
@@ -164,14 +189,41 @@ export default function BlocklistManagement() {
                     </button>
                   </div>
                   <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">
-                    {blockInputType === 'id' ? 'ID Number' : 'Email Address'}
+                    {blockInputType === 'id' ? 'ID Number' : 'Institutional Email'}
                   </Label>
-                  <Input 
-                    placeholder={blockInputType === 'id' ? 'e.g. 25-12946-343' : 'e.g. juan.santos@neu.edu.ph'} 
-                    className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" 
-                    value={newBlockId} 
-                    onChange={(e) => setNewBlockId(e.target.value)} 
-                  />
+                  
+                  {blockInputType === 'id' ? (
+                    <Input 
+                      inputMode="numeric"
+                      maxLength={13}
+                      placeholder="e.g. 25-12946-343" 
+                      className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" 
+                      value={newBlockId} 
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '');
+                        let formatted = digits;
+                        if (digits.length > 2) formatted = digits.slice(0, 2) + '-' + digits.slice(2);
+                        if (digits.length > 7) formatted = digits.slice(0, 2) + '-' + digits.slice(2, 7) + '-' + digits.slice(7, 10);
+                        setNewBlockId(formatted);
+                      }}
+                    />
+                  ) : (
+                    <div className="flex items-center h-14 bg-[#f0f4f1] border-none rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-[#c9a227]/30 transition-all">
+                      <input
+                        type="text"
+                        value={newBlockId.replace('@neu.edu.ph', '')}
+                        onChange={e => {
+                          const val = e.target.value.replace(/@.*/, '');
+                          setNewBlockId(val.toLowerCase());
+                        }}
+                        placeholder="username"
+                        className="flex-1 h-full bg-transparent pl-4 pr-0 text-[#1a3a2a] placeholder-slate-400 focus:outline-none text-sm font-bold"
+                      />
+                      <div className="h-full flex items-center px-4 bg-[#e8f0ea] border-l border-[#d4e4d8] shrink-0">
+                        <span className="text-[#4a6741] text-xs font-black select-none whitespace-nowrap">@neu.edu.ph</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Full Name (Auto-filled if found)</Label>
@@ -183,7 +235,7 @@ export default function BlocklistManagement() {
                 </div>
               </div>
               <DialogFooter className="gap-4">
-                <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-[#d4e4d8]" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                <Button variant="outline" className="rounded-2xl h-14 px-8 font-black border-[#d4e4d8]" onClick={() => { setShowAddModal(false); resetModal(); }}>Cancel</Button>
                 <Button className="rounded-2xl h-14 px-10 font-black bg-[#9b1c1c] text-white" disabled={isProcessing || !newBlockId || !newBlockReason} onClick={handleManualBlock}>
                   {isProcessing ? <Loader2 className="animate-spin" /> : "Confirm Block"}
                 </Button>
@@ -315,3 +367,4 @@ export default function BlocklistManagement() {
     </AdminLayout>
   );
 }
+
