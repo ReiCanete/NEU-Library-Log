@@ -13,7 +13,6 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Label } from '@/components/ui/label';
-import { SelectItem } from '@/components/ui/select';
 
 const NEU_COLLEGES = [
   'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences',
@@ -439,7 +438,7 @@ export default function ReportsPage() {
                   <select value={filterCollege} onChange={e => setFilterCollege(e.target.value)}
                     className="w-full h-12 bg-[#f4f8f5] border-none rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:ring-2 focus:ring-[#c9a227]/30">
                     <option value="all">All Colleges</option>
-                    {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <button onClick={() => { setFilterPurpose('all'); setFilterCollege('all'); setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd')); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}
