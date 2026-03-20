@@ -7,7 +7,7 @@ import { Search, UserX, Loader2, ShieldCheck, AlertTriangle, ShieldAlert, Chevro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useAuth } from '@/firebase';
-import { collection, query, orderBy, deleteDoc, doc, Timestamp, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, deleteDoc, doc, Timestamp, addDoc, getDocs, where } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -30,10 +30,35 @@ export default function BlocklistManagement() {
   const [newBlockId, setNewBlockId] = useState('');
   const [newBlockName, setNewBlockName] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
+  const [blockInputType, setBlockInputType] = useState<'id' | 'email'>('id');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Auto-fill lookup
+  useEffect(() => {
+    if (!db || !newBlockId.trim()) { 
+      setNewBlockName(''); 
+      return; 
+    }
+    const lookup = async () => {
+      const field = blockInputType === 'id' ? 'studentId' : 'email';
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'users'), where(field, '==', newBlockId.trim().toLowerCase()))
+        );
+        if (!snap.empty) {
+          const userData = snap.docs[0].data();
+          setNewBlockName(userData.fullName || userData.displayName || '');
+        }
+      } catch (err) {
+        console.error("Auto-fill lookup failed:", err);
+      }
+    };
+    const timer = setTimeout(lookup, 500);
+    return () => clearTimeout(timer);
+  }, [newBlockId, blockInputType, db]);
 
   const blocklistQuery = useMemo(() => {
     if (!db) return null;
@@ -77,19 +102,26 @@ export default function BlocklistManagement() {
     try {
       await addDoc(collection(db, 'blocklist'), {
         studentId: normalizedBlockId,
-        fullName: newBlockName || 'Unregistered Account',
+        fullName: newBlockName.trim() || 'Unknown',
         reason: newBlockReason,
         blockedBy: auth.currentUser?.email || 'Staff',
         blockedAt: Timestamp.now()
       });
       toast({ title: "Success", description: "ID added to blocklist." });
-      setNewBlockId(''); setNewBlockName(''); setNewBlockReason('');
+      resetModal();
       setShowAddModal(false);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const resetModal = () => {
+    setNewBlockId('');
+    setNewBlockName('');
+    setNewBlockReason('');
+    setBlockInputType('id');
   };
 
   return (
@@ -103,7 +135,7 @@ export default function BlocklistManagement() {
               <p className="text-[10px] font-black text-[#4a6741] uppercase tracking-widest mt-1">Managed proactive prohibited list</p>
             </div>
           </div>
-          <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+          <Dialog open={showAddModal} onOpenChange={(open) => { if(!open) resetModal(); setShowAddModal(open); }}>
             <DialogTrigger asChild>
               <Button className="h-12 px-6 rounded-xl bg-gradient-to-r from-[#9b1c1c] to-[#7f1d1d] text-white font-black hover:opacity-90 shadow-lg shadow-red-200/50 flex gap-2 transition-all">
                 <ShieldAlert className="h-5 w-5" /> Manually Block ID
@@ -116,11 +148,33 @@ export default function BlocklistManagement() {
               </DialogHeader>
               <div className="py-6 space-y-6">
                 <div className="space-y-2">
-                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">ID / Email</Label>
-                  <Input placeholder="e.g. 25-12946-343 or email@neu.edu.ph" className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" value={newBlockId} onChange={(e) => setNewBlockId(e.target.value)} />
+                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Type</Label>
+                  <div className="flex gap-1 bg-[#f0f4f1] rounded-xl p-1 w-fit mb-4">
+                    <button
+                      onClick={() => { setBlockInputType('id'); setNewBlockId(''); setNewBlockName(''); }}
+                      className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${blockInputType === 'id' ? 'bg-white text-[#1a3a2a] shadow-sm' : 'text-[#4a6741]'}`}
+                    >
+                      Student ID
+                    </button>
+                    <button
+                      onClick={() => { setBlockInputType('email'); setNewBlockId(''); setNewBlockName(''); }}
+                      className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${blockInputType === 'email' ? 'bg-white text-[#1a3a2a] shadow-sm' : 'text-[#4a6741]'}`}
+                    >
+                      Email
+                    </button>
+                  </div>
+                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">
+                    {blockInputType === 'id' ? 'ID Number' : 'Email Address'}
+                  </Label>
+                  <Input 
+                    placeholder={blockInputType === 'id' ? 'e.g. 25-12946-343' : 'e.g. juan.santos@neu.edu.ph'} 
+                    className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" 
+                    value={newBlockId} 
+                    onChange={(e) => setNewBlockId(e.target.value)} 
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Full Name (Optional)</Label>
+                  <Label className="font-black text-[10px] uppercase tracking-widest text-[#1a3a2a] ml-1">Full Name (Auto-filled if found)</Label>
                   <Input placeholder="Visitor's name" className="h-14 rounded-2xl bg-[#f0f4f1] border-none font-bold text-[#1a3a2a]" value={newBlockName} onChange={(e) => setNewBlockName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
