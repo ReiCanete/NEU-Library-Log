@@ -13,6 +13,7 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Label } from '@/components/ui/label';
+import { SelectItem } from '@/components/ui/select';
 
 const NEU_COLLEGES = [
   'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences',
@@ -188,7 +189,28 @@ export default function ReportsPage() {
         doc.text(`Filters applied: ${activeFilters.join(' | ')}`, 14, 86);
       }
 
-      let y = activeFilters.length > 0 ? 96 : 90;
+      // Institution info block
+      doc.setFillColor(248, 250, 248);
+      doc.rect(14, activeFilters.length > 0 ? 91 : 85, pageW - 28, 18, 'F');
+      doc.setDrawColor(201, 162, 39);
+      doc.setLineWidth(0.3);
+      doc.rect(14, activeFilters.length > 0 ? 91 : 85, pageW - 28, 18, 'S');
+
+      const infoY = activeFilters.length > 0 ? 97 : 91;
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(26, 58, 42);
+      doc.text('New Era University — Library Department', 18, infoY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('9 Central Ave, New Era, Quezon City, 1107 Metro Manila', 18, infoY + 5);
+      doc.text('info@neu.edu.ph  |  (02) 8981 4221  |  dpo@neu.edu.ph', 18, infoY + 10);
+      doc.setTextColor(26, 58, 42);
+      doc.setFont('helvetica', 'bolditalic');
+      doc.setFontSize(7);
+      doc.text('Godliness is the foundation of knowledge.', pageW - 18, infoY + 5, { align: 'right' });
+
+      let y = activeFilters.length > 0 ? 116 : 110;
 
       // ── EXECUTIVE SUMMARY ────────────────────────────────────────────────
       if (y > 200) { doc.addPage(); y = 20; }
@@ -319,6 +341,23 @@ export default function ReportsPage() {
         showHead: 'everyPage',
       });
 
+      const lastY = (doc as any).lastAutoTable.finalY + 8;
+      if (lastY < 270) {
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bolditalic');
+        doc.setTextColor(26, 58, 42);
+        doc.text('MISSION:', 14, lastY);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text('Provide quality education anchored on Christian values with the prime purpose of bringing honor and glory to God.', 14, lastY + 5, { maxWidth: pageW - 28 });
+        doc.setFont('helvetica', 'bolditalic');
+        doc.setTextColor(26, 58, 42);
+        doc.text('VISION:', 14, lastY + 12);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text('A world-class Institution of learning with a unique Christian culture of excellence, discipline, and service to humanity.', 14, lastY + 17, { maxWidth: pageW - 28 });
+      }
+
       // ── FOOTER on all pages ───────────────────────────────────────────────
       const totalPages = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
@@ -329,8 +368,14 @@ export default function ReportsPage() {
         doc.setTextColor(200, 220, 210);
         doc.setFont('helvetica', 'normal');
         doc.text(
-          `NEW ERA UNIVERSITY — NEU Library Log  |  Confidential  |  Page ${i} of ${totalPages}`,
-          pageW / 2, 294, { align: 'center' }
+          `NEW ERA UNIVERSITY  |  9 Central Ave, New Era, Quezon City  |  info@neu.edu.ph  |  (02) 8981 4221  |  Page ${i} of ${totalPages}`,
+          pageW / 2, 292, { align: 'center' }
+        );
+        doc.setFontSize(6);
+        doc.setTextColor(150, 180, 160);
+        doc.text(
+          'NEU Library Log — Official System Export  |  Confidential Document',
+          pageW / 2, 296, { align: 'center' }
         );
       }
 
