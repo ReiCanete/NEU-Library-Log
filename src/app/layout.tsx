@@ -8,6 +8,10 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 export const metadata: Metadata = {
   title: 'NEU Library Log',
   description: 'Digital visitor log system for NEU Library',
+  icons: {
+    icon: '/neu-library-logo.png',
+    apple: '/neu-library-logo.png',
+  },
 };
 
 export default function RootLayout({
