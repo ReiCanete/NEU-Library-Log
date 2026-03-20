@@ -19,9 +19,9 @@ const NEU_COLLEGES = [
   'College of Business Administration', 'College of Communication',
   'College of Informatics and Computing Studies', 'College of Criminology',
   'College of Education', 'College of Engineering and Architecture',
-  'College of Medical Technology', 'College of Midwifery', 'College of Music',
+  'College of Law', 'College of Medical Technology', 'College of Midwifery', 'College of Music',
   'College of Nursing', 'College of Physical Therapy', 'College of Respiratory Therapy',
-  'School of International Relations'
+  'School of International Relations', 'School of Graduate Studies'
 ];
 
 const PURPOSES = [
@@ -394,7 +394,7 @@ export default function ReportsPage() {
                   <select value={filterCollege} onChange={e => setFilterCollege(e.target.value)}
                     className="w-full h-12 bg-[#f4f8f5] border-none rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:ring-2 focus:ring-[#c9a227]/30">
                     <option value="all">All Colleges</option>
-                    {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </select>
                 </div>
                 <button onClick={() => { setFilterPurpose('all'); setFilterCollege('all'); setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd')); setEndDate(format(new Date(), 'yyyy-MM-dd')); }}

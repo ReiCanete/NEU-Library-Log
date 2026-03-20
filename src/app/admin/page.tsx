@@ -13,7 +13,7 @@ import { AdminLayout } from '@/components/admin/admin-layout';
 import { Label } from '@/components/ui/label';
 
 const NEU_COLLEGES = [
-  'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences', 'College of Business Administration', 'College of Communication', 'College of Informatics and Computing Studies', 'College of Criminology', 'College of Education', 'College of Engineering and Architecture', 'College of Medical Technology', 'College of Midwifery', 'College of Music', 'College of Nursing', 'College of Physical Therapy', 'College of Respiratory Therapy', 'School of International Relations'
+  'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences', 'College of Business Administration', 'College of Communication', 'College of Informatics and Computing Studies', 'College of Criminology', 'College of Education', 'College of Engineering and Architecture', 'College of Law', 'College of Medical Technology', 'College of Midwifery', 'College of Music', 'College of Nursing', 'College of Physical Therapy', 'College of Respiratory Therapy', 'School of International Relations', 'School of Graduate Studies'
 ];
 
 const PURPOSE_COLORS: Record<string, string> = {

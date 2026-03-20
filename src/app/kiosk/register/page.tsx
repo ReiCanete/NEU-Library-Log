@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Check, ChevronDown, UserPlus, ArrowLeft, Lock } from 'lucide-react';
+import { Loader2, Check, ChevronDown, ArrowLeft, Lock } from 'lucide-react';
 import { logAppError } from '@/lib/errorMessages';
 import AnnouncementToast from '@/components/kiosk/AnnouncementToast';
 
@@ -22,13 +22,43 @@ const COLLEGES = [
   { name: "College of Criminology", programs: ["BS Criminology"] },
   { name: "College of Education", programs: ["BS Elementary Education", "BS Elementary Education (Preschool Education)", "BS Elementary Education (Special Education)", "BS Secondary Education Major in Music Arts and Physical Education", "BS Secondary Education Major in English", "BS Secondary Education Major in Filipino", "BS Secondary Education Major in Mathematics", "BS Secondary Education Major in Science", "BS Secondary Education Major in Social Studies", "BS Secondary Education Major in Technology and Livelihood Education"] },
   { name: "College of Engineering and Architecture", programs: ["BS Architecture", "BS Astronomy", "BS Civil Engineering", "BS Electrical Engineering", "BS Electronics Engineering", "BS Industrial Engineering", "BS Mechanical Engineering"] },
+  { name: "College of Law", programs: ["Juris Doctor"] },
   { name: "College of Medical Technology", programs: ["BS Medical Technology"] },
   { name: "College of Midwifery", programs: ["Diploma in Midwifery"] },
   { name: "College of Music", programs: ["BM Choral Conducting", "BM Music Education", "BM Piano", "BM Voice"] },
   { name: "College of Nursing", programs: ["BS Nursing"] },
   { name: "College of Physical Therapy", programs: ["BS Physical Therapy"] },
   { name: "College of Respiratory Therapy", programs: ["BS Respiratory Therapy"] },
-  { name: "School of International Relations", programs: ["BA Foreign Service"] }
+  { name: "School of International Relations", programs: ["BA Foreign Service"] },
+  {
+    name: 'School of Graduate Studies',
+    programs: [
+      'Doctor in Business Administration',
+      'Master in Business Administration',
+      'Master in Business Administration Major in Human Resource Management',
+      'Master in Business Administration Major in Organizational Development',
+      'Doctor of Philosophy in Education Major in Bilingual Education',
+      'Doctor of Philosophy in Education Major in Early Childhood Education',
+      'Doctor of Philosophy in Education Major in Educational Leadership',
+      'Doctor of Philosophy in Education Major in Educational Management',
+      'Doctor of Philosophy in Education Major in Guidance & Counseling',
+      'Doctor of Philosophy in Education Major in Instructional Leadership',
+      'Doctor of Philosophy in Education Major in Special Education and Inclusive Education',
+      'Master of Arts in Education Major in Early Childhood Education',
+      'Master of Arts in Education Major in Educational Management',
+      'Master of Arts in Education Major in Educational Psychology',
+      'Master of Arts in Education Major in Educational Technology',
+      'Master of Arts in Education Major in Environmental Education',
+      'Master of Arts in Education Major in Filipino',
+      'Master of Arts in Education Major in Guidance and Counseling',
+      'Master of Arts in Education Major in Language Education',
+      'Master of Arts in Education Major in Mathematics Education',
+      'Master of Arts in Education Major in Reading Education',
+      'Master of Arts in Education Major in Science Education',
+      'Master of Arts in Education Major in Social Science',
+      'Master of Arts in Education Major in Special Education and Inclusive Education',
+    ]
+  }
 ];
 
 function RegisterForm() {
@@ -44,7 +74,6 @@ function RegisterForm() {
   const isGoogleSignIn = method === 'google';
   const nameAutoCapitalize = isGoogleSignIn ? 'none' : 'words';
   
-  const [visitorType] = useState('Student');
   const [firstName, setFirstName] = useState('');
   const [middleInitial, setMiddleInitial] = useState('');
   const [lastName, setLastName] = useState('');

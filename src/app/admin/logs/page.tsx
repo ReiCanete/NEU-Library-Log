@@ -142,9 +142,9 @@ export default function VisitorLogs() {
     'College of Business Administration','College of Communication',
     'College of Informatics and Computing Studies','College of Criminology',
     'College of Education','College of Engineering and Architecture',
-    'College of Medical Technology','College of Midwifery','College of Music',
+    'College of Law', 'College of Medical Technology','College of Midwifery','College of Music',
     'College of Nursing','College of Physical Therapy','College of Respiratory Therapy',
-    'School of International Relations'
+    'School of International Relations', 'School of Graduate Studies'
   ];
 
   const filteredUsers = useMemo(() => {
