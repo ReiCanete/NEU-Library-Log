@@ -14,7 +14,19 @@
 
 ## 📖 Overview
 
-The **NEU Library Log** is a professional digital visitor management system designed for the New Era University Library. It replaces traditional paper-based logs with a high-performance digital kiosk, providing real-time analytics for library staff and a seamless entry experience for students.
+The **NEU Library Log** is a high-performance digital visitor management system designed specifically for the New Era University Library. Built to replace traditional paper logs, it provides a seamless entry experience for students while offering library staff real-time analytics, automated reporting, and proactive security management.
+
+---
+
+## 🏛️ About New Era University
+
+New Era University (NEU) is a private, non-sectarian educational institution in the Philippines, established and maintained by the Iglesia Ni Cristo.
+
+- **Philosophy:** Godliness is the foundation of knowledge.
+- **Mission:** Provide quality education anchored on Christian values with the prime purpose of bringing honor and glory to God.
+- **Vision:** A world-class Institution of learning with a unique Christian culture of excellence, discipline, and service to humanity.
+- **Main Campus:** 9 Central Ave, New Era, Quezon City, 1107 Metro Manila.
+- **Contact:** info@neu.edu.ph | (02) 8981 4221 | dpo@neu.edu.ph
 
 ---
 
@@ -22,21 +34,23 @@ The **NEU Library Log** is a professional digital visitor management system desi
 
 ### 🖥️ Kiosk (Visitor-Facing)
 - **Smart ID Entry:** Optimized for manual input with automatic dash formatting (`XX-XXXXX-XXX`).
-- **Institutional Authentication:** Secure sign-in via Google restricted to `@neu.edu.ph` domains.
-- **Visitor Registration:** First-time registration with name validation and automatic word capitalization.
-- **Visit Purpose Selection:** Large, touch-friendly cards for selecting library activities.
-- **Welcome Display:** Personalized entry confirmation with an 8-second auto-reset timer.
-- **Broadcast System:** Floating announcement toasts (Gold for notices, pulsing Red for urgent alerts).
-- **Session Protection:** Automatic 3-minute idle timeout to protect visitor privacy.
-- **Admin Role Select:** Staff signing in at the kiosk can choose between logging a visit or entering the portal.
+- **Institutional Authentication:** Secure sign-in via Google restricted exclusively to `@neu.edu.ph` domains.
+- **Visitor Registration:** Guided first-time setup with institutional data validation and smart auto-capitalization.
+- **PHT Timezone Sync:** Real-time visitor counts and timestamps aligned with Philippine Standard Time (PHT).
+- **Broadcast System:** Floating announcement toasts (Gold for notices, Red pulsing glow for urgent institutional alerts).
+- **Session Protection:** Automatic 3-minute idle timeout with a 10-second warning to protect visitor privacy.
+- **Blocklist Enforcement:** Immediate restriction of access for IDs/Emails recorded in the managed blocklist.
 
 ### 🛡️ Admin Panel (Staff-Facing)
-- **Live Dashboard:** Real-time metrics banner, top visit purposes, and visitor trend visualizations.
-- **Visitor Logs:** Searchable activity history with a detailed side panel for visitor profiles and history.
-- **Registry Management:** Full list of registered users with options to edit or remove profiles.
-- **Proactive Security:** Managed blocklist to immediately restrict access to specific IDs.
-- **System Reporting:** Official PDF and CSV export engines featuring institutional NEU branding.
-- **Broadcast Center:** Command center for posting scheduled or urgent library announcements.
+- **Live Dashboard:** Real-time metrics banner, top visit purposes, purpose distribution chart, college leaderboards, and daily visitor trends.
+- **Visitor Logs:** Centralized archive featuring two distinct modules:
+  - **Activity Log:** Searchable entry history with a detailed side panel showing full visitor profiles and historical visit history.
+  - **Registered Users:** Full registry management with options to edit or remove profiles.
+- **Proactive Security:** Managed blocklist allowing staff to restrict access by Student ID or Email with automatic name lookup from Firestore.
+- **Official Reporting:** 
+  - **Branded PDF Export:** Professional reports featuring the NEU logo, institutional info, mission/vision, and full audit tables.
+  - **CSV Engines:** Export capabilities for dashboard metrics, user registries, and historical logs.
+- **Role Protection:** Admin roles are preserved and cannot be overwritten by the kiosk registration process.
 
 ---
 
@@ -59,16 +73,40 @@ The **NEU Library Log** is a professional digital visitor management system desi
 
 ### `users`
 - Stores visitor profiles (Student ID, Full Name, College, Program, Email, Role).
-- Roles are restricted to `visitor` and `admin`.
+- Roles are strictly restricted to `visitor` and `admin`.
 
 ### `visits`
-- Real-time log of every entry (Student ID, Full Name, Purpose, Login Method, Timestamp).
+- Real-time log of every library entry (Student ID, Full Name, Purpose, Login Method, Timestamp).
 
 ### `blocklist`
-- Records of restricted individuals (Student ID, Reason, Admin who blocked, Timestamp).
+- Records of restricted individuals (Student ID/Email, Reason, Admin who blocked, Timestamp).
 
 ### `announcements`
 - Broadcast messages (Content, Priority, Active Status, Date Range).
+
+---
+
+## 🏫 Supported Colleges
+
+The system includes pre-defined mapping for the following departments:
+- College of Accountancy
+- College of Agriculture
+- College of Arts and Sciences
+- College of Business Administration
+- College of Communication
+- College of Informatics and Computing Studies
+- College of Criminology
+- College of Education
+- College of Engineering and Architecture
+- College of Law
+- College of Medical Technology
+- College of Midwifery
+- College of Music
+- College of Nursing
+- College of Physical Therapy
+- College of Respiratory Therapy
+- School of International Relations
+- School of Graduate Studies
 
 ---
 
@@ -123,8 +161,15 @@ The **NEU Library Log** is a professional digital visitor management system desi
 ---
 
 ## ⚠️ Known Limitations
-- **Mobile Compatibility:** The system is optimized for kiosk displays and desktop admin use; responsiveness for mobile devices is not yet fully verified.
-- **Admin Access:** Administrative roles must be manually assigned within the Firestore `users` collection by setting the `role` field to `"admin"`.
+- **Mobile Compatibility:** The system is optimized for kiosk displays and desktop admin use; full responsiveness for mobile devices is currently under verification.
+
+---
+
+## 🛡️ Admin Access Note
+Administrative roles are managed manually within the Firestore `users` collection by setting the `role` field to `"admin"`.
+**Current Administrators:**
+- `reiangelo.canete@neu.edu.ph` (System Developer)
+- `jcesperanza@neu.edu.ph` (Library Faculty)
 
 ---
 
