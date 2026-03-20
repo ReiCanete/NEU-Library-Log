@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const NEU_COLLEGES = [
   'College of Accountancy', 'College of Agriculture', 'College of Arts and Sciences', 'College of Business Administration', 'College of Communication', 'College of Informatics and Computing Studies', 'College of Criminology', 'College of Education', 'College of Engineering and Architecture', 'College of Law', 'College of Medical Technology', 'College of Midwifery', 'College of Music', 'College of Nursing', 'College of Physical Therapy', 'College of Respiratory Therapy', 'School of International Relations', 'School of Graduate Studies'
@@ -191,25 +192,27 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">Purpose Filter</Label>
-              <select
-                value={filterPurpose}
-                onChange={e => setFilterPurpose(e.target.value)}
-                className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227]/60 transition-all"
-              >
-                <option value="all">All Purposes</option>
-                {Object.keys(PURPOSE_COLORS).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <Select value={filterPurpose} onValueChange={setFilterPurpose}>
+                <SelectTrigger className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:ring-2 focus:ring-[#c9a227]/30">
+                  <SelectValue placeholder="All Purposes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Purposes</SelectItem>
+                  {Object.keys(PURPOSE_COLORS).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-[10px] font-black uppercase tracking-widest text-[#4a6741] mb-2 block">College Filter</Label>
-              <select
-                value={filterCollege}
-                onChange={e => setFilterCollege(e.target.value)}
-                className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:outline-none focus:ring-2 focus:ring-[#c9a227]/30 focus:border-[#c9a227]/60 transition-all"
-              >
-                <option value="all">All Colleges</option>
-                {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <Select value={filterCollege} onValueChange={setFilterCollege}>
+                <SelectTrigger className="w-full h-11 bg-[#f4f8f5] border border-[#c8ddd0] rounded-xl px-4 text-xs font-bold text-[#1a3a2a] focus:ring-2 focus:ring-[#c9a227]/30">
+                  <SelectValue placeholder="All Colleges" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Colleges</SelectItem>
+                  {NEU_COLLEGES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
