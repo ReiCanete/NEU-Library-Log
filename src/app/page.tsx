@@ -213,8 +213,10 @@ function KioskEntryContent() {
         return;
       }
 
+      const normalizedEmail = user.email?.toLowerCase() ?? '';
+
       const blockSnap = await getDocs(
-        query(collection(db, 'blocklist'), where('studentId', '==', user.email))
+        query(collection(db, 'blocklist'), where('studentId', '==', normalizedEmail))
       );
       if (!blockSnap.empty) {
         await signOut(auth);
@@ -223,40 +225,44 @@ function KioskEntryContent() {
       }
 
       const userSnap = await getDocs(
-        query(collection(db, 'users'), where('email', '==', user.email))
+        query(collection(db, 'users'), where('email', '==', normalizedEmail))
       );
 
       if (userSnap.empty) {
         sessionStorage.setItem('kiosk_google_user', JSON.stringify({
-          email: user.email,
+          email: normalizedEmail,
           fullName: user.displayName || '',
           loginMethod: 'google',
           isFirstTime: true
         }));
-        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.displayName || '')}`;
+        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(normalizedEmail)}&name=${encodeURIComponent(user.displayName || '')}`;
         return;
       }
 
       const userData = userSnap.docs[0].data();
 
-      if (!userData.studentId || !userData.college) {
+      const hasStudentId = userData.studentId && userData.studentId.trim() !== '';
+      const hasCollege = userData.college && userData.college.trim() !== '';
+      const hasName = userData.fullName && userData.fullName.trim() !== '';
+
+      if (!hasStudentId || !hasCollege || !hasName) {
         sessionStorage.setItem('kiosk_google_user', JSON.stringify({
-          email: user.email,
+          email: normalizedEmail,
           fullName: userData.fullName || user.displayName || '',
           loginMethod: 'google',
           isFirstTime: false
         }));
-        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(userData.fullName || user.displayName || '')}`;
+        window.location.href = `/kiosk/register?method=google&email=${encodeURIComponent(normalizedEmail)}&name=${encodeURIComponent(userData.fullName || user.displayName || '')}`;
         return;
       }
 
       if (userData.role === 'admin') {
         sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-          studentId: userData.studentId || user.email,
+          studentId: userData.studentId || normalizedEmail,
           fullName: userData.fullName || user.displayName || '',
           college: userData.college || '',
           program: userData.program || '',
-          email: user.email,
+          email: normalizedEmail,
           loginMethod: 'google',
           role: 'admin'
         }));
@@ -265,11 +271,11 @@ function KioskEntryContent() {
       }
 
       sessionStorage.setItem('kiosk_visitor', JSON.stringify({
-        studentId: userData.studentId || user.email,
+        studentId: userData.studentId || normalizedEmail,
         fullName: userData.fullName || user.displayName || '',
         college: userData.college || '',
         program: userData.program || '',
-        email: user.email,
+        email: normalizedEmail,
         loginMethod: 'google'
       }));
       window.location.href = '/kiosk/purpose';
